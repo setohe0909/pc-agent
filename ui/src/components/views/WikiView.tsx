@@ -1,5 +1,5 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity } from "lucide-react";
+import { Activity, Globe, LayoutGrid } from "lucide-react";
 
 export function WikiView() {
   return (
@@ -61,13 +61,56 @@ export function WikiView() {
             <p className="text-xs text-muted-foreground">Inicia una investigación profunda sobre mercados o tendencias burstátiles. Útil para identificar oportunidades en Kalshi.</p>
           </div>
 
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <code className="bg-blue-500/20 text-blue-400 px-2 py-1 rounded font-bold">!approve_trade [id]</code>
-              <span className="text-sm font-medium">Ejecución de Trading</span>
+          <section className="space-y-4">
+            <h3 className="text-xl font-semibold text-primary">Diccionario de Comandos (Discord)</h3>
+            <div className="grid gap-4 md:grid-cols-2">
+              <Card className="bg-muted/30">
+                <CardHeader>
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Activity className="h-4 w-4" /> Sistemas
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-xs space-y-2">
+                  <p><strong>!status</strong></p>
+                  <p className="text-muted-foreground">Muestra el estado de salud de todos los microservicios (Ollama, API, Runtime, DB).</p>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-muted/30">
+                <CardHeader>
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Globe className="h-4 w-4" /> Inteligencia
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-xs space-y-2">
+                  <p><strong>!ask [pregunta]</strong></p>
+                  <p className="text-muted-foreground">Consulta rápida al asistente usando el contexto actual.</p>
+                  <p><strong>!research [tema]</strong></p>
+                  <p className="text-muted-foreground">Búsqueda profunda en fuentes externas y memoria vectorial (RAG).</p>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-muted/30 border-primary/20">
+                <CardHeader>
+                  <CardTitle className="text-sm flex items-center gap-2 text-primary">
+                    <LayoutGrid className="h-4 w-4" /> Trading Pro (Dual Agent)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-xs space-y-2">
+                  <p><strong>!approve_trade [instrucción]</strong></p>
+                  <p className="text-muted-foreground">Inicia el flujo de ejecución real en Kalshi.</p>
+                  <div className="bg-background/50 p-2 rounded mt-2 font-mono text-[10px]">
+                    Ej: !approve_trade Compra 5 contratos YES en el mercado de tasas de la FED
+                  </div>
+                  <ul className="list-disc pl-4 mt-2 text-muted-foreground">
+                    <li>Pasa por validación de balance.</li>
+                    <li>Requiere aprobación del Agente Crítico.</li>
+                    <li>Genera Embed visual en Discord.</li>
+                  </ul>
+                </CardContent>
+              </Card>
             </div>
-            <p className="text-xs text-muted-foreground">Autoriza una operación financiera. Solo funciona si el usuario está en la lista de Aprobadores y en el canal correcto.</p>
-          </div>
+          </section>
         </CardContent>
       </Card>
 
