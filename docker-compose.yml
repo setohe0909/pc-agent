@@ -13,6 +13,9 @@ services:
       - supabase-vector-db
     volumes:
       - ./services/control-api:/app
+      - runtime-config:/config
+    environment:
+      - RUNTIME_CONFIG_PATH=/config/runtime-config.json
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
   assistant-runtime:
@@ -25,6 +28,9 @@ services:
       - "8100:8100"
     volumes:
       - ./services/assistant-runtime:/app
+      - runtime-config:/config
+    environment:
+      - RUNTIME_CONFIG_PATH=/config/runtime-config.json
     command: python -m app.main
 
   discord-bot:
@@ -38,6 +44,9 @@ services:
       - assistant-runtime
     volumes:
       - ./services/discord-bot:/app
+      - runtime-config:/config
+    environment:
+      - RUNTIME_CONFIG_PATH=/config/runtime-config.json
     command: python -m app.main
 
   ingestion-worker:
@@ -51,6 +60,9 @@ services:
       - supabase-vector-db
     volumes:
       - ./services/ingestion-worker:/app
+      - runtime-config:/config
+    environment:
+      - RUNTIME_CONFIG_PATH=/config/runtime-config.json
     command: python -m app.main
 
   ollama:
@@ -188,3 +200,4 @@ volumes:
   langfuse-db-data:
   langfuse-clickhouse-data:
   langfuse-minio-data:
+  runtime-config:

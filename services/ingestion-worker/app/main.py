@@ -11,6 +11,9 @@ from app.settings import settings
 from app.supabase_store import KnowledgeDocument, SupabaseKnowledgeStore
 
 
+from langfuse.decorators import observe
+
+@observe(name="ingest_enabled_sources")
 async def ingest_enabled_sources() -> int:
     store = SupabaseKnowledgeStore(
         url=settings.supabase_url,

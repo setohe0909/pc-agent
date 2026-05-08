@@ -1,32 +1,50 @@
 import asyncio
 import os
-
+import json
+from pathlib import Path
 import httpx
 
 
-def _approvers() -> set[str]:
-    return {value.strip() for value in os.getenv("DISCORD_APPROVER_USER_IDS", "").split(",") if value.strip()}
-
-
-def _is_requests_channel(channel_id: int) -> bool:
-    expected = os.getenv("DISCORD_REQUESTS_CHANNEL_ID")
-    return bool(expected) and str(channel_id) == expected
-
-
 async def _send_assistant_request(payload: dict) -> dict:
-    base_url = os.getenv("OPEN_CLAW_BASE_URL", "http://assistant-runtime:8100").rstrip("/")
+    base_url = _get_env("OPEN_CLAW_BASE_URL", "http://assistant-runtime:8100").rstrip("/")
     async with httpx.AsyncClient(timeout=15) as client:
         response = await client.post(f"{base_url}/assistant/request", json=payload)
     response.raise_for_status()
     return response.json()
 
 
+def _get_env(key: str, default: str | None = None) -> str | None:
+    # 1. Check environment
+    val = os.getenv(key)
+    if val:
+        return val
+    # 2. Check shared runtime config
+    config_path = os.getenv("RUNTIME_CONFIG_PATH", "/config/runtime-config.json")
+    try:
+        if Path(config_path).exists():
+            config = json.loads(Path(config_path).read_text(encoding="utf-8"))
+            return config.get(key.lower()) or default
+    except Exception:
+        pass
+    return default
+
+
+def _is_requests_channel(channel_id: int) -> bool:
+    expected = _get_env("DISCORD_REQUESTS_CHANNEL_ID")
+    return bool(expected) and str(channel_id) == expected
+
+
+def _approvers() -> set[str]:
+    return {value.strip() for value in _get_env("DISCORD_APPROVER_USER_IDS", "").split(",") if value.strip()}
+
+
 async def main() -> None:
-    token = os.getenv("DISCORD_BOT_TOKEN")
-    if not token:
-        print("Discord bot en espera: falta DISCORD_BOT_TOKEN")
-        while True:
-            await asyncio.sleep(3600)
+    token = None
+    while not token:
+        token = _get_env("DISCORD_BOT_TOKEN")
+        if not token:
+            print("Discord bot en espera: falta DISCORD_BOT_TOKEN en env o /config/runtime-config.json")
+            await asyncio.sleep(10)
 
     import discord
 

@@ -1,5 +1,5 @@
 import httpx
-
+from langfuse.decorators import observe
 
 class OllamaEmbedder:
     def __init__(self, base_url: str, model: str, dimensions: int) -> None:
@@ -7,7 +7,13 @@ class OllamaEmbedder:
         self.model = model
         self.dimensions = dimensions
 
+    @observe(as_type="generation", name="ollama_embed")
     async def embed(self, text: str) -> list[float]:
+        from langfuse.decorators import langfuse_context
+        langfuse_context.update_current_observation(
+            model=self.model,
+            input=text
+        )
         async with httpx.AsyncClient(timeout=60) as client:
             response = await client.post(
                 f"{self.base_url}/api/embed",

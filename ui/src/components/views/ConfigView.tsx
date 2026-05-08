@@ -20,7 +20,10 @@ export function ConfigView({ data, onSave }: { data: any, adminToken: string, on
     if (payload.mentis_enabled === "false") payload.mentis_enabled = false;
     if (payload.langfuse_enabled === "true") payload.langfuse_enabled = true;
     if (payload.langfuse_enabled === "false") payload.langfuse_enabled = false;
-
+    
+    // API Keys mapping
+    if (payload.openai_api_key) payload.openai_api_key = payload.openai_api_key;
+    if (payload.gemini_api_key) payload.gemini_api_key = payload.gemini_api_key;
     // Remove empty strings so we don't override with empties if backend expects omission
     Object.keys(payload).forEach(key => {
       if (payload[key] === "") delete payload[key];
@@ -72,10 +75,26 @@ export function ConfigView({ data, onSave }: { data: any, adminToken: string, on
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-2">
+              <Label>Langfuse Public Key</Label>
+              <Input name="langfuse_public_key" type="password" placeholder="pk-..." autoComplete="off" />
+            </div>
+            <div className="space-y-2">
+              <Label>Langfuse Secret Key</Label>
+              <Input name="langfuse_secret_key" type="password" placeholder="sk-..." autoComplete="off" />
+            </div>
 
             <div className="space-y-2">
               <Label>Ollama URL</Label>
               <Input name="ollama_base_url" defaultValue={integrations.ollama} placeholder="http://localhost:11434" />
+            </div>
+            <div className="space-y-2">
+              <Label>OpenAI API Key</Label>
+              <Input name="openai_api_key" type="password" placeholder="sk-..." autoComplete="off" />
+            </div>
+            <div className="space-y-2">
+              <Label>Gemini API Key</Label>
+              <Input name="gemini_api_key" type="password" placeholder="AIza..." autoComplete="off" />
             </div>
 
             <div className="space-y-2 lg:col-span-3">
