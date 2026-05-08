@@ -1,3 +1,4 @@
+import os
 from fastapi import APIRouter, Depends, HTTPException, status
 from apscheduler.triggers.cron import CronTrigger
 from pydantic import BaseModel, Field, field_validator
@@ -106,6 +107,10 @@ async def config() -> dict:
                 "has_service_role_key": bool(runtime.get("supabase_service_role_key") or settings.supabase_service_role_key),
             },
             "ollama": settings.effective("ollama_base_url"),
+            "openai_api_key_configured": bool(runtime.get("openai_api_key") or os.getenv("OPENAI_API_KEY")),
+            "gemini_api_key_configured": bool(runtime.get("gemini_api_key") or os.getenv("GEMINI_API_KEY")),
+            "langfuse_public_key_configured": bool(runtime.get("langfuse_public_key") or settings.langfuse_public_key),
+            "langfuse_secret_key_configured": bool(runtime.get("langfuse_secret_key") or settings.langfuse_secret_key),
         },
     }
 

@@ -76,11 +76,21 @@ export function ConfigView({ data, onSave }: { data: any, adminToken: string, on
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Langfuse Public Key</Label>
+              <div className="flex justify-between items-center">
+                <Label>Langfuse Public Key</Label>
+                <span className={`text-[10px] font-bold ${integrations.langfuse_public_key_configured ? "text-green-500" : "text-yellow-500"}`}>
+                  {integrations.langfuse_public_key_configured ? "✓ CONFIGURADO" : "⚠ PENDIENTE"}
+                </span>
+              </div>
               <Input name="langfuse_public_key" type="password" placeholder="pk-..." autoComplete="off" />
             </div>
             <div className="space-y-2">
-              <Label>Langfuse Secret Key</Label>
+              <div className="flex justify-between items-center">
+                <Label>Langfuse Secret Key</Label>
+                <span className={`text-[10px] font-bold ${integrations.langfuse_secret_key_configured ? "text-green-500" : "text-yellow-500"}`}>
+                  {integrations.langfuse_secret_key_configured ? "✓ CONFIGURADO" : "⚠ PENDIENTE"}
+                </span>
+              </div>
               <Input name="langfuse_secret_key" type="password" placeholder="sk-..." autoComplete="off" />
             </div>
 
@@ -89,11 +99,21 @@ export function ConfigView({ data, onSave }: { data: any, adminToken: string, on
               <Input name="ollama_base_url" defaultValue={integrations.ollama} placeholder="http://localhost:11434" />
             </div>
             <div className="space-y-2">
-              <Label>OpenAI API Key</Label>
+              <div className="flex justify-between items-center">
+                <Label>OpenAI API Key</Label>
+                <span className={`text-[10px] font-bold ${integrations.openai_api_key_configured ? "text-green-500" : "text-yellow-500"}`}>
+                  {integrations.openai_api_key_configured ? "✓ CONFIGURADO" : "⚠ PENDIENTE"}
+                </span>
+              </div>
               <Input name="openai_api_key" type="password" placeholder="sk-..." autoComplete="off" />
             </div>
             <div className="space-y-2">
-              <Label>Gemini API Key</Label>
+              <div className="flex justify-between items-center">
+                <Label>Gemini API Key</Label>
+                <span className={`text-[10px] font-bold ${integrations.gemini_api_key_configured ? "text-green-500" : "text-yellow-500"}`}>
+                  {integrations.gemini_api_key_configured ? "✓ CONFIGURADO" : "⚠ PENDIENTE"}
+                </span>
+              </div>
               <Input name="gemini_api_key" type="password" placeholder="AIza..." autoComplete="off" />
             </div>
 
