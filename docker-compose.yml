@@ -61,12 +61,16 @@ services:
     volumes:
       - ollama-data:/root/.ollama
 
+  mentisdb:
+    image: traefik/whoami
+    ports:
+      - "9471:80"
+
   ui:
-    image: nginx:1.27-alpine
+    build:
+      context: ./ui
     ports:
       - "${UI_PORT:-8080}:80"
-    volumes:
-      - ./ui:/usr/share/nginx/html:ro
     depends_on:
       - control-api
 
