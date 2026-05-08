@@ -1,4 +1,5 @@
-import { Activity, Database, Globe, Key, LayoutGrid, Save, Server } from "lucide-react";
+import type { FormEvent } from "react";
+import { Activity, Brain, Database, Globe, LayoutGrid, Save, Server } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";

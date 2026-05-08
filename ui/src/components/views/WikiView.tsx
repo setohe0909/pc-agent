@@ -1,5 +1,5 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, BookOpen, Brain, Database, ShieldCheck, TerminalSquare } from "lucide-react";
+import { Activity } from "lucide-react";
 
 export function WikiView() {
   return (
