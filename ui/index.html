@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PC Agent Control</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <h1>PC Agent</h1>
+        <p>Control operativo para Kalshi, memoria, Discord y conocimiento.</p>
+      </div>
+      <button id="refresh">Actualizar</button>
+    </header>
+
+    <main class="layout">
+      <section>
+        <h2>Servidores</h2>
+        <div id="services" class="grid"></div>
+      </section>
+
+      <section>
+        <h2>Configuracion</h2>
+        <pre id="config" class="panel"></pre>
+      </section>
+
+      <section>
+        <h2>Editar configuracion</h2>
+        <form id="config-form" class="config-form">
+          <input name="admin_token" placeholder="Token admin" type="password" autocomplete="off" />
+          <input name="open_claw_base_url" placeholder="Assistant runtime URL" />
+          <input name="mentis_base_url" placeholder="MentisDB URL" />
+          <input name="langfuse_host" placeholder="Langfuse URL" />
+          <input name="ollama_base_url" placeholder="Ollama URL" />
+          <input name="supabase_url" placeholder="Supabase URL" />
+          <input name="supabase_publishable_key" placeholder="Supabase publishable key" type="password" autocomplete="off" />
+          <input name="supabase_service_role_key" placeholder="Supabase service role key" type="password" autocomplete="off" />
+          <input name="embedding_model" placeholder="Embedding model" />
+          <input name="embedding_dimensions" placeholder="Embedding dimensions" type="number" min="1" max="8192" />
+          <input name="discord_requests_channel_id" placeholder="Discord requests channel" />
+          <input name="discord_notifications_channel_id" placeholder="Discord notifications channel" />
+          <input name="discord_status_channel_id" placeholder="Discord status channel" />
+          <button type="submit">Guardar</button>
+        </form>
+        <div id="config-status" class="panel">Sin cambios recientes</div>
+      </section>
+
+      <section>
+        <h2>Discord</h2>
+        <div id="discord" class="grid"></div>
+        <form id="discord-form" class="discord-form">
+          <input name="admin_token" placeholder="Token admin" type="password" autocomplete="off" />
+          <input name="discord_bot_token" placeholder="Discord bot token" type="password" autocomplete="off" />
+          <input name="discord_requests_channel_id" placeholder="Canal solicitudes" />
+          <input name="discord_notifications_channel_id" placeholder="Canal notificaciones" />
+          <input name="discord_status_channel_id" placeholder="Canal estado" />
+          <input name="discord_approver_user_ids" placeholder="Usuarios aprobadores, separados por coma" />
+          <button type="submit">Guardar Discord</button>
+        </form>
+        <div id="discord-status" class="panel">Sin cambios recientes</div>
+      </section>
+
+      <section>
+        <h2>Fuentes para embeddings</h2>
+        <form id="source-form" class="source-form">
+          <input name="admin_token" placeholder="Token admin" type="password" autocomplete="off" />
+          <input name="name" placeholder="Nombre de la fuente" required />
+          <select name="source_type">
+            <option value="kalshi_market">Kalshi market</option>
+            <option value="trend">Trend</option>
+            <option value="rss">RSS</option>
+            <option value="website">Website</option>
+            <option value="manual">Manual</option>
+          </select>
+          <input name="url" placeholder="URL opcional" />
+          <input name="schedule" placeholder="Cron opcional" />
+          <button type="submit">Agregar</button>
+        </form>
+        <div id="sources" class="grid"></div>
+      </section>
+
+      <section>
+        <h2>Supabase PGVector</h2>
+        <div id="supabase" class="panel">Verificando...</div>
+      </section>
+
+      <section>
+        <h2>Mentis</h2>
+        <div id="mentis" class="panel">Verificando...</div>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,186 @@
+name: pc-agent
+
+services:
+  control-api:
+    build:
+      context: ./services/control-api
+    env_file:
+      - path: .env
+        required: false
+    ports:
+      - "${CONTROL_API_PORT:-8000}:8000"
+    depends_on:
+      - supabase-vector-db
+    volumes:
+      - ./services/control-api:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  assistant-runtime:
+    build:
+      context: ./services/assistant-runtime
+    env_file:
+      - path: .env
+        required: false
+    ports:
+      - "8100:8100"
+    volumes:
+      - ./services/assistant-runtime:/app
+    command: python -m app.main
+
+  discord-bot:
+    build:
+      context: ./services/discord-bot
+    env_file:
+      - path: .env
+        required: false
+    depends_on:
+      - control-api
+      - assistant-runtime
+    volumes:
+      - ./services/discord-bot:/app
+    command: python -m app.main
+
+  ingestion-worker:
+    build:
+      context: ./services/ingestion-worker
+    env_file:
+      - path: .env
+        required: false
+    depends_on:
+      - control-api
+      - supabase-vector-db
+    volumes:
+      - ./services/ingestion-worker:/app
+    command: python -m app.main
+
+  ollama:
+    image: ollama/ollama:0.6.8
+    profiles: ["embeddings"]
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+
+  ui:
+    image: nginx:1.27-alpine
+    ports:
+      - "${UI_PORT:-8080}:80"
+    volumes:
+      - ./ui:/usr/share/nginx/html:ro
+    depends_on:
+      - control-api
+
+  supabase-vector-db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "54322:5432"
+    volumes:
+      - supabase-vector-data:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+
+  langfuse-web:
+    image: langfuse/langfuse:3
+    profiles: ["observability"]
+    depends_on:
+      - langfuse-db
+      - langfuse-clickhouse
+      - langfuse-redis
+      - langfuse-minio
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@langfuse-db:5432/postgres
+      CLICKHOUSE_URL: http://langfuse-clickhouse:8123
+      CLICKHOUSE_MIGRATION_URL: clickhouse://langfuse-clickhouse:9000
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ""
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_CLUSTER_ENABLED: "false"
+      REDIS_CONNECTION_STRING: redis://langfuse-redis:6379
+      LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://langfuse-minio:9000
+      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: minio
+      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: miniosecret
+      LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
+      LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+      SALT: ${LANGFUSE_SALT:-change-me}
+      ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:-0000000000000000000000000000000000000000000000000000000000000000}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-change-me}
+      NEXTAUTH_URL: http://localhost:3000
+    ports:
+      - "3000:3000"
+
+  langfuse-worker:
+    image: langfuse/langfuse-worker:3
+    profiles: ["observability"]
+    depends_on:
+      - langfuse-db
+      - langfuse-clickhouse
+      - langfuse-redis
+      - langfuse-minio
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@langfuse-db:5432/postgres
+      CLICKHOUSE_URL: http://langfuse-clickhouse:8123
+      CLICKHOUSE_MIGRATION_URL: clickhouse://langfuse-clickhouse:9000
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ""
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_CLUSTER_ENABLED: "false"
+      REDIS_CONNECTION_STRING: redis://langfuse-redis:6379
+      LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://langfuse-minio:9000
+      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: minio
+      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: miniosecret
+      LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
+      LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+      SALT: ${LANGFUSE_SALT:-change-me}
+      ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:-0000000000000000000000000000000000000000000000000000000000000000}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-change-me}
+      NEXTAUTH_URL: http://localhost:3000
+
+  langfuse-db:
+    image: postgres:16-alpine
+    profiles: ["observability"]
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_DB: postgres
+    volumes:
+      - langfuse-db-data:/var/lib/postgresql/data
+
+  langfuse-clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    profiles: ["observability"]
+    volumes:
+      - langfuse-clickhouse-data:/var/lib/clickhouse
+
+  langfuse-redis:
+    image: valkey/valkey:8-alpine
+    profiles: ["observability"]
+
+  langfuse-minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    profiles: ["observability"]
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: miniosecret
+    command: server /data --console-address ":9001"
+    volumes:
+      - langfuse-minio-data:/data
+    ports:
+      - "9001:9001"
+
+volumes:
+  supabase-vector-data:
+  ollama-data:
+  langfuse-db-data:
+  langfuse-clickhouse-data:
+  langfuse-minio-data:
