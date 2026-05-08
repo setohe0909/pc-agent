@@ -9,7 +9,9 @@ class Settings(BaseSettings):
     cors_allow_origins: str = "http://localhost:8080,http://127.0.0.1:8080"
     open_claw_base_url: str = "http://assistant-runtime:8100"
     mentis_base_url: str = "http://mentisdb:9471"
+    mentis_enabled: bool = False
     langfuse_host: str = "http://langfuse-web:3000"
+    langfuse_enabled: bool = False
     next_public_supabase_url: str = "https://gerhikdxsbglfdsupmsi.supabase.co"
     next_public_supabase_publishable_key: str = "sb_publishable_sV7xhYAjW0gg-2MXGk0MHg_jQ4l9GN9"
     supabase_url: str = "https://gerhikdxsbglfdsupmsi.supabase.co"

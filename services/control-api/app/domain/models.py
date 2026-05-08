@@ -60,3 +60,20 @@ class SupabaseVerification:
     has_publishable_key: bool
     has_service_role_key: bool
     detail: str
+
+
+@dataclass(frozen=True)
+class IngestionSchedule:
+    market_ingestion_cron: str
+    trends_ingestion_cron: str
+    mentis_sync_cron: str
+
+
+@dataclass(frozen=True)
+class IngestionRun:
+    id: str
+    target: str
+    status: str
+    detail: str
+    started_at: datetime
+    finished_at: datetime | None = None

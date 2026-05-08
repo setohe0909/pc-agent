@@ -13,14 +13,23 @@ class HttpSystemProbe(SystemProbe):
         checks = [
             ("control-api", "self"),
             ("assistant-runtime", f"{self.settings.effective('open_claw_base_url')}/health"),
-            ("mentis", f"{self.settings.effective('mentis_base_url')}/health"),
-            ("langfuse", f"{self.settings.effective('langfuse_host')}/api/public/health"),
         ]
+        if self.settings.effective("mentis_enabled"):
+            checks.append(("mentis", f"{self.settings.effective('mentis_base_url')}/health"))
+        else:
+            checks.append(("mentis", "disabled"))
+        if self.settings.effective("langfuse_enabled"):
+            checks.append(("langfuse", f"{self.settings.effective('langfuse_host')}/api/public/health"))
+        else:
+            checks.append(("langfuse", "disabled"))
         results: list[ServiceStatus] = []
         async with httpx.AsyncClient(timeout=3) as client:
             for name, url in checks:
                 if url == "self":
                     results.append(ServiceStatus(name=name, state=ServiceState.healthy, detail="API activa"))
+                    continue
+                if url == "disabled":
+                    results.append(ServiceStatus(name=name, state=ServiceState.unknown, detail="Integracion opcional desactivada"))
                     continue
                 try:
                     response = await client.get(url)

@@ -1,7 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from apscheduler.triggers.cron import CronTrigger
 from pydantic import BaseModel, Field, field_validator
 
 from app.api.auth import require_admin
+from app.adapters.config.ingestion_control import JsonIngestionControl
 from app.adapters.config.in_memory import InMemoryKnowledgeSourceRepository
 from app.adapters.config.probes import HttpSystemProbe
 from app.adapters.config.runtime_config import RuntimeConfigStore, RuntimeConfigUpdate
@@ -10,16 +12,21 @@ from app.adapters.mentis.client import MentisHttpMemory
 from app.adapters.supabase.client import SupabaseVectorKnowledgeBase
 from app.application.use_cases import (
     CheckSystemStatus,
+    GetIngestionSchedule,
+    ListIngestionRuns,
     ListKnowledgeSources,
     RegisterKnowledgeSource,
+    TriggerIngestionRun,
+    UpdateIngestionSchedule,
     VerifyMentisHealth,
     VerifySupabaseVectorStore,
 )
-from app.domain.models import DiscordConfig, KnowledgeSource, SourceType
+from app.domain.models import DiscordConfig, IngestionSchedule, KnowledgeSource, SourceType
 
 router = APIRouter()
 source_repository = InMemoryKnowledgeSourceRepository()
 runtime_config_store = RuntimeConfigStore()
+ingestion_control = JsonIngestionControl()
 
 
 class KnowledgeSourceRequest(BaseModel):
@@ -37,6 +44,25 @@ class KnowledgeSourceRequest(BaseModel):
         if not value.startswith(("https://", "http://")):
             raise ValueError("La URL debe iniciar con http:// o https://")
         return value
+
+
+class IngestionScheduleRequest(BaseModel):
+    market_ingestion_cron: str = Field(max_length=120)
+    trends_ingestion_cron: str = Field(max_length=120)
+    mentis_sync_cron: str = Field(max_length=120)
+
+    @field_validator("market_ingestion_cron", "trends_ingestion_cron", "mentis_sync_cron")
+    @classmethod
+    def validate_cron(cls, value: str) -> str:
+        try:
+            CronTrigger.from_crontab(value)
+        except ValueError as exc:
+            raise ValueError("Cron invalido. Usa formato de 5 campos, por ejemplo: 0 */2 * * *") from exc
+        return value
+
+
+class TriggerIngestionRequest(BaseModel):
+    target: str = Field(pattern="^(markets|trends|mentis|all)$")
 
 
 @router.get("/health")
@@ -68,7 +94,9 @@ async def config() -> dict:
         "integrations": {
             "open_claw": settings.effective("open_claw_base_url"),
             "mentis": settings.effective("mentis_base_url"),
+            "mentis_enabled": settings.effective("mentis_enabled"),
             "langfuse": settings.effective("langfuse_host"),
+            "langfuse_enabled": settings.effective("langfuse_enabled"),
             "supabase": {
                 "url": settings.effective("supabase_url"),
                 "embedding_provider": settings.effective("embedding_provider"),
@@ -112,8 +140,18 @@ async def add_knowledge_source(request: KnowledgeSourceRequest) -> dict:
 
 @router.get("/mentis/verify")
 async def verify_mentis() -> dict:
+    if not settings.effective("mentis_enabled"):
+        return {
+            "mentis": {
+                "reachable": False,
+                "can_read": False,
+                "can_write": False,
+                "detail": "MentisDB opcional desactivado. Activalo en Configuracion cuando el servicio este corriendo.",
+                "enabled": False,
+            }
+        }
     use_case = VerifyMentisHealth(MentisHttpMemory(settings.effective("mentis_base_url")))
-    return {"mentis": await use_case.execute()}
+    return {"mentis": await use_case.execute(), "enabled": True}
 
 
 @router.get("/supabase/verify")
@@ -121,6 +159,26 @@ async def verify_supabase() -> dict:
     knowledge_base = _supabase_knowledge_base()
     use_case = VerifySupabaseVectorStore(knowledge_base)
     return {"supabase": await use_case.execute()}
+
+
+@router.get("/ingestion")
+async def ingestion_status() -> dict:
+    schedule = await GetIngestionSchedule(ingestion_control).execute()
+    runs = await ListIngestionRuns(ingestion_control).execute()
+    return {"schedule": schedule, "runs": runs}
+
+
+@router.put("/ingestion/schedule", dependencies=[Depends(require_admin)])
+async def update_ingestion_schedule(request: IngestionScheduleRequest) -> dict:
+    schedule = IngestionSchedule(**request.model_dump())
+    updated = await UpdateIngestionSchedule(ingestion_control).execute(schedule)
+    return {"schedule": updated}
+
+
+@router.post("/ingestion/runs", dependencies=[Depends(require_admin)])
+async def trigger_ingestion_run(request: TriggerIngestionRequest) -> dict:
+    run = await TriggerIngestionRun(ingestion_control).execute(request.target)
+    return {"run": run}
 
 
 def _supabase_knowledge_base() -> SupabaseVectorKnowledgeBase:

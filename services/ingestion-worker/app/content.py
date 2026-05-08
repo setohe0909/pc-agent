@@ -58,7 +58,7 @@ async def fetch_validated_url(url: str, max_redirects: int = 3) -> httpx.Respons
     async with httpx.AsyncClient(timeout=20, follow_redirects=False) as client:
         for _ in range(max_redirects + 1):
             validate_fetch_url(current_url)
-            response = await client.get(current_url, headers={"User-Agent": "pc-agent-ingestion/0.1"})
+            response = await client.get(current_url, headers={"User-Agent": "pc-agent-ingestion/0.2.0"})
             if response.status_code not in {301, 302, 303, 307, 308}:
                 return response
             location = response.headers.get("location")

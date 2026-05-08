@@ -9,3 +9,5 @@ build/
 supabase/**/.temp/
 runtime-config.json
 services/control-api/runtime-config.json
+ingestion-control.json
+services/control-api/ingestion-control.json

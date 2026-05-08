@@ -10,7 +10,9 @@ CONFIG_PATH = Path(os.getenv("RUNTIME_CONFIG_PATH", "runtime-config.json"))
 PUBLIC_KEYS = {
     "open_claw_base_url",
     "mentis_base_url",
+    "mentis_enabled",
     "langfuse_host",
+    "langfuse_enabled",
     "supabase_url",
     "embedding_provider",
     "embedding_model",
@@ -39,7 +41,9 @@ SECRET_KEYS = {
 class RuntimeConfigUpdate(BaseModel):
     open_claw_base_url: str | None = Field(default=None, max_length=2048)
     mentis_base_url: str | None = Field(default=None, max_length=2048)
+    mentis_enabled: bool | None = None
     langfuse_host: str | None = Field(default=None, max_length=2048)
+    langfuse_enabled: bool | None = None
     supabase_url: str | None = Field(default=None, max_length=2048)
     supabase_publishable_key: str | None = Field(default=None, max_length=4096)
     supabase_service_role_key: str | None = Field(default=None, max_length=4096)

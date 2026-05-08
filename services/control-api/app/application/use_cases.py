@@ -1,5 +1,18 @@
-from app.domain.models import KnowledgeSource, MentisVerification, ServiceStatus, SupabaseVerification
-from app.ports.gateways import KnowledgeSourceRepository, MentisMemory, SystemProbe, VectorKnowledgeBase
+from app.domain.models import (
+    IngestionRun,
+    IngestionSchedule,
+    KnowledgeSource,
+    MentisVerification,
+    ServiceStatus,
+    SupabaseVerification,
+)
+from app.ports.gateways import (
+    IngestionControl,
+    KnowledgeSourceRepository,
+    MentisMemory,
+    SystemProbe,
+    VectorKnowledgeBase,
+)
 
 
 class CheckSystemStatus:
@@ -40,3 +53,35 @@ class VerifySupabaseVectorStore:
 
     async def execute(self) -> SupabaseVerification:
         return await self.knowledge_base.verify()
+
+
+class GetIngestionSchedule:
+    def __init__(self, control: IngestionControl) -> None:
+        self.control = control
+
+    async def execute(self) -> IngestionSchedule:
+        return await self.control.get_schedule()
+
+
+class UpdateIngestionSchedule:
+    def __init__(self, control: IngestionControl) -> None:
+        self.control = control
+
+    async def execute(self, schedule: IngestionSchedule) -> IngestionSchedule:
+        return await self.control.update_schedule(schedule)
+
+
+class ListIngestionRuns:
+    def __init__(self, control: IngestionControl) -> None:
+        self.control = control
+
+    async def execute(self) -> list[IngestionRun]:
+        return await self.control.list_runs()
+
+
+class TriggerIngestionRun:
+    def __init__(self, control: IngestionControl) -> None:
+        self.control = control
+
+    async def execute(self, target: str) -> IngestionRun:
+        return await self.control.trigger_run(target)

@@ -1,6 +1,13 @@
 from typing import Protocol
 
-from app.domain.models import KnowledgeSource, MentisVerification, ServiceStatus, SupabaseVerification
+from app.domain.models import (
+    IngestionRun,
+    IngestionSchedule,
+    KnowledgeSource,
+    MentisVerification,
+    ServiceStatus,
+    SupabaseVerification,
+)
 
 
 class SystemProbe(Protocol):
@@ -28,4 +35,18 @@ class ConversationTracer(Protocol):
 
 class VectorKnowledgeBase(Protocol):
     async def verify(self) -> SupabaseVerification:
+        ...
+
+
+class IngestionControl(Protocol):
+    async def get_schedule(self) -> IngestionSchedule:
+        ...
+
+    async def update_schedule(self, schedule: IngestionSchedule) -> IngestionSchedule:
+        ...
+
+    async def list_runs(self) -> list[IngestionRun]:
+        ...
+
+    async def trigger_run(self, target: str) -> IngestionRun:
         ...

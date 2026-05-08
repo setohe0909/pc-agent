@@ -1,34 +1,56 @@
 # PC Agent
 
-Asistente modular para investigar mercados de Kalshi, operar bajo reglas controladas,
-mantener memoria en Mentis, observar conversaciones con Langfuse y exponer una UI de
-control.
+Version: `0.2.0`
+
+PC Agent es una plataforma modular para investigar mercados de Kalshi, acumular
+conocimiento en Supabase/pgvector, usar memoria operativa en MentisDB, observar
+conversaciones con Langfuse y canalizar decisiones por Discord antes de cualquier
+operacion.
+
+## Que Incluye
+
+- UI de control en `http://localhost:8080`.
+- API de control para estado, configuracion runtime, Supabase y MentisDB.
+- Runtime del asistente con compuerta de seguridad para decisiones por Discord.
+- Bot de Discord con comandos iniciales.
+- Worker de ingestion que lee fuentes, genera embeddings con Ollama y guarda en Supabase.
+- Migraciones Supabase para `knowledge_sources`, `knowledge_documents`, pgvector y busqueda semantica.
+- Docker Compose con perfiles opcionales para Ollama y Langfuse.
 
 ## Servicios
 
-- `control-api`: API principal y panel de control. Mantiene la configuracion,
-  salud de servicios, fuentes de embeddings y verificaciones de Mentis.
-- `assistant-runtime`: runtime donde vive el asistente Open-Claw y el router de
-  modelos Gemini, MiniMax y GPT.
-- `discord-bot`: puente con Discord para solicitudes, notificaciones operativas y
-  estado del asistente.
-- `ingestion-worker`: crons de recoleccion de mercados, tendencias y fuentes
-  externas para Supabase/pgvector.
-- `ui`: interfaz web para estado, configuracion, Discord, fuentes de datos y Mentis.
-- `langfuse-*`: observabilidad self-hosted para trazas de conversaciones.
-- `supabase-vector-db`: base Postgres con pgvector para desarrollo local.
-- `ollama`: runtime local opcional para embeddings gratis con `mxbai-embed-large`.
+- `control-api`: API principal, health checks, configuracion runtime y fuentes de conocimiento.
+- `assistant-runtime`: runtime del asistente y compuerta para decisiones de trading.
+- `discord-bot`: puente con Discord para solicitudes, investigacion y aprobaciones.
+- `ingestion-worker`: crons de recoleccion y embeddings hacia Supabase.
+- `ui`: consola web estatica estilo shadcn.
+- `supabase-vector-db`: Postgres + pgvector local para desarrollo.
+- `ollama`: runtime local opcional para embeddings.
+- `langfuse-*`: observabilidad self-hosted bajo perfil `observability`.
 
-## Inicio rapido
+## Inicio Rapido
 
-1. Copia `.env.example` a `.env` y completa las credenciales.
-2. En Supabase, ejecuta la migracion de pgvector:
+1. Copia variables de entorno:
 
-```text
-infra/supabase/migrations/001_vector_knowledge.sql
+```bash
+cp .env.example .env
 ```
 
-3. Levanta la plataforma:
+2. Configura al menos:
+
+```text
+ADMIN_API_TOKEN=
+SUPABASE_URL=
+SUPABASE_PUBLISHABLE_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+DISCORD_BOT_TOKEN=
+DISCORD_REQUESTS_CHANNEL_ID=
+DISCORD_NOTIFICATIONS_CHANNEL_ID=
+DISCORD_STATUS_CHANNEL_ID=
+DISCORD_APPROVER_USER_IDS=
+```
+
+3. Levanta servicios base:
 
 ```bash
 docker compose up --build
@@ -40,66 +62,72 @@ docker compose up --build
 http://localhost:8080
 ```
 
-5. API de control:
+5. Usa el token admin en la barra lateral para guardar configuracion desde la UI.
 
-```text
-http://localhost:8000/health
+## Perfiles Docker
+
+Embeddings con Ollama:
+
+```bash
+docker compose --profile embeddings up --build
+docker compose exec ollama ollama pull mxbai-embed-large
 ```
 
-## Arquitectura
+Observabilidad con Langfuse:
 
-La arquitectura sigue un enfoque hexagonal/Clean Architecture:
+```bash
+docker compose --profile observability up --build
+```
 
-- El dominio no conoce Docker, HTTP, Discord, Kalshi, Supabase, Langfuse ni SDKs LLM.
-- Los casos de uso coordinan decisiones del asistente.
-- Los puertos definen capacidades como `KalshiGateway`, `MemoryStore`,
-  `EmbeddingKnowledgeBase`, `ConversationTracer` y `NotificationSender`.
-- Los adaptadores traducen SDKs externos hacia esos puertos.
+Todo junto:
 
-Ver [docs/architecture.md](docs/architecture.md).
+```bash
+docker compose --profile embeddings --profile observability up --build
+```
+
+## UI
+
+La consola incluye estas secciones:
+
+- `Resumen`: salud de servicios, Supabase y MentisDB.
+- `Discord`: token del bot, canales y usuarios aprobadores.
+- `Conocimiento`: alta de fuentes RSS/web/manuales.
+- `Configuracion`: URLs y claves runtime, sin exponer secretos.
+- `Wiki`: guia rapida de uso dentro del producto.
+
+La configuracion editable se guarda en `runtime-config.json`, excluido de git.
+Los secretos se pueden guardar, pero la API solo devuelve si existen o no.
 
 ## Supabase PGVector
 
-El proyecto esta configurado para usar:
+El proyecto usa Supabase como vector store publico para conocimiento. Tablas:
 
-```text
-NEXT_PUBLIC_SUPABASE_URL=https://gerhikdxsbglfdsupmsi.supabase.co
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_sV7xhYAjW0gg-2MXGk0MHg_jQ4l9GN9
+- `knowledge_sources`: fuentes habilitadas para ingestion.
+- `knowledge_documents`: documentos/chunks con embeddings.
+
+Funcion de busqueda:
+
+```sql
+public.match_knowledge_documents(query_embedding, match_count, filter)
 ```
 
-La publishable key sirve para consultas permitidas por RLS. Para que los workers
-inserten fuentes, documentos y embeddings hace falta una de estas opciones:
-
-- `SUPABASE_SERVICE_ROLE_KEY` para usar la API de Supabase desde backend.
-- `VECTOR_DATABASE_URL` de Postgres para escribir directamente desde workers.
-
-El endpoint `/supabase/verify` revisa si la API REST responde y si la tabla
-`knowledge_sources` ya existe.
-
-## Decisiones De Trading
-
-Toda decision de trading y toda apertura de posicion debe originarse en Discord.
-El runtime rechaza acciones `trade_decision` y `open_position` si no incluyen:
-
-- origen `platform=discord`;
-- canal `DISCORD_REQUESTS_CHANNEL_ID`;
-- aprobacion explicita;
-- usuario aprobador incluido en `DISCORD_APPROVER_USER_IDS`, cuando esa lista esta configurada.
-
-Comandos iniciales del bot:
+Migraciones principales:
 
 ```text
-!ask pregunta general
-!research solicitud de investigacion
-!approve_trade decision aprobada para evaluar
+supabase/migrations/20260508000100_vector_knowledge.sql
+supabase/migrations/20260508000200_ollama_mxbai_embeddings.sql
+supabase/migrations/20260508000300_knowledge_document_hash.sql
 ```
 
-La implementacion actual todavia no ejecuta ordenes reales de Kalshi; solo deja
-la compuerta de seguridad antes de conectar el adapter de trading.
+Para aplicar migraciones:
+
+```bash
+npm_config_cache=/private/tmp/pc-agent-npm-cache npx --yes supabase@latest db push --linked --workdir . --yes
+```
 
 ## Embeddings
 
-El modelo por defecto es `mxbai-embed-large` via Ollama:
+Modelo por defecto:
 
 ```text
 EMBEDDING_PROVIDER=ollama
@@ -108,9 +136,73 @@ EMBEDDING_DIMENSIONS=1024
 OLLAMA_BASE_URL=http://ollama:11434
 ```
 
-Para levantar Ollama local:
+El worker descarga fuentes, extrae texto, divide en chunks, llama a Ollama
+`/api/embed` y guarda en Supabase con `content_hash` para evitar duplicados.
+
+## Discord Y Trading
+
+Toda decision de trading y apertura de posicion debe originarse en Discord.
+El runtime rechaza `trade_decision` y `open_position` si no incluyen:
+
+- origen `platform=discord`;
+- canal `DISCORD_REQUESTS_CHANNEL_ID`;
+- aprobacion explicita;
+- aprobador incluido en `DISCORD_APPROVER_USER_IDS`, si esa lista esta configurada.
+
+Comandos iniciales:
+
+```text
+!ask pregunta general
+!research solicitud de investigacion
+!approve_trade decision aprobada para evaluar
+```
+
+Importante: PC Agent `0.2.0` todavia no ejecuta ordenes reales de Kalshi. La
+compuerta de seguridad esta lista antes de conectar el adapter de trading.
+
+## MentisDB
+
+MentisDB esta modelado como memoria operativa del asistente. La verificacion actual
+detecta disponibilidad, pero la sincronizacion real read/write sigue pendiente de
+adapter MCP/HTTP especifico.
+
+Config recomendada:
+
+```text
+MENTIS_BASE_URL=http://localhost:9471
+```
+
+## Langfuse
+
+Langfuse se levanta con el perfil `observability`. Sirve para revisar conversaciones,
+trazas y llamadas a herramientas cuando el adapter de observabilidad este conectado
+con claves reales.
+
+## Arquitectura
+
+El proyecto sigue un enfoque Clean/Hexagonal:
+
+- Dominio y casos de uso no dependen de SDKs externos.
+- Supabase, Discord, MentisDB, Langfuse, Ollama y Kalshi viven como adaptadores.
+- Las reglas de decision de trading viven en el runtime/politicas, no en la UI.
+
+Ver [docs/architecture.md](docs/architecture.md).
+
+## Validacion
+
+Pruebas actuales:
 
 ```bash
-docker compose --profile embeddings up ollama
-docker compose exec ollama ollama pull mxbai-embed-large
+python3 tests/test_use_cases.py
+python3 tests/test_assistant_runtime_gate.py
+python3 tests/test_ingestion_worker.py
+docker compose --profile observability --profile embeddings config
 ```
+
+## Roadmap
+
+- Adapter Kalshi demo/live con limites de riesgo.
+- Aprobacion humana completa desde Discord antes de ordenes reales.
+- Sincronizacion real Supabase -> MentisDB.
+- Integracion completa de Langfuse traces.
+- UI para historial de ingestion y documentos/chunks.
