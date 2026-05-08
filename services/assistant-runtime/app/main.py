@@ -19,7 +19,12 @@ def load_runtime_config():
             for key, value in config.items():
                 if value:
                     # Update environment so litellm and other components see it
-                    os.environ[key.upper()] = str(value)
+                    env_key = key.upper()
+                    os.environ[env_key] = str(value)
+                    
+                    # Litellm compatibility for Ollama
+                    if env_key == "OLLAMA_BASE_URL":
+                        os.environ["OLLAMA_API_BASE"] = str(value)
             print(f"Configuracion runtime cargada desde {config_path}")
     except Exception as exc:
         print(f"Error cargando configuracion runtime: {exc}")

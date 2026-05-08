@@ -18,6 +18,12 @@ class OpenClawLLMAdapter(LLMPort):
     def _get_provider(self, policy: str) -> str:
         # Politica de enrutamiento (Open-Claw router)
         provider = os.getenv("DEFAULT_LLM_PROVIDER", "openai")
+        
+        # Fallback automatico si no hay API Key de OpenAI
+        if provider == "openai" and not os.getenv("OPENAI_API_KEY"):
+            print("AVISO: OPENAI_API_KEY no encontrada. Usando Ollama como fallback.")
+            provider = "ollama"
+
         if provider == "openai":
             if policy == "cheap":
                 return "openai/gpt-4o-mini"
@@ -27,7 +33,8 @@ class OpenClawLLMAdapter(LLMPort):
                 return "anthropic/claude-3-haiku-20240307"
             return "anthropic/claude-3-5-sonnet-20241022"
         elif provider == "ollama":
-            return "ollama/llama3.2"
+            # Usar llama3 que es el que el usuario tiene descargado
+            return "ollama/llama3:latest"
         return "openai/gpt-4o-mini"
 
     async def chat(self, prompt: str, context: dict | None = None) -> str:

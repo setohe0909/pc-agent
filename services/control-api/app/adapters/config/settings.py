@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     mentis_enabled: bool = False
     langfuse_host: str = "http://langfuse-web:3000"
     langfuse_enabled: bool = False
+    langfuse_public_key: str | None = None
+    langfuse_secret_key: str | None = None
     next_public_supabase_url: str = "https://gerhikdxsbglfdsupmsi.supabase.co"
     next_public_supabase_publishable_key: str = "sb_publishable_sV7xhYAjW0gg-2MXGk0MHg_jQ4l9GN9"
     supabase_url: str = "https://gerhikdxsbglfdsupmsi.supabase.co"

@@ -19,7 +19,7 @@ export default function App() {
 
   const refresh = () => {
     Promise.all([
-      getJson("/health").catch(() => null),
+      getJson("/status").catch(() => null),
       getJson("/config").catch(() => null),
       getJson("/config/runtime").catch(() => null),
       getJson("/knowledge-sources").catch(() => null),
