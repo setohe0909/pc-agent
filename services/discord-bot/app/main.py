@@ -47,6 +47,49 @@ async def main() -> None:
             await asyncio.sleep(10)
 
     import discord
+    from discord.ui import Button, View
+
+    class TradeView(View):
+        def __init__(self, payload, message_author):
+            super().__init__(timeout=120)
+            self.payload = payload
+            self.message_author = message_author
+
+        @discord.ui.button(label="✅ Confirmar Orden", style=discord.ButtonStyle.green)
+        async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+            if str(interaction.user.id) != str(self.message_author.id):
+                await interaction.response.send_message("No eres el autor de esta solicitud.", ephemeral=True)
+                return
+            
+            await interaction.response.edit_message(content="⏳ Procesando ejecución con análisis dual...", view=None)
+            try:
+                result = await _send_assistant_request(self.payload)
+                
+                if result.get("status") == "executed":
+                    embed = discord.Embed(
+                        title="🚀 TRADE EJECUTADO",
+                        description=result.get("message"),
+                        color=discord.Color.green()
+                    )
+                    order = result.get("order", {})
+                    embed.add_field(name="Ticker", value=order.get("ticker", "N/A"), inline=True)
+                    embed.add_field(name="ID Orden", value=order.get("order_id", "N/A"), inline=True)
+                    embed.add_field(name="🛡️ Nota Crítica", value=result.get("critic_note", "N/A"), inline=False)
+                    embed.set_footer(text="Confirmado vía botón - PC Agent Pro")
+                    await interaction.message.edit(content=None, embed=embed)
+                else:
+                    embed = discord.Embed(
+                        title="⚠️ Operación Detenida",
+                        description=result.get("message"),
+                        color=discord.Color.orange()
+                    )
+                    await interaction.message.edit(content=None, embed=embed)
+            except Exception as e:
+                await interaction.message.edit(content=f"❌ Error técnico: {e}", embed=None)
+
+        @discord.ui.button(label="❌ Cancelar", style=discord.ButtonStyle.red)
+        async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+            await interaction.response.edit_message(content="🚫 Orden cancelada y descartada.", embed=None, view=None)
 
     intents = discord.Intents.default()
     intents.message_content = True
@@ -68,8 +111,8 @@ async def main() -> None:
         if content == "!status":
             try:
                 base_url = _get_env("CONTROL_API_URL", "http://control-api:8000").rstrip("/")
-                async with httpx.AsyncClient(timeout=5) as client:
-                    resp = await client.get(f"{base_url}/status")
+                async with httpx.AsyncClient(timeout=5) as client_http:
+                    resp = await client_http.get(f"{base_url}/status")
                 
                 if resp.status_code == 200:
                     status_data = resp.json()
@@ -88,6 +131,7 @@ async def main() -> None:
         action_type = "chat"
         prompt = content
         approval = None
+        
         if content.startswith("!research "):
             action_type = "research"
             prompt = content.removeprefix("!research ").strip()
@@ -98,14 +142,26 @@ async def main() -> None:
             if approvers and str(message.author.id) not in approvers:
                 await message.reply("No estas autorizado para aprobar decisiones de trading.")
                 return
+            
             action_type = "trade_decision"
             prompt = content.removeprefix("!approve_trade ").strip()
-            approval = {
-                "status": "approved",
-                "channel_id": str(message.channel.id),
-                "approver_user_id": str(message.author.id),
-                "message_id": str(message.id),
+            
+            payload = {
+                "action_type": action_type,
+                "prompt": prompt,
+                "source": {"platform": "discord", "channel_id": str(message.channel.id), "user_id": str(message.author.id)},
+                "approval": {"status": "approved"}
             }
+
+            embed = discord.Embed(
+                title="⚖️ Confirmación de Operación",
+                description=f"Instrucción: **{prompt}**\n\n¿Deseas que el Analista y el Crítico procesen esta orden?",
+                color=discord.Color.blue()
+            )
+            embed.set_footer(text="Haz clic en un botón para proceder.")
+            
+            await message.reply(embed=embed, view=TradeView(payload, message.author))
+            return
 
         payload = {
             "action_type": action_type,
@@ -119,44 +175,15 @@ async def main() -> None:
         }
         try:
             result = await _send_assistant_request(payload)
-            
-            # Si es una decision de trade, enviamos un Embed profesional
-            if action_type == "trade_decision" and result.get("status") == "executed":
-                embed = discord.Embed(
-                    title="🚀 Trade Ejecutado con Éxito",
-                    description=result.get("message"),
-                    color=discord.Color.green()
-                )
-                order = result.get("order", {})
-                embed.add_field(name="Ticker", value=order.get("ticker", "N/A"), inline=True)
-                embed.add_field(name="ID de Orden", value=order.get("order_id", "N/A"), inline=True)
-                
-                critic_note = result.get("critic_note", "Sin observaciones.")
-                embed.add_field(name="🛡️ Nota del Crítico", value=critic_note, inline=False)
-                
-                embed.set_footer(text="Sistema Pro - Analista + Crítico + Motor de Riesgo")
-                await message.reply(embed=embed)
-            
-            elif action_type == "trade_decision" and "rejected" in result.get("status", ""):
-                # Embed para rechazos (Motor de riesgo o Critico)
-                embed = discord.Embed(
-                    title="⚠️ Trade Detenido por Seguridad",
-                    description=result.get("message"),
-                    color=discord.Color.orange()
-                )
-                await message.reply(embed=embed)
-            else:
-                # Respuesta normal para chat/research
-                await message.reply(f"Estado: {result.get('status')}. {result.get('reason') or result.get('message')}")
+            await message.reply(f"Respuesta: {result.get('message')}")
         except Exception as exc:
-            await message.reply(f"No pude contactar al runtime del asistente: {exc}")
+            await message.reply(f"No pude contactar al runtime: {exc}")
 
     while True:
         try:
             await client.start(token)
         except discord.errors.HTTPException as e:
             if e.status == 429:
-                # Discord rate limit
                 wait_time = 60
                 print(f"RATE LIMIT: Discord nos ha bloqueado temporalmente (429). Durmiendo {wait_time}s antes de reintentar...")
                 await asyncio.sleep(wait_time)
