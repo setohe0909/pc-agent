@@ -119,7 +119,35 @@ async def main() -> None:
         }
         try:
             result = await _send_assistant_request(payload)
-            await message.reply(f"Estado: {result.get('status')}. {result.get('reason') or result.get('message')}")
+            
+            # Si es una decision de trade, enviamos un Embed profesional
+            if action_type == "trade_decision" and result.get("status") == "executed":
+                embed = discord.Embed(
+                    title="🚀 Trade Ejecutado con Éxito",
+                    description=result.get("message"),
+                    color=discord.Color.green()
+                )
+                order = result.get("order", {})
+                embed.add_field(name="Ticker", value=order.get("ticker", "N/A"), inline=True)
+                embed.add_field(name="ID de Orden", value=order.get("order_id", "N/A"), inline=True)
+                
+                critic_note = result.get("critic_note", "Sin observaciones.")
+                embed.add_field(name="🛡️ Nota del Crítico", value=critic_note, inline=False)
+                
+                embed.set_footer(text="Sistema Pro - Analista + Crítico + Motor de Riesgo")
+                await message.reply(embed=embed)
+            
+            elif action_type == "trade_decision" and "rejected" in result.get("status", ""):
+                # Embed para rechazos (Motor de riesgo o Critico)
+                embed = discord.Embed(
+                    title="⚠️ Trade Detenido por Seguridad",
+                    description=result.get("message"),
+                    color=discord.Color.orange()
+                )
+                await message.reply(embed=embed)
+            else:
+                # Respuesta normal para chat/research
+                await message.reply(f"Estado: {result.get('status')}. {result.get('reason') or result.get('message')}")
         except Exception as exc:
             await message.reply(f"No pude contactar al runtime del asistente: {exc}")
 

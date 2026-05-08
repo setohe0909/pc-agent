@@ -22,39 +22,68 @@ class TradingWorkflow:
         return response
 
     async def execute_trade_decision(self, prompt: str, user_id: str | None = None) -> dict:
-        # 1. Obtener mercados disponibles
+        # 1. Chequeo de Salud Financiera (Robustez)
+        balance = await self.trading.get_balance()
+        if balance <= 0:
+            return {"status": "error", "message": "Saldo insuficiente o error consultando balance."}
+
+        # 2. Obtener mercados disponibles
         markets = await self.trading.get_markets()
         
-        # 2. Analizar con el LLM (Open-Claw router)
+        # 3. FASE ANALISTA: Proponer una jugada
         analysis = await self.llm.analyze_trade(market_data=markets, prompt=prompt)
         
         if not analysis.get("should_trade"):
             return {
-                "status": "rejected_by_llm",
-                "message": analysis.get("decision", "El LLM recomendo NO hacer el trade o no encontro el mercado.")
+                "status": "rejected_by_analyst",
+                "message": analysis.get("decision", "El Analista recomendo no operar.")
             }
             
-        # 3. Si el LLM aprobo, extraer los parametros de la intencion de trade
-        # (Para este demo, extraeremos de forma basica un ticker o usaremos uno por defecto
-        # en un entorno real el LLM debe devolver el JSON con el ticker exacto y accion).
+        # 4. MOTOR DE RIESGO (Backend logic)
+        amount = analysis.get("amount", 10)
+        max_investment = 50.0 # Limite de seguridad configurable
+        if amount > max_investment:
+            return {
+                "status": "rejected_by_risk",
+                "message": f"La orden de ${amount} excede el limite de seguridad de ${max_investment}."
+            }
+
+        # 5. FASE CRITICO: ¿Tiene sentido la propuesta?
+        # En una implementacion pro, aqui llamariamos a un LLM mas potente (ej: Gemini Pro) 
+        # con un prompt de "Abogado del Diablo".
+        critic_prompt = f"Actua como un gestor de riesgos senior. El analista propone {analysis.get('decision')}. ¿Ves algun riesgo oculto?"
+        critic_opinion = await self.llm.chat(critic_prompt)
+        
+        if "RECHAZAR" in critic_opinion.upper():
+            return {
+                "status": "rejected_by_critic",
+                "message": f"El Crítico rechazo la jugada: {critic_opinion}"
+            }
+
+        # 6. Si todo paso, preparar ejecucion con ID unico (Idempotencia)
+        client_order_id = f"trade-{os.urandom(4).hex()}"
         ticker = analysis.get("ticker", markets[0]["ticker"])
         action = analysis.get("action", "BUY YES")
-        amount = analysis.get("amount", 10)
         
-        # 4. Colocar la orden en Kalshi (Demo)
-        order = await self.trading.place_order(ticker=ticker, action=action, amount=amount)
+        order = await self.trading.place_order(
+            ticker=ticker, 
+            action=action, 
+            amount=amount, 
+            client_order_id=client_order_id
+        )
         
-        # 5. Guardar evento en la memoria
+        # 7. Guardar en memoria
         if self.memory and user_id:
             await self.memory.save_interaction(user_id, {
-                "type": "trade_executed",
-                "prompt": prompt,
+                "type": "pro_trade_executed",
+                "order_id": client_order_id,
                 "analysis": analysis,
-                "order": order
+                "critic": critic_opinion
             })
             
         return {
             "status": "executed",
-            "message": analysis.get("decision", "El LLM aprobo la orden."),
-            "order": order
+            "message": f"Analisis dual completado. Confianza: {analysis.get('confidence', 'Alta')}.",
+            "order": order,
+            "critic_note": critic_opinion[:100] + "..."
         }
