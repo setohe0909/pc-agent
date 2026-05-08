@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     discord_status_channel_id: str | None = None
     discord_approver_user_ids: str | None = None
     discord_bot_token: str | None = None
+    kalshi_username: str | None = None
+    kalshi_password: str | None = None
+    kalshi_key_id: str | None = None
     default_llm_provider: str = "openai"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")

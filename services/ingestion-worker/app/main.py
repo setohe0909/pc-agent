@@ -1,6 +1,7 @@
 import asyncio
 import signal
 import time
+import httpx
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -49,7 +50,28 @@ async def ingest_enabled_sources() -> int:
         saved = await store.upsert_documents(documents)
         total_saved += saved
         print(f"Fuente {source.name}: {saved} documentos/chunks guardados")
+    
+    # Notificar a Discord si hay un canal configurado
+    if total_saved > 0 and settings.discord_notifications_channel_id:
+        await send_discord_notification(
+            settings.discord_notifications_channel_id,
+            f"✅ **Ingesta completada**: Se han procesado y vectorizado **{total_saved}** nuevos fragmentos de conocimiento."
+        )
+        
     return total_saved
+
+
+async def send_discord_notification(channel_id: str, content: str):
+    token = settings.discord_bot_token
+    if not token:
+        return
+    url = f"https://discord.com/api/v10/channels/{channel_id}/messages"
+    headers = {"Authorization": f"Bot {token}"}
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            await client.post(url, headers=headers, json={"content": content})
+    except Exception as e:
+        print(f"Error enviando notificacion a Discord: {e}")
 
 
 def collect_markets() -> None:

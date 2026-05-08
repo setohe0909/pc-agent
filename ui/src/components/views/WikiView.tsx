@@ -1,4 +1,5 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Activity, BookOpen, Brain, Database, ShieldCheck, TerminalSquare } from "lucide-react";
 
 export function WikiView() {
   return (
@@ -27,14 +28,57 @@ export function WikiView() {
         </CardContent>
       </Card>
 
+      <Card className="md:col-span-2 lg:col-span-3 border-blue-500/30 bg-blue-500/5">
+        <CardHeader>
+          <CardTitle className="text-xl flex items-center gap-2">
+            <Activity className="w-5 h-5 text-blue-500" />
+            Guía de Comandos de Discord
+          </CardTitle>
+          <CardDescription>Usa estos comandos en el canal de solicitudes autorizado para interactuar con el agente.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <code className="bg-blue-500/20 text-blue-400 px-2 py-1 rounded font-bold">!status</code>
+              <span className="text-sm font-medium">Salud del Sistema</span>
+            </div>
+            <p className="text-xs text-muted-foreground">Consulta el estado proactivo de todos los servicios (Ollama, Gemini, Supabase, Mentis). Úsalo para verificar conectividad.</p>
+          </div>
+          
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <code className="bg-blue-500/20 text-blue-400 px-2 py-1 rounded font-bold">!ask [texto]</code>
+              <span className="text-sm font-medium">Consulta de Conocimiento</span>
+            </div>
+            <p className="text-xs text-muted-foreground">Pregunta sobre cualquier tema. El agente buscará en las fuentes vectorizadas en Supabase y MentisDB para responder.</p>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <code className="bg-blue-500/20 text-blue-400 px-2 py-1 rounded font-bold">!research [tema]</code>
+              <span className="text-sm font-medium">Análisis de Tendencias</span>
+            </div>
+            <p className="text-xs text-muted-foreground">Inicia una investigación profunda sobre mercados o tendencias burstátiles. Útil para identificar oportunidades en Kalshi.</p>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <code className="bg-blue-500/20 text-blue-400 px-2 py-1 rounded font-bold">!approve_trade [id]</code>
+              <span className="text-sm font-medium">Ejecución de Trading</span>
+            </div>
+            <p className="text-xs text-muted-foreground">Autoriza una operación financiera. Solo funciona si el usuario está en la lista de Aprobadores y en el canal correcto.</p>
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">3. Discord</CardTitle>
+          <CardTitle className="text-lg">Configuración de Modelos</CardTitle>
         </CardHeader>
         <CardContent>
-          <CardDescription className="mb-4">Configura token, canales y aprobadores. Las decisiones de trading solo pasan por Discord.</CardDescription>
+          <CardDescription className="mb-4">Switch dinámico entre proveedores. Si no hay API Key de OpenAI, el sistema busca Ollama.</CardDescription>
           <code className="bg-secondary text-secondary-foreground text-xs p-2 rounded block break-words font-mono">
-            !ask · !research · !approve_trade
+            DEFAULT_LLM_PROVIDER: gemini | openai | ollama
           </code>
         </CardContent>
       </Card>

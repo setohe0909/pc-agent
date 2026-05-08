@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     market_ingestion_cron: str = "0 */2 * * *"
     trends_ingestion_cron: str = "15 */4 * * *"
     mentis_sync_cron: str = "30 */2 * * *"
+    discord_bot_token: str | None = None
+    discord_notifications_channel_id: str | None = None
     langfuse_host: str = "http://langfuse-web:3000"
     langfuse_public_key: str | None = None
     langfuse_secret_key: str | None = None

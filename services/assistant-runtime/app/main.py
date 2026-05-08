@@ -7,7 +7,7 @@ import uvicorn
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
 
-from app.adapters.kalshi import KalshiDemoAdapter
+from app.adapters.kalshi import KalshiHttpAdapter
 from app.adapters.open_claw import OpenClawLLMAdapter
 from app.use_cases.trading_workflow import TradingWorkflow
 
@@ -78,7 +78,7 @@ async def assistant_request(request: AssistantRequest) -> dict:
         }
 
     # Inyectar dependencias (Hexagonal Architecture)
-    trading_port = KalshiDemoAdapter()
+    trading_port = KalshiHttpAdapter()
     llm_port = OpenClawLLMAdapter()
     # MemoryPort no implementado por el momento en este demo
     workflow = TradingWorkflow(trading_port=trading_port, llm_port=llm_port)

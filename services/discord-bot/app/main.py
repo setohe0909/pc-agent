@@ -62,7 +62,27 @@ async def main() -> None:
             return
 
         content = message.content.strip()
-        if not content.startswith(("!ask ", "!research ", "!approve_trade ")):
+        if not content.startswith(("!ask ", "!research ", "!approve_trade ", "!status")):
+            return
+
+        if content == "!status":
+            try:
+                base_url = _get_env("CONTROL_API_URL", "http://control-api:8000").rstrip("/")
+                async with httpx.AsyncClient(timeout=5) as client:
+                    resp = await client.get(f"{base_url}/status")
+                
+                if resp.status_code == 200:
+                    status_data = resp.json()
+                    services = status_data.get("services", [])
+                    report = "**PC Agent - System Status**\n"
+                    for s in services:
+                        emoji = "✅" if s["state"] == "healthy" else "❌" if s["state"] == "offline" else "⚠️"
+                        report += f"{emoji} **{s['name']}**: {s['state']} ({s['detail']})\n"
+                    await message.reply(report)
+                else:
+                    await message.reply(f"Error al obtener status: HTTP {resp.status_code}")
+            except Exception as exc:
+                await message.reply(f"No pude conectar con el Control API: {exc}")
             return
 
         action_type = "chat"
@@ -103,7 +123,21 @@ async def main() -> None:
         except Exception as exc:
             await message.reply(f"No pude contactar al runtime del asistente: {exc}")
 
-    await client.start(token)
+    while True:
+        try:
+            await client.start(token)
+        except discord.errors.HTTPException as e:
+            if e.status == 429:
+                # Discord rate limit
+                wait_time = 60
+                print(f"RATE LIMIT: Discord nos ha bloqueado temporalmente (429). Durmiendo {wait_time}s antes de reintentar...")
+                await asyncio.sleep(wait_time)
+            else:
+                print(f"Error de conexion con Discord: {e}")
+                await asyncio.sleep(10)
+        except Exception as e:
+            print(f"Error inesperado en el bot: {e}")
+            await asyncio.sleep(10)
 
 
 if __name__ == "__main__":

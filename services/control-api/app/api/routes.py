@@ -111,6 +111,10 @@ async def config() -> dict:
             "gemini_api_key_configured": bool(runtime.get("gemini_api_key") or os.getenv("GEMINI_API_KEY")),
             "langfuse_public_key_configured": bool(runtime.get("langfuse_public_key") or settings.langfuse_public_key),
             "langfuse_secret_key_configured": bool(runtime.get("langfuse_secret_key") or settings.langfuse_secret_key),
+            "kalshi_configured": bool(
+                (runtime.get("kalshi_username") or settings.kalshi_username) and 
+                (runtime.get("kalshi_password") or settings.kalshi_password)
+            )
         },
     }
 
