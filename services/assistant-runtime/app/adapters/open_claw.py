@@ -1,5 +1,6 @@
 import json
 import os
+from pathlib import Path
 
 from litellm import acompletion
 
@@ -16,25 +17,44 @@ class OpenClawLLMAdapter(LLMPort):
             litellm.failure_callback = ["langfuse"]
 
     def _get_provider(self, policy: str) -> str:
-        # Politica de enrutamiento (Open-Claw router)
-        provider = os.getenv("DEFAULT_LLM_PROVIDER", "openai")
+        # Recargar configuracion runtime dinamicamente
+        config_path = os.getenv("RUNTIME_CONFIG_PATH", "/config/runtime-config.json")
+        runtime_config = {}
+        try:
+            if Path(config_path).exists():
+                runtime_config = json.loads(Path(config_path).read_text(encoding="utf-8"))
+        except Exception:
+            pass
+
+        provider = runtime_config.get("default_llm_provider") or os.getenv("DEFAULT_LLM_PROVIDER", "openai")
+        openai_key = runtime_config.get("openai_api_key") or os.getenv("OPENAI_API_KEY")
         
         # Fallback automatico si no hay API Key de OpenAI
-        if provider == "openai" and not os.getenv("OPENAI_API_KEY"):
-            print("AVISO: OPENAI_API_KEY no encontrada. Usando Ollama como fallback.")
+        if provider == "openai" and not openai_key:
             provider = "ollama"
 
         if provider == "openai":
+            # Inyectar key en el entorno para litellm (si viene de runtime config)
+            if openai_key:
+                os.environ["OPENAI_API_KEY"] = openai_key
+            
             if policy == "cheap":
                 return "openai/gpt-4o-mini"
             return "openai/gpt-4o"
-        elif provider == "anthropic":
-            if policy == "cheap":
-                return "anthropic/claude-3-haiku-20240307"
-            return "anthropic/claude-3-5-sonnet-20241022"
         elif provider == "ollama":
-            # Usar llama3 que es el que el usuario tiene descargado
+            # Asegurar que litellm sepa donde esta ollama (prioridad a la UI)
+            ollama_url = runtime_config.get("ollama_base_url") or os.getenv("OLLAMA_BASE_URL", "http://ollama:11434")
+            os.environ["OLLAMA_API_BASE"] = ollama_url
+            
+            # Usar llama3 que es el que el usuario tiene
             return "ollama/llama3:latest"
+        elif provider == "gemini":
+            gemini_key = runtime_config.get("gemini_api_key") or os.getenv("GEMINI_API_KEY")
+            if gemini_key:
+                os.environ["GEMINI_API_KEY"] = gemini_key
+            if policy == "cheap":
+                return "gemini/gemini-1.5-flash"
+            return "gemini/gemini-1.5-pro"
         return "openai/gpt-4o-mini"
 
     async def chat(self, prompt: str, context: dict | None = None) -> str:
