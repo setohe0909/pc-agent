@@ -41,9 +41,9 @@ def _approvers() -> set[str]:
 async def main() -> None:
     token = None
     while not token:
-        token = _get_env("DISCORD_BOT_TOKEN")
+        token = _get_env("DISCORD_BOT_TOKEN") or _get_env("DISCORD_TOKEN")
         if not token:
-            print("Discord bot en espera: falta DISCORD_BOT_TOKEN en env o /config/runtime-config.json")
+            print("Discord bot en espera: falta DISCORD_BOT_TOKEN o DISCORD_TOKEN en env o runtime config")
             await asyncio.sleep(10)
 
     import discord

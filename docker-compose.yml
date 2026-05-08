@@ -47,6 +47,7 @@ services:
       - runtime-config:/config
     environment:
       - RUNTIME_CONFIG_PATH=/config/runtime-config.json
+      - PYTHONUNBUFFERED=1
     command: python -m app.main
 
   ingestion-worker:
