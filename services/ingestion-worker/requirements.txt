@@ -6,3 +6,5 @@ langfuse==2.57.0
 google-generativeai
 litellm
 tavily-python
+fastapi==0.115.12
+uvicorn[standard]==0.34.2

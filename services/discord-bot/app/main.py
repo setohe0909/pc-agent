@@ -107,7 +107,33 @@ async def main() -> None:
             return
 
         content = message.content.strip()
-        if not content.startswith(("!ask ", "!research ", "!approve_trade ", "!status", "!memory")):
+        if not content.startswith(("!ask ", "!research ", "!approve_trade ", "!status", "!memory", "!run ")):
+            return
+
+        if content.startswith("!run "):
+            target = content.removeprefix("!run ").strip()
+            try:
+                base_url = _get_env("CONTROL_API_URL", "http://control-api:8000").rstrip("/")
+                admin_token = _get_env("ADMIN_API_TOKEN")
+                headers = {"x-admin-token": admin_token} if admin_token else {}
+                
+                async with httpx.AsyncClient(timeout=10) as client_http:
+                    resp = await client_http.post(
+                        f"{base_url}/ingestion/runs", 
+                        json={"target": target},
+                        headers=headers
+                    )
+                
+                if resp.status_code == 200:
+                    data = resp.json()
+                    if data.get("status") == "triggered":
+                        await message.reply(f"🚀 **Ejecución iniciada**: El trabajo `{target}` está corriendo en segundo plano.")
+                    else:
+                        await message.reply(f"⚠️ **Error**: {data.get('message', 'Desconocido')}")
+                else:
+                    await message.reply(f"Error HTTP {resp.status_code}: {resp.text}")
+            except Exception as exc:
+                await message.reply(f"Fallo al conectar con Control API: {exc}")
             return
 
         if content == "!memory":

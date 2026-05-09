@@ -187,8 +187,13 @@ async def update_ingestion_schedule(request: IngestionScheduleRequest) -> dict:
 
 @router.post("/ingestion/runs", dependencies=[Depends(require_admin)])
 async def trigger_ingestion_run(request: TriggerIngestionRequest) -> dict:
-    run = await TriggerIngestionRun(ingestion_control).execute(request.target)
-    return {"run": run}
+    worker_url = "http://ingestion-worker:8000"
+    async with httpx.AsyncClient(timeout=5) as client:
+        try:
+            resp = await client.post(f"{worker_url}/run/{request.target}")
+            return resp.json()
+        except Exception as e:
+            return {"status": "error", "message": f"No se pudo contactar al worker: {e}"}
 
 
 @router.get("/mentis/memory")

@@ -2,6 +2,8 @@ import asyncio
 import signal
 import time
 import httpx
+import uvicorn
+from fastapi import FastAPI, BackgroundTasks
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -10,9 +12,27 @@ from app.content import chunk_document, content_hash, fetch_source_documents
 from app.embedding import OllamaEmbedder
 from app.settings import settings
 from app.supabase_store import KnowledgeDocument, SupabaseKnowledgeStore
-
-
+from app.services.trend_service import TrendService
 from langfuse.decorators import observe
+
+# --- Servidor API para ejecuciones manuales ---
+app = FastAPI()
+
+@app.post("/run/{target}")
+async def run_manual_job(target: str, background_tasks: BackgroundTasks):
+    print(f"[API] Solicitud de ejecucion manual recibida para: {target}")
+    if target == "markets":
+        background_tasks.add_task(collect_markets)
+    elif target == "trends":
+        background_tasks.add_task(collect_trends)
+    elif target == "mentis":
+        background_tasks.add_task(sync_mentis)
+    elif target == "all":
+        background_tasks.add_task(collect_markets)
+        background_tasks.add_task(collect_trends)
+    else:
+        return {"status": "error", "message": f"Target {target} no valido"}
+    return {"status": "triggered", "target": target}
 
 @observe(name="ingest_enabled_sources")
 async def ingest_enabled_sources() -> int:
@@ -29,29 +49,31 @@ async def ingest_enabled_sources() -> int:
     sources = await store.list_enabled_sources(settings.ingestion_max_sources_per_run)
     total_saved = 0
     for source in sources:
-        raw_documents = await fetch_source_documents(source, settings.ingestion_max_documents_per_source)
-        documents: list[KnowledgeDocument] = []
-        for raw_document in raw_documents:
-            for chunk in chunk_document(raw_document, settings.ingestion_chunk_chars):
-                if not chunk.content:
-                    continue
-                embedding = await embedder.embed(f"{chunk.title}\n\n{chunk.content}")
-                documents.append(
-                    KnowledgeDocument(
-                        source_id=source.id,
-                        title=chunk.title,
-                        content=chunk.content,
-                        metadata=chunk.metadata,
-                        content_hash=content_hash(source.id, chunk.title, chunk.content),
-                        embedding=embedding,
-                        embedding_model=settings.embedding_model,
+        try:
+            raw_documents = await fetch_source_documents(source, settings.ingestion_max_documents_per_source)
+            documents: list[KnowledgeDocument] = []
+            for raw_document in raw_documents:
+                for chunk in chunk_document(raw_document, settings.ingestion_chunk_chars):
+                    if not chunk.content:
+                        continue
+                    embedding = await embedder.embed(f"{chunk.title}\n\n{chunk.content}")
+                    documents.append(
+                        KnowledgeDocument(
+                            source_id=source.id,
+                            title=chunk.title,
+                            content=chunk.content,
+                            metadata=chunk.metadata,
+                            content_hash=content_hash(source.id, chunk.title, chunk.content),
+                            embedding=embedding,
+                            embedding_model=settings.embedding_model,
+                        )
                     )
-                )
-        saved = await store.upsert_documents(documents)
-        total_saved += saved
-        print(f"Fuente {source.name}: {saved} documentos/chunks guardados")
+            saved = await store.upsert_documents(documents)
+            total_saved += saved
+            print(f"Fuente {source.name}: {saved} documentos/chunks guardados")
+        except Exception as e:
+            print(f"Error procesando fuente {source.name}: {e}")
     
-    # Notificar a Discord si hay un canal configurado
     if total_saved > 0 and settings.discord_notifications_channel_id:
         await send_discord_notification(
             settings.discord_notifications_channel_id,
@@ -75,27 +97,17 @@ async def send_discord_notification(channel_id: str, content: str):
 
 
 def collect_markets() -> None:
-    _run_job("collect_markets", ingest_enabled_sources())
+    asyncio.run(ingest_enabled_sources())
 
-
-from app.services.trend_service import TrendService
 
 def collect_trends() -> None:
-    print("[CRON] Iniciando recoleccion de tendencias diarias...")
+    print("[JOB] Iniciando recoleccion de tendencias...")
     service = TrendService()
-    _run_job("collect_trends", service.run_daily_trends())
+    asyncio.run(service.run_daily_trends())
 
 
 def sync_mentis() -> None:
-    print("Sincronizacion MentisDB pendiente: falta adapter MCP/read-write real.")
-
-
-def _run_job(name: str, coroutine) -> None:
-    try:
-        saved = asyncio.run(coroutine)
-        print(f"{name}: {saved} documentos/chunks procesados")
-    except Exception as exc:
-        print(f"{name}: fallo {exc}")
+    print("Sincronizacion MentisDB pendiente.")
 
 
 def main() -> None:
@@ -105,28 +117,8 @@ def main() -> None:
     scheduler.add_job(sync_mentis, CronTrigger.from_crontab(settings.mentis_sync_cron))
     scheduler.start()
 
-    print(
-        "Ingestion worker activo",
-        {
-            "MARKET_INGESTION_CRON": settings.market_ingestion_cron,
-            "TRENDS_INGESTION_CRON": settings.trends_ingestion_cron,
-            "MENTIS_SYNC_CRON": settings.mentis_sync_cron,
-            "EMBEDDING_MODEL": settings.embedding_model,
-            "EMBEDDING_DIMENSIONS": settings.embedding_dimensions,
-        },
-    )
-
-    running = True
-
-    def stop(*_: object) -> None:
-        nonlocal running
-        running = False
-
-    signal.signal(signal.SIGTERM, stop)
-    signal.signal(signal.SIGINT, stop)
-    while running:
-        time.sleep(1)
-    scheduler.shutdown()
+    print("Ingestion worker activo con Scheduler y API en puerto 8000")
+    uvicorn.run(app, host="0.0.0.0", port=8000)
 
 
 if __name__ == "__main__":
