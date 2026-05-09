@@ -166,28 +166,24 @@ async def main() -> None:
 
         if content.startswith("!run "):
             target = content.removeprefix("!run ").strip()
+            await message.reply(f"🚀 Ejecución iniciada: El trabajo **{target}** está corriendo en segundo plano.")
             try:
-                base_url = _get_env("CONTROL_API_URL", "http://control-api:8000").rstrip("/")
-                admin_token = _get_env("ADMIN_API_TOKEN")
-                headers = {"x-admin-token": admin_token} if admin_token else {}
+                # Llamada al control-api usando el nombre estatico definido en docker-compose
+                control_api_url = "http://control-api:8000"
+                print(f"[DEBUG] Bot llamando a Control API en: {control_api_url}/ingestion/runs")
                 
-                async with httpx.AsyncClient(timeout=10) as client_http:
+                async with httpx.AsyncClient(timeout=15) as client_http:
                     resp = await client_http.post(
-                        f"{base_url}/ingestion/runs", 
+                        f"{control_api_url}/ingestion/runs",
                         json={"target": target},
-                        headers=headers
+                        headers={"x-admin-token": os.getenv("ADMIN_API_TOKEN")}
                     )
-                
-                if resp.status_code == 200:
-                    data = resp.json()
-                    if data.get("status") == "triggered":
-                        await message.reply(f"🚀 **Ejecución iniciada**: El trabajo `{target}` está corriendo en segundo plano.")
-                    else:
-                        await message.reply(f"⚠️ **Error**: {data.get('message', 'Desconocido')}")
-                else:
-                    await message.reply(f"Error HTTP {resp.status_code}: {resp.text}")
-            except Exception as exc:
-                await message.reply(f"Fallo al conectar con Control API: {exc}")
+                    print(f"[DEBUG] Respuesta Control API: {resp.status_code} - {resp.text}")
+                    if resp.status_code != 200:
+                        await message.reply(f"⚠️ Error del Servidor ({resp.status_code}): {resp.text}")
+            except Exception as e:
+                print(f"[CONNECTION ERROR] Fallo al contactar a {control_api_url}: {e}")
+                await message.reply(f"⚠️ Error de Conexión: No pude contactar al cerebro del sistema ({e})")
             return
 
         if content == "!memory":

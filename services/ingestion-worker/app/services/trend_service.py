@@ -18,7 +18,7 @@ class TrendService:
         # Configurar Gemini
         api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
         genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel("models/gemini-flash-latest")
+        self.model = genai.GenerativeModel("models/gemini-1.5-flash")
         
         # Configurar Tavily
         tavily_key = os.getenv("TAVILY_API_KEY")
@@ -67,11 +67,12 @@ class TrendService:
 
     async def _send_notification(self, content: str):
         """Helper para enviar notificaciones simples de texto"""
-        token = os.getenv("DISCORD_TOKEN")
-        channel_id = os.getenv("DISCORD_NOTIFICATIONS_CHANNEL_ID")
+        token = settings.discord_bot_token
+        channel_id = settings.discord_notifications_channel_id
+        
         print(f"[NOTIFY] Intentando enviar a Discord (Canal: {channel_id})...")
         if not token or not channel_id: 
-            print("[NOTIFY ERROR] DISCORD_TOKEN o CHANNEL_ID faltantes.")
+            print(f"[NOTIFY ERROR] Faltan credenciales. Token: {'Presente' if token else 'Faltante'}, Canal: {channel_id}")
             return
         
         url = f"https://discord.com/api/v10/channels/{channel_id}/messages"
