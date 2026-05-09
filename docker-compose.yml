@@ -2,6 +2,8 @@ name: pc-agent
 
 services:
   control-api:
+    container_name: control-api
+    hostname: control-api
     build:
       context: ./services/control-api
     env_file:
@@ -51,6 +53,8 @@ services:
     command: python -m app.main
 
   ingestion-worker:
+    container_name: ingestion-worker
+    hostname: ingestion-worker
     build:
       context: ./services/ingestion-worker
     env_file:

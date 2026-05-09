@@ -150,8 +150,14 @@ async def main() -> None:
                 answer_data = await _send_assistant_request(payload)
                 answer = answer_data.get("message", "No hubo respuesta.")
                 
-                # 3. Respondemos en el hilo
-                await thread.send(f"🤖 **Respuesta de Open Claw:**\n\n{answer}")
+                # 3. Respondemos en el hilo (con soporte para mensajes largos)
+                if len(answer) > 1900:
+                    chunks = [answer[i:i+1900] for i in range(0, len(answer), 1900)]
+                    await thread.send("🤖 **Respuesta de Open Claw (Parte 1):**")
+                    for i, chunk in enumerate(chunks):
+                        await thread.send(f"{chunk}")
+                else:
+                    await thread.send(f"🤖 **Respuesta de Open Claw:**\n\n{answer}")
             except discord.Forbidden:
                 await message.reply("❌ No tengo permiso para crear hilos en este canal. Por favor, dales permiso a 'Crear hilos públicos'.")
             except Exception as e:
