@@ -29,7 +29,8 @@ class OpenClawLLMAdapter(LLMPort):
         provider = runtime_config.get("default_llm_provider") or os.getenv("DEFAULT_LLM_PROVIDER", "openai")
         
         if provider == "gemini":
-            model = "gemini-1.5-flash" if policy == "cheap" else "gemini-1.5-pro"
+            # Usamos los alias 'latest' que el escaneo confirmo como disponibles
+            model = "models/gemini-flash-latest" if policy == "cheap" else "models/gemini-pro-latest"
             return "gemini", model
         elif provider == "ollama":
             return "ollama", "llama3:latest"
