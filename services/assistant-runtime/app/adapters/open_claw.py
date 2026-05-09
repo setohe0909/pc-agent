@@ -40,20 +40,37 @@ class OpenClawLLMAdapter(LLMPort):
         
         return "openai", "gpt-4o-mini"
 
+    async def _generate_with_fallback(self, prompt: str, system_instruction: str | None = None, response_mime_type: str = "text/plain") -> str:
+        model_candidates = ["models/gemini-flash-latest", "models/gemini-pro-latest", "models/gemini-2.0-flash-lite"]
+        api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+        genai.configure(api_key=api_key)
+        
+        last_error = None
+        for model_name in model_candidates:
+            try:
+                print(f"[OPEN CLAW] Intentando con modelo: {model_name}...")
+                model = genai.GenerativeModel(model_name, system_instruction=system_instruction)
+                gen_config = genai.GenerationConfig(response_mime_type=response_mime_type)
+                response = await model.generate_content_async(prompt, generation_config=gen_config)
+                return response.text
+            except Exception as e:
+                last_error = e
+                if "429" in str(e) or "404" in str(e):
+                    print(f"[OPEN CLAW WARNING] Error en {model_name}. Saltando...")
+                    continue
+                else:
+                    raise e
+        raise last_error
+
     async def chat(self, prompt: str, context: dict | None = None) -> str:
         provider, model = self._get_provider_info(policy="cheap")
         
         if provider == "gemini":
-            api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
-            genai.configure(api_key=api_key)
-            gemini_model = genai.GenerativeModel(model)
-            
             full_prompt = prompt
             if context:
                 full_prompt = f"Contexto:\n{json.dumps(context)}\n\nPregunta: {prompt}"
             
-            response = await gemini_model.generate_content_async(full_prompt)
-            return response.text
+            return await self._generate_with_fallback(full_prompt)
         else:
             # Fallback a litellm para otros proveedores
             litellm_model = f"{provider}/{model}" if provider != "openai" else f"openai/{model}"
@@ -73,18 +90,13 @@ class OpenClawLLMAdapter(LLMPort):
         user_content = f"Mercados:\n{json.dumps(market_data)}\n\nSolicitud: {prompt}"
 
         if provider == "gemini":
-            api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
-            genai.configure(api_key=api_key)
-            gemini_model = genai.GenerativeModel(
-                model_name=model,
-                system_instruction=system_prompt
-            )
-            response = await gemini_model.generate_content_async(
-                user_content,
-                generation_config=genai.GenerationConfig(response_mime_type="application/json")
-            )
             try:
-                return json.loads(response.text)
+                response_text = await self._generate_with_fallback(
+                    user_content, 
+                    system_instruction=system_prompt,
+                    response_mime_type="application/json"
+                )
+                return json.loads(response_text)
             except:
                 return {"decision": "Error procesando JSON de Gemini", "should_trade": False}
         else:

@@ -8,6 +8,7 @@ from app.settings import settings
 
 class TrendService:
     def __init__(self):
+        self.settings = settings
         self.mentis = MentisClient(settings.langfuse_host)
         self.categories = [
             "mercados de trading",
@@ -18,15 +19,38 @@ class TrendService:
         # Configurar Gemini
         api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
         genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel("models/gemini-1.5-flash")
         
         # Configurar Tavily
         tavily_key = os.getenv("TAVILY_API_KEY")
         self.tavily = TavilyClient(api_key=tavily_key) if tavily_key else None
 
+    async def _generate_content_with_fallback(self, prompt: str):
+        """Intenta generar contenido probando varios modelos por si hay limites de cuota"""
+        model_candidates = [
+            "models/gemini-flash-latest",
+            "models/gemini-pro-latest",
+            "models/gemini-2.0-flash-lite"
+        ]
+        
+        last_error = None
+        for model_name in model_candidates:
+            try:
+                print(f"[LLM] Intentando con modelo: {model_name}...")
+                model = genai.GenerativeModel(model_name)
+                response = await model.generate_content_async(prompt)
+                return response.text
+            except Exception as e:
+                last_error = e
+                if "429" in str(e):
+                    print(f"[LLM WARNING] Cuota agotada en {model_name}. Probando siguiente...")
+                    continue
+                else:
+                    raise e
+        raise last_error
+
     async def run_daily_trends(self):
         if not self.tavily:
-            print("[TRENDS ERROR] No hay TAVILY_API_KEY configurada. No se puede realizar busqueda real.")
+            print("[TRENDS ERROR] No hay TAVILY_API_KEY configurada.")
             return []
 
         print("[TRENDS] Iniciando sondeo REAL de tendencias con Tavily...")
@@ -39,13 +63,13 @@ class TrendService:
                 search_result = self.tavily.search(query=search_query, search_depth="advanced")
                 
                 prompt = (
-                    f"Analiza las siguientes noticias y tendencias reales encontradas en la web sobre '{category}' en Twitter/X.\n"
-                    f"Resultados de búsqueda: {json.dumps(search_result['results'])}\n\n"
-                    "Genera un resumen ejecutivo de 3 puntos sobre por que esto es relevante para un agente de trading autónomo."
+                    f"Analiza estas noticias reales sobre '{category}' en Twitter/X:\n"
+                    f"{json.dumps(search_result['results'])}\n\n"
+                    "Genera un resumen ejecutivo de 3 puntos para un agente de trading."
                 )
                 
-                response = await self.model.generate_content_async(prompt)
-                summary = response.text
+                # Usamos el nuevo helper con fallback
+                summary = await self._generate_content_with_fallback(prompt)
                 
                 await self.mentis.save_daily_knowledge(category, summary)
                 results.append({"category": category, "summary": summary})
@@ -54,9 +78,9 @@ class TrendService:
                     await self._check_proactive_opportunities(category, summary)
             
             # --- Notificacion de Exito ---
-            msg = f"📊 **Análisis de Tendencias Completado**\nSe han procesado **{len(results)}** categorías y guardado en Mentis Memory.\n\n"
+            msg = f"📊 **Análisis de Tendencias Completado**\nSe han procesado **{len(results)}** categorías.\n"
             for r in results:
-                msg += f"• *{r['category']}*: Procesado ✅\n"
+                msg += f"• *{r['category']}*: ✅\n"
             await self._send_notification(msg)
 
         except Exception as e:
