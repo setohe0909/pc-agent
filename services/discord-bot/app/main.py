@@ -3,6 +3,8 @@ import os
 import json
 from pathlib import Path
 import httpx
+from fastapi import FastAPI, Request
+import uvicorn
 
 
 async def _send_assistant_request(payload: dict) -> dict:
@@ -105,7 +107,42 @@ async def main() -> None:
             return
 
         content = message.content.strip()
-        if not content.startswith(("!ask ", "!research ", "!approve_trade ", "!status")):
+        if not content.startswith(("!ask ", "!research ", "!approve_trade ", "!status", "!memory")):
+            return
+
+        if content == "!memory":
+            try:
+                base_url = _get_env("CONTROL_API_URL", "http://control-api:8000").rstrip("/")
+                async with httpx.AsyncClient(timeout=10) as client_http:
+                    resp = await client_http.get(f"{base_url}/mentis/memory")
+                
+                if resp.status_code == 200:
+                    data = resp.json()
+                    memory_list = data.get("memory", [])
+                    if not memory_list:
+                        await message.reply("🧠 **Memoria vacía**: No he recolectado tendencias hoy todavía.")
+                        return
+                    
+                    report = "🧠 **Memoria Reciente del Agente**\n"
+                    report += "-----------------------------------\n"
+                    for item in memory_list:
+                        category = item.get("category", "N/A").upper()
+                        date = item.get("date_key", "N/A")
+                        body = item.get("content", "")
+                        # Truncamos si es muy largo para el reporte
+                        if len(body) > 300: body = body[:300] + "..."
+                        report += f"🔹 **{category}** ({date}):\n{body}\n\n"
+                    
+                    # Usamos nuestra función de mensajes largos por si hay mucha memoria
+                    if len(report) > 1900:
+                        chunks = [report[i:i+1900] for i in range(0, len(report), 1900)]
+                        for chunk in chunks: await message.reply(chunk)
+                    else:
+                        await message.reply(report)
+                else:
+                    await message.reply(f"Error al obtener memoria: HTTP {resp.status_code}")
+            except Exception as exc:
+                await message.reply(f"No pude conectar con el Control API: {exc}")
             return
 
         if content == "!status":
@@ -187,6 +224,41 @@ async def main() -> None:
                 await message.reply(f"Respuesta: {response_text}")
         except Exception as exc:
             await message.reply(f"No pude contactar al runtime: {exc}")
+
+    # --- Servidor API interno para notificaciones ---
+    app_api = FastAPI()
+
+    @app_api.post("/notify/trade")
+    async def notify_trade(request: Request):
+        data = await request.json()
+        channel_id = _get_env("DISCORD_NOTIFICATIONS_CHANNEL_ID")
+        if not channel_id:
+            return {"status": "error", "message": "No hay canal de notificaciones configurado"}
+        
+        title = data.get("title", "🚀 OPORTUNIDAD DETECTADA")
+        message_text = data.get("message", "")
+        trade_payload = data.get("payload", {})
+        
+        channel = client.get_channel(int(channel_id))
+        if channel:
+            embed = discord.Embed(title=title, description=message_text, color=discord.Color.gold())
+            embed.set_footer(text="Inteligencia Social de PC Agent")
+            
+            # Buscamos un autor valido (el primer aprobador) para que el boton funcione
+            approvers = list(_approvers())
+            class DummyAuthor:
+                def __init__(self, id): self.id = id
+            
+            author = DummyAuthor(approvers[0]) if approvers else client.user
+            
+            await channel.send(embed=embed, view=TradeView(trade_payload, author))
+            return {"status": "sent"}
+        return {"status": "error", "message": "Canal no encontrado"}
+
+    # Ejecutamos el servidor API en segundo plano
+    config = uvicorn.Config(app_api, host="0.0.0.0", port=8001, log_level="info")
+    server = uvicorn.Server(config)
+    asyncio.create_task(server.serve())
 
     while True:
         try:

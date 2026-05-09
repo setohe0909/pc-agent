@@ -1,4 +1,5 @@
 import os
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 from apscheduler.triggers.cron import CronTrigger
 from pydantic import BaseModel, Field, field_validator
@@ -188,6 +189,28 @@ async def update_ingestion_schedule(request: IngestionScheduleRequest) -> dict:
 async def trigger_ingestion_run(request: TriggerIngestionRequest) -> dict:
     run = await TriggerIngestionRun(ingestion_control).execute(request.target)
     return {"run": run}
+
+
+@router.get("/mentis/memory")
+async def get_mentis_memory():
+    url = settings.effective("supabase_url")
+    key = settings.effective("supabase_service_role_key") or settings.effective("supabase_publishable_key")
+    headers = {
+        "apikey": key,
+        "Authorization": f"Bearer {key}",
+    }
+    async with httpx.AsyncClient() as client:
+        try:
+            # Consultamos los últimos 10 registros de memoria
+            response = await client.get(
+                f"{url}/rest/v1/mentis_memory?order=created_at.desc&limit=10",
+                headers=headers
+            )
+            if response.status_code != 200:
+                return {"memory": [], "detail": f"Error de Supabase: {response.text}"}
+            return {"memory": response.json()}
+        except Exception as e:
+            return {"memory": [], "detail": str(e)}
 
 
 def _supabase_knowledge_base() -> SupabaseVectorKnowledgeBase:
