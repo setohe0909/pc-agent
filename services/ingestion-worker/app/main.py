@@ -78,8 +78,12 @@ def collect_markets() -> None:
     _run_job("collect_markets", ingest_enabled_sources())
 
 
+from app.services.trend_service import TrendService
+
 def collect_trends() -> None:
-    _run_job("collect_trends", ingest_enabled_sources())
+    print("[CRON] Iniciando recoleccion de tendencias diarias...")
+    service = TrendService()
+    _run_job("collect_trends", service.run_daily_trends())
 
 
 def sync_mentis() -> None:
