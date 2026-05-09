@@ -11,10 +11,18 @@ class TradingWorkflow:
 
     async def execute_chat(self, prompt: str, user_id: str | None = None) -> str:
         context = None
+        system_instructions = "Eres un asistente financiero experto. Responde siempre de forma profesional y basada en datos."
+        
+        # Si parece una investigacion, reforzamos el rol del asistente
+        if any(keyword in prompt.lower() for keyword in ["investiga", "research", "analiza", "tendencias"]):
+            system_instructions += " El usuario solicita una investigacion profunda. Analiza tendencias, riesgos y oportunidades de mercado."
+
         if self.memory and user_id:
             context = await self.memory.get_context(user_id)
         
-        response = await self.llm.chat(prompt, context)
+        # Enriquecemos el prompt con las instrucciones de sistema si es necesario
+        full_prompt = f"{system_instructions}\n\nPregunta: {prompt}"
+        response = await self.llm.chat(full_prompt, context)
         
         if self.memory and user_id:
             await self.memory.save_interaction(user_id, {"prompt": prompt, "response": response})

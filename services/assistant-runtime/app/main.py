@@ -90,17 +90,23 @@ async def assistant_request(request: AssistantRequest) -> dict:
             result_text = await workflow.execute_chat(prompt=request.prompt, user_id=request.source.user_id)
             result = {"status": "success", "message": result_text}
 
+        # DEBUG: Ver que esta devolviendo el workflow
+        print(f"[DEBUG] Workflow result: {result}")
+
         return {
             "status": result.get("status", "accepted"),
             "provider": os.getenv("DEFAULT_LLM_PROVIDER", "openai"),
-            "message": result.get("message", "Operacion exitosa."),
+            "message": result.get("message") or "El asistente no pudo generar una respuesta de texto.",
             "order": result.get("order"),
+            "critic_note": result.get("critic_note"),
             "input": request.model_dump(),
         }
     except Exception as exc:
+        print(f"[ERROR] Exception in assistant_request: {exc}")
         return {
             "status": "error",
             "reason": str(exc),
+            "message": f"Error interno: {str(exc)}",
             "input": request.model_dump(),
         }
 

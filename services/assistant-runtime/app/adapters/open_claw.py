@@ -51,7 +51,10 @@ class OpenClawLLMAdapter(LLMPort):
         elif provider == "gemini":
             gemini_key = runtime_config.get("gemini_api_key") or os.getenv("GEMINI_API_KEY")
             if gemini_key:
-                os.environ["GEMINI_API_KEY"] = gemini_key
+                # Usar la variable estandar de Google AI Studio
+                os.environ["GOOGLE_API_KEY"] = gemini_key
+            
+            # Forzar el uso de gemini/ (AI Studio via explicit api_key)
             if policy == "cheap":
                 return "gemini/gemini-1.5-flash"
             return "gemini/gemini-1.5-pro"
@@ -67,11 +70,19 @@ class OpenClawLLMAdapter(LLMPort):
             })
         messages.append({"role": "user", "content": prompt})
 
+        # Pasamos la key explicitamente para evitar que litellm use VertexAI
+        api_key = os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
+
         response = await acompletion(
             model=model,
             messages=messages,
+            api_key=api_key
         )
-        return response.choices[0].message.content
+        content = response.choices[0].message.content
+        if not content:
+            print(f"[LLM ERROR] El modelo {model} devolvio una respuesta vacia.")
+            return "Lo siento, no pude generar una respuesta. Por favor, intenta de nuevo o revisa la configuración de la IA."
+        return content
 
     async def analyze_trade(self, market_data: dict, prompt: str) -> dict:
         # Usa el modelo mas inteligente (y mas caro) para decisiones financieras
@@ -89,10 +100,13 @@ class OpenClawLLMAdapter(LLMPort):
             {"role": "user", "content": f"Mercados disponibles:\n{json.dumps(market_data, indent=2)}\n\nSolicitud del usuario: {prompt}"}
         ]
 
+        api_key = os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
+
         response = await acompletion(
             model=model,
             messages=messages,
-            response_format={"type": "json_object"}
+            response_format={"type": "json_object"},
+            api_key=api_key
         )
         content = response.choices[0].message.content
         try:
