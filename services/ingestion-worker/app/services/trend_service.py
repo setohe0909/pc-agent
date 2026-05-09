@@ -1,5 +1,6 @@
 import os
 import json
+import httpx
 import google.generativeai as genai
 from tavily import TavilyClient
 from app.adapters.mentis import MentisClient

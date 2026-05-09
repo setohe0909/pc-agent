@@ -232,6 +232,7 @@ async def main() -> None:
     async def notify_trade(request: Request):
         data = await request.json()
         channel_id = _get_env("DISCORD_NOTIFICATIONS_CHANNEL_ID")
+        print(f"[NOTIFY] Intentando enviar alerta al canal: {channel_id}")
         if not channel_id:
             return {"status": "error", "message": "No hay canal de notificaciones configurado"}
         
