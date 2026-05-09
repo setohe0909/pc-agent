@@ -107,16 +107,36 @@ async def main() -> None:
             return
 
         content = message.content.strip()
-        if not content.startswith(("!ask ", "!research ", "!approve_trade ", "!status", "!memory", "!run ", "!claw ")):
+        command_list = ("!ask ", "!research ", "!approve_trade ", "!status", "!memory", "!run ", "!claw ", "!help")
+        if not content.startswith(command_list):
             return
 
-        if content.startswith("!claw "):
-            query = content.removeprefix("!claw ").strip()
-            # 1. Creamos un hilo para la consulta
-            thread = await message.create_thread(name=f"Claw: {query[:30]}...")
-            await thread.send("🔍 Consultando a Open Claw (Analizando memoria de Mentis)...")
+        # --- COMANDO HELP ---
+        if content == "!help":
+            embed = discord.Embed(
+                title="📖 Guía de Comandos - PC Agent", 
+                description="Aquí tienes todo lo que puedo hacer por ti:",
+                color=discord.Color.blue()
+            )
+            embed.add_field(name="🤖 Inteligencia Proactiva", value="`!memory`: Ver qué he aprendido hoy.\n`!run trends`: Forzar búsqueda de tendencias.", inline=False)
+            embed.add_field(name="🧠 Asistente Open Claw", value="`!claw <pregunta>`: Abre un hilo de análisis profundo usando mi memoria diaria.", inline=False)
+            embed.add_field(name="📊 Trading & Research", value="`!ask <duda>`: Pregunta rápida.\n`!research <tema>`: Investigación profunda.\n`!status`: Estado del sistema.", inline=False)
+            embed.add_field(name="⚖️ Decisiones", value="`!approve_trade <id>`: Aprobar una operación sugerida.", inline=False)
+            embed.set_footer(text="PC Agent v2.0 - Autonomía y Análisis")
+            await message.reply(embed=embed)
+            return
+
+        if content.startswith("!claw"):
+            query = content.removeprefix("!claw").strip()
+            if not query:
+                await message.reply("⚠️ Por favor, añade una pregunta después de `!claw`.")
+                return
             
+            # 1. Creamos un hilo para la consulta
             try:
+                thread = await message.create_thread(name=f"Claw: {query[:30]}...")
+                await thread.send("🔍 Consultando a Open Claw (Analizando memoria de Mentis)...")
+                
                 # 2. Llamamos al assistant-runtime
                 payload = {
                     "action_type": "chat",
@@ -132,8 +152,10 @@ async def main() -> None:
                 
                 # 3. Respondemos en el hilo
                 await thread.send(f"🤖 **Respuesta de Open Claw:**\n\n{answer}")
+            except discord.Forbidden:
+                await message.reply("❌ No tengo permiso para crear hilos en este canal. Por favor, dales permiso a 'Crear hilos públicos'.")
             except Exception as e:
-                await thread.send(f"❌ Error al contactar a Open Claw: {e}")
+                await message.reply(f"❌ Error al contactar a Open Claw: {e}")
             return
 
         if content.startswith("!run "):

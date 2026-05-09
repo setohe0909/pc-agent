@@ -22,17 +22,22 @@ app = FastAPI()
 async def run_manual_job(target: str, background_tasks: BackgroundTasks):
     print(f"[API] Solicitud de ejecucion manual recibida para: {target}")
     if target == "markets":
-        background_tasks.add_task(collect_markets)
+        background_tasks.add_task(ingest_enabled_sources)
     elif target == "trends":
-        background_tasks.add_task(collect_trends)
+        service = TrendService()
+        background_tasks.add_task(service.run_daily_trends)
     elif target == "mentis":
-        background_tasks.add_task(sync_mentis)
+        background_tasks.add_task(sync_mentis_async)
     elif target == "all":
-        background_tasks.add_task(collect_markets)
-        background_tasks.add_task(collect_trends)
+        background_tasks.add_task(ingest_enabled_sources)
+        service = TrendService()
+        background_tasks.add_task(service.run_daily_trends)
     else:
         return {"status": "error", "message": f"Target {target} no valido"}
     return {"status": "triggered", "target": target}
+
+async def sync_mentis_async():
+    print("Sincronizacion MentisDB pendiente.")
 
 @observe(name="ingest_enabled_sources")
 async def ingest_enabled_sources() -> int:
@@ -96,30 +101,23 @@ async def send_discord_notification(channel_id: str, content: str):
         print(f"Error enviando notificacion a Discord: {e}")
 
 
-def collect_markets() -> None:
+# --- Manejadores para el Scheduler (Thread safe) ---
+def collect_markets_sync():
     asyncio.run(ingest_enabled_sources())
 
-
-def collect_trends() -> None:
-    print("[JOB] Iniciando recoleccion de tendencias...")
+def collect_trends_sync():
+    print("[JOB] Iniciando recoleccion de tendencias via Scheduler...")
     service = TrendService()
     asyncio.run(service.run_daily_trends())
 
-
-def sync_mentis() -> None:
-    print("Sincronizacion MentisDB pendiente.")
-
-
 def main() -> None:
     scheduler = BackgroundScheduler(timezone="UTC")
-    scheduler.add_job(collect_markets, CronTrigger.from_crontab(settings.market_ingestion_cron))
-    scheduler.add_job(collect_trends, CronTrigger.from_crontab(settings.trends_ingestion_cron))
-    scheduler.add_job(sync_mentis, CronTrigger.from_crontab(settings.mentis_sync_cron))
+    scheduler.add_job(collect_markets_sync, CronTrigger.from_crontab(settings.market_ingestion_cron))
+    scheduler.add_job(collect_trends_sync, CronTrigger.from_crontab(settings.trends_ingestion_cron))
     scheduler.start()
 
     print("Ingestion worker activo con Scheduler y API en puerto 8000")
     uvicorn.run(app, host="0.0.0.0", port=8000)
-
 
 if __name__ == "__main__":
     main()
