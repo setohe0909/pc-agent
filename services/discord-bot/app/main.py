@@ -107,7 +107,33 @@ async def main() -> None:
             return
 
         content = message.content.strip()
-        if not content.startswith(("!ask ", "!research ", "!approve_trade ", "!status", "!memory", "!run ")):
+        if not content.startswith(("!ask ", "!research ", "!approve_trade ", "!status", "!memory", "!run ", "!claw ")):
+            return
+
+        if content.startswith("!claw "):
+            query = content.removeprefix("!claw ").strip()
+            # 1. Creamos un hilo para la consulta
+            thread = await message.create_thread(name=f"Claw: {query[:30]}...")
+            await thread.send("🔍 Consultando a Open Claw (Analizando memoria de Mentis)...")
+            
+            try:
+                # 2. Llamamos al assistant-runtime
+                payload = {
+                    "action_type": "chat",
+                    "prompt": query,
+                    "source": {
+                        "platform": "discord",
+                        "channel_id": str(message.channel.id),
+                        "user_id": str(message.author.id)
+                    }
+                }
+                answer_data = await _send_assistant_request(payload)
+                answer = answer_data.get("message", "No hubo respuesta.")
+                
+                # 3. Respondemos en el hilo
+                await thread.send(f"🤖 **Respuesta de Open Claw:**\n\n{answer}")
+            except Exception as e:
+                await thread.send(f"❌ Error al contactar a Open Claw: {e}")
             return
 
         if content.startswith("!run "):

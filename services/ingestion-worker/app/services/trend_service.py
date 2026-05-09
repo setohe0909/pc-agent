@@ -69,11 +69,16 @@ class TrendService:
         """Helper para enviar notificaciones simples de texto"""
         token = os.getenv("DISCORD_TOKEN")
         channel_id = os.getenv("DISCORD_NOTIFICATIONS_CHANNEL_ID")
-        if not token or not channel_id: return
+        print(f"[NOTIFY] Intentando enviar a Discord (Canal: {channel_id})...")
+        if not token or not channel_id: 
+            print("[NOTIFY ERROR] DISCORD_TOKEN o CHANNEL_ID faltantes.")
+            return
+        
         url = f"https://discord.com/api/v10/channels/{channel_id}/messages"
         headers = {"Authorization": f"Bot {token}"}
         async with httpx.AsyncClient(timeout=10) as client:
-            await client.post(url, headers=headers, json={"content": content})
+            resp = await client.post(url, headers=headers, json={"content": content})
+            print(f"[NOTIFY STATUS] {resp.status_code} - {resp.text}")
 
     async def _check_proactive_opportunities(self, category: str, trend_summary: str):
         """Busca oportunidades de trading reales basadas en la tendencia"""

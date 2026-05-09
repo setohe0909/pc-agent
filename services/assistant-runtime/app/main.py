@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from app.adapters.kalshi import KalshiHttpAdapter
 from app.adapters.open_claw import OpenClawLLMAdapter
+from app.adapters.memory import MentisMemoryAdapter
 from app.use_cases.trading_workflow import TradingWorkflow
 
 def load_runtime_config():
@@ -80,8 +81,8 @@ async def assistant_request(request: AssistantRequest) -> dict:
     # Inyectar dependencias (Hexagonal Architecture)
     trading_port = KalshiHttpAdapter()
     llm_port = OpenClawLLMAdapter()
-    # MemoryPort no implementado por el momento en este demo
-    workflow = TradingWorkflow(trading_port=trading_port, llm_port=llm_port)
+    memory_port = MentisMemoryAdapter()
+    workflow = TradingWorkflow(trading_port=trading_port, llm_port=llm_port, memory_port=memory_port)
 
     try:
         if request.action_type in {ActionType.trade_decision, ActionType.open_position}:
