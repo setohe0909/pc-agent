@@ -32,32 +32,48 @@ class TrendService:
         print("[TRENDS] Iniciando sondeo REAL de tendencias con Tavily...")
         results = []
         
-        for category in self.categories:
-            print(f"[TRENDS] Buscando tendencias para: {category}...")
-            # Buscamos especificamente tendencias en X/Twitter a traves de Tavily
-            search_query = f"trending topics and news on X twitter about {category} today"
-            search_result = self.tavily.search(query=search_query, search_depth="advanced")
-            
-            # Gemini resume y analiza la importancia
-            prompt = (
-                f"Analiza las siguientes noticias y tendencias reales encontradas en la web sobre '{category}' en Twitter/X.\n"
-                f"Resultados de búsqueda: {json.dumps(search_result['results'])}\n\n"
-                "Genera un resumen ejecutivo de 3 puntos sobre por que esto es relevante para un agente de trading autónomo."
-            )
-            
-            response = await self.model.generate_content_async(prompt)
-            summary = response.text
-            
-            # Guardamos en Mentis
-            await self.mentis.save_daily_knowledge(category, summary)
-            results.append({"category": category, "summary": summary})
+        try:
+            for category in self.categories:
+                print(f"[TRENDS] Buscando tendencias para: {category}...")
+                search_query = f"trending topics and news on X twitter about {category} today"
+                search_result = self.tavily.search(query=search_query, search_depth="advanced")
+                
+                prompt = (
+                    f"Analiza las siguientes noticias y tendencias reales encontradas en la web sobre '{category}' en Twitter/X.\n"
+                    f"Resultados de búsqueda: {json.dumps(search_result['results'])}\n\n"
+                    "Genera un resumen ejecutivo de 3 puntos sobre por que esto es relevante para un agente de trading autónomo."
+                )
+                
+                response = await self.model.generate_content_async(prompt)
+                summary = response.text
+                
+                await self.mentis.save_daily_knowledge(category, summary)
+                results.append({"category": category, "summary": summary})
 
-            # --- NUEVO: Busqueda de oportunidades en Kalshi ---
-            if category in ["mercados de trading", "politica", "Soccer, nba, futbol america"]:
-                await self._check_proactive_opportunities(category, summary)
+                if category in ["mercados de trading", "politica", "Soccer, nba, futbol america"]:
+                    await self._check_proactive_opportunities(category, summary)
             
-        print(f"[TRENDS] Finalizado. {len(results)} categorias procesadas con datos reales.")
+            # --- Notificacion de Exito ---
+            msg = f"📊 **Análisis de Tendencias Completado**\nSe han procesado **{len(results)}** categorías y guardado en Mentis Memory.\n\n"
+            for r in results:
+                msg += f"• *{r['category']}*: Procesado ✅\n"
+            await self._send_notification(msg)
+
+        except Exception as e:
+            await self._send_notification(f"❌ **Error en Análisis de Tendencias**: {str(e)}")
+            print(f"[TRENDS ERROR] {e}")
+
         return results
+
+    async def _send_notification(self, content: str):
+        """Helper para enviar notificaciones simples de texto"""
+        token = os.getenv("DISCORD_TOKEN")
+        channel_id = os.getenv("DISCORD_NOTIFICATIONS_CHANNEL_ID")
+        if not token or not channel_id: return
+        url = f"https://discord.com/api/v10/channels/{channel_id}/messages"
+        headers = {"Authorization": f"Bot {token}"}
+        async with httpx.AsyncClient(timeout=10) as client:
+            await client.post(url, headers=headers, json={"content": content})
 
     async def _check_proactive_opportunities(self, category: str, trend_summary: str):
         """Busca oportunidades de trading reales basadas en la tendencia"""
