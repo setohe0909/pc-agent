@@ -175,7 +175,16 @@ async def main() -> None:
         }
         try:
             result = await _send_assistant_request(payload)
-            await message.reply(f"Respuesta: {result.get('message')}")
+            response_text = result.get('message') or "El asistente no devolvio una respuesta."
+            
+            # Si el mensaje es muy largo, lo dividimos en partes de 1900 caracteres
+            if len(response_text) > 1900:
+                chunks = [response_text[i:i+1900] for i in range(0, len(response_text), 1900)]
+                for i, chunk in enumerate(chunks):
+                    prefix = f"**Parte {i+1}/{len(chunks)}**:\n" if len(chunks) > 1 else ""
+                    await message.reply(f"{prefix}{chunk}")
+            else:
+                await message.reply(f"Respuesta: {response_text}")
         except Exception as exc:
             await message.reply(f"No pude contactar al runtime: {exc}")
 
