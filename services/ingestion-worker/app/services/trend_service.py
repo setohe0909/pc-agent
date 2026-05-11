@@ -32,11 +32,10 @@ class TrendService:
         """Intenta generar contenido probando varios modelos por si hay limites de cuota"""
         import asyncio
         model_candidates = [
-            "models/gemini-1.5-flash",
-            "models/gemini-1.5-flash-8b",
+            "models/gemini-2.0-flash-lite",
+            "models/gemini-3.1-flash-lite",
             "models/gemini-flash-latest",
-            "models/gemini-pro-latest",
-            "models/gemini-2.0-flash-lite-preview-02-05" # Intentando con el preview especifico
+            "models/gemini-pro-latest"
         ]
         
         last_error = None

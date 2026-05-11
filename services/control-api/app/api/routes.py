@@ -209,9 +209,9 @@ async def get_today_intelligence():
     }
     async with httpx.AsyncClient() as client:
         try:
-            # Consultamos registros usando el date_key exacto
+            # Consultamos registros de hoy usando el rango de created_at
             response = await client.get(
-                f"{url}/rest/v1/mentis_memory?date_key=eq.{today}&order=created_at.desc",
+                f"{url}/rest/v1/mentis_memory?created_at=gte.{today}T00:00:00Z&order=created_at.desc",
                 headers=headers
             )
             if response.status_code != 200:

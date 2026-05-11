@@ -190,10 +190,11 @@ async def main() -> None:
             try:
                 base_url = _get_env("CONTROL_API_URL", "http://control-api:8000").rstrip("/")
                 async with httpx.AsyncClient(timeout=10) as client_http:
-                    resp = await client_http.get(f"{base_url}/mentis/memory")
+                    resp = await client_http.get(f"{base_url}/intelligence/memory/today")
                 
                 if resp.status_code == 200:
                     data = resp.json()
+                    print(f"[DEBUG MEMORY] Datos recibidos del API: {data}")
                     memory_list = data.get("memory", [])
                     if not memory_list:
                         await message.reply("🧠 **Memoria vacía**: No he recolectado tendencias hoy todavía.")
@@ -204,7 +205,7 @@ async def main() -> None:
                     for item in memory_list:
                         category = item.get("category", "N/A").upper()
                         date = item.get("date_key", "N/A")
-                        body = item.get("content", "")
+                        body = item.get("summary", "")
                         # Truncamos si es muy largo para el reporte
                         if len(body) > 300: body = body[:300] + "..."
                         report += f"🔹 **{category}** ({date}):\n{body}\n\n"

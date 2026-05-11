@@ -23,8 +23,7 @@ class MentisClient:
         payload = {
             "category": category,
             "summary": content,
-            "created_at": now.isoformat(),
-            "date_key": today
+            "created_at": now.isoformat()
         }
         
         try:
