@@ -31,6 +31,8 @@ class MarketingWorkflow:
             return await self._monitor_trends()
         elif sub_command == "sentiment":
             return await self._analyze_sentiment()
+        elif sub_command == "collab":
+            return await self._find_collaborations(prompt)
         else:
             # Default chat for marketing context
             return await self._marketing_chat(prompt)
@@ -265,3 +267,20 @@ class MarketingWorkflow:
             summary += "✨ El sentimiento general es saludable. ¡Sigue así!"
 
         return {"status": "success", "message": summary}
+
+    async def _find_collaborations(self, prompt: str) -> dict:
+        collab_prompt = (
+            f"Busca y propón estrategias de colaboración para una marca con este perfil: {prompt}\n\n"
+            f"Incluye:\n"
+            f"1. **Micro-Influencers**: Perfiles de nicho que encajen con la estética.\n"
+            f"2. **Cuentas de Complemento**: Marcas no competidoras para sorteos o co-branding.\n"
+            f"3. **Ideas de Campaña**: Formatos sugeridos para la colaboración (Takeover, unboxing, etc.).\n\n"
+            f"El objetivo es expansión de audiencia y credibilidad."
+        )
+        
+        suggestions = await self.llm.chat(collab_prompt)
+        
+        return {
+            "status": "success",
+            "message": f"## 🤝 Propuesta de Colaboraciones e Influencers\n\n{suggestions}"
+        }

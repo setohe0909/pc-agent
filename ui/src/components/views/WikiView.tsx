@@ -129,6 +129,8 @@ export function WikiView() {
                   <p className="text-muted-foreground">Detecta tendencias virales en TikTok/IG y sugiere contenido adaptado.</p>
                   <p><strong>!marketer sentiment</strong></p>
                   <p className="text-muted-foreground">Analiza el tono de la comunidad y alerta sobre posibles crisis de reputación.</p>
+                  <p><strong>!marketer collab [marca]</strong></p>
+                  <p className="text-muted-foreground">Identifica micro-influencers y marcas para colaboraciones estratégicas.</p>
                   <p><strong>!marketer plan [tema]</strong></p>
                   <p className="text-muted-foreground">Planifica campañas basadas en tendencias e insights de diseño.</p>
                   <p><strong>!marketer research [competidor]</strong></p>
