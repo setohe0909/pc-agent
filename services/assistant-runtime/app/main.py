@@ -91,6 +91,7 @@ async def assistant_request(request: AssistantRequest) -> dict:
         if request.action_type in {ActionType.trade_decision, ActionType.open_position}:
             result = await workflow.execute_trade_decision(prompt=request.prompt, user_id=request.source.user_id)
         elif request.action_type == ActionType.marketing:
+            print(f"[DEBUG] Entrando a MarketingWorkflow con prompt: {request.prompt}")
             result = await marketing_workflow.execute_marketing_action(prompt=request.prompt, payload=request.payload)
         else:
             result_text = await workflow.execute_chat(prompt=request.prompt, user_id=request.source.user_id)

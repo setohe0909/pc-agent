@@ -1,5 +1,5 @@
 import type { FormEvent } from "react";
-import { Instagram, Music2, Megaphone, Save, Sparkles, TrendingUp, Search } from "lucide-react";
+import { Camera, Music, Megaphone, Save, Sparkles, TrendingUp, Search } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -7,8 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export function MarketerView({ data, onSave }: { data: any, adminToken: string, onSave: (payload: any) => Promise<void> }) {
-  const { config, runtime } = data;
-  const integrations = config?.integrations || {};
+  const { runtime } = data;
   const currentRuntime = runtime?.runtime || {};
 
   const handleSave = async (e: FormEvent<HTMLFormElement>) => {
@@ -43,7 +42,7 @@ export function MarketerView({ data, onSave }: { data: any, adminToken: string, 
         <Card>
           <CardHeader>
             <CardTitle className="text-md flex items-center gap-2">
-              <Instagram className="w-5 h-5 text-pink-500" />
+              <Camera className="w-5 h-5 text-pink-500" />
               Instagram Business
             </CardTitle>
             <CardDescription>Conecta tu cuenta para responder comentarios y planificar.</CardDescription>
@@ -72,7 +71,7 @@ export function MarketerView({ data, onSave }: { data: any, adminToken: string, 
         <Card>
           <CardHeader>
             <CardTitle className="text-md flex items-center gap-2">
-              <Music2 className="w-5 h-5 text-black" />
+              <Music className="w-5 h-5 text-black" />
               TikTok For Business
             </CardTitle>
             <CardDescription>Gestión de contenido y tendencias en TikTok.</CardDescription>

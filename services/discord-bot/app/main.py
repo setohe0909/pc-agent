@@ -254,12 +254,14 @@ async def main() -> None:
             return
 
         if content.startswith("!marketer-status"):
+            print(f"[DEBUG] Comando !marketer-status detectado")
             payload = {
                 "action_type": "marketing",
                 "prompt": "dame tu estado",
                 "source": {"platform": "discord", "channel_id": str(message.channel.id), "user_id": str(message.author.id)},
                 "payload": {"sub_command": "status"}
             }
+            print(f"[DEBUG] Enviando solicitud !marketer-status al assistant-runtime")
             try:
                 result = await _send_assistant_request(payload)
                 await message.reply(result.get("message", "No pude obtener el estado del marketer."))
