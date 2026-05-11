@@ -23,6 +23,8 @@ class MarketingWorkflow:
             return await self._get_status()
         elif sub_command == "qualify":
             return await self._qualify_leads()
+        elif sub_command == "magnet":
+            return await self._process_lead_magnets()
         else:
             # Default chat for marketing context
             return await self._marketing_chat(prompt)
@@ -144,3 +146,35 @@ class MarketingWorkflow:
             # Aquí podríamos disparar un evento que el discord-bot escuche.
             
         return {"status": "success", "message": summary}
+
+    async def _process_lead_magnets(self) -> dict:
+        # 1. Definir disparadores y enlaces
+        # En una versión real, esto vendría de la configuración guardada en Supabase
+        magnets = {
+            "GUIA": {"link": "https://brand.com/free-guide", "name": "Guía de Estilo"},
+            "INFO": {"link": "https://brand.com/catalog", "name": "Catálogo 2026"}
+        }
+        
+        comments = await self.marketing.get_comments("instagram", "latest_post")
+        processed_count = 0
+        details = []
+        
+        for comment in comments:
+            text_upper = comment["text"].upper()
+            for trigger, data in magnets.items():
+                if trigger in text_upper:
+                    # 2. Enviar DM (stub)
+                    dm_text = f"¡Hola! Gracias por tu interés. Aquí tienes tu {data['name']}: {data['link']}"
+                    await self.marketing.send_dm("instagram", comment["user"], dm_text)
+                    
+                    details.append(f"✅ DM enviado a **{comment['user']}** (Trigger: `{trigger}`)")
+                    processed_count += 1
+                    break
+        
+        if processed_count == 0:
+            return {"status": "success", "message": "No se encontraron comentarios con palabras clave de Lead Magnet (GUIA, INFO)."}
+            
+        return {
+            "status": "success", 
+            "message": f"### 🧲 Automatización de Lead Magnets\n\n" + "\n".join(details) + f"\n\n**Total procesados:** {processed_count}"
+        }

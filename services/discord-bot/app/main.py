@@ -119,7 +119,7 @@ async def main() -> None:
                 color=discord.Color.blue()
             )
             embed.add_field(name="🤖 Inteligencia Proactiva", value="`!memory`: Ver qué he aprendido hoy.\n`!run trends`: Forzar búsqueda de tendencias.", inline=False)
-            embed.add_field(name="📣 Marketing Sub-Agent", value="`!marketer-status`: Estado del marketer.\n`!marketer respond`: Responder comentarios.\n`!marketer qualify`: Detectar leads calientes.\n`!marketer plan <tema>`: Planear campaña.\n`!marketer research <competidor>`: Sondeo de competencia.", inline=False)
+            embed.add_field(name="📣 Marketing Sub-Agent", value="`!marketer-status`: Estado del marketer.\n`!marketer respond`: Responder comentarios.\n`!marketer qualify`: Detectar leads calientes.\n`!marketer magnet`: Automatizar Lead Magnets (DM).\n`!marketer plan <tema>`: Planear campaña.\n`!marketer research <competidor>`: Sondeo de competencia.", inline=False)
             embed.add_field(name="🧠 Asistente Open Claw", value="`!claw <pregunta>`: Abre un hilo de análisis profundo usando mi memoria diaria.", inline=False)
             embed.add_field(name="📊 Trading & Research", value="`!ask <duda>`: Pregunta rápida.\n`!research <tema>`: Investigación profunda.\n`!status`: Estado del sistema.", inline=False)
             embed.add_field(name="⚖️ Decisiones", value="`!approve_trade <id>`: Aprobar una operación sugerida.", inline=False)
@@ -286,6 +286,9 @@ async def main() -> None:
             elif raw_query.startswith("qualify"):
                 sub_command = "qualify"
                 prompt = "cualifica leads"
+            elif raw_query.startswith("magnet"):
+                sub_command = "magnet"
+                prompt = "procesa lead magnets"
 
             payload = {
                 "action_type": "marketing",
