@@ -27,6 +27,8 @@ class MarketingWorkflow:
             return await self._process_lead_magnets()
         elif sub_command == "funnel":
             return await self._generate_funnel(prompt)
+        elif sub_command == "trends":
+            return await self._monitor_trends()
         else:
             # Default chat for marketing context
             return await self._marketing_chat(prompt)
@@ -197,3 +199,26 @@ class MarketingWorkflow:
             "status": "success",
             "message": f"## 🗺️ Estrategia de Funnel de Ventas\n\n{funnel_strategy}"
         }
+
+    async def _monitor_trends(self) -> dict:
+        # 1. Simular obtención de tendencias (En real usaría APIs de TikTok/IG o scrapers)
+        trends_detected = [
+            {"name": "Minimalist Lifestyle", "growth": "45%", "platform": "TikTok"},
+            {"name": "Handmade Aesthetics", "growth": "30%", "platform": "Instagram"}
+        ]
+        
+        # 2. Generar sugerencias basadas en tendencias
+        trend_prompt = (
+            f"Analiza estas tendencias crecientes:\n{json.dumps(trends_detected)}\n\n"
+            f"Sugiere 2 ideas creativas de contenido para una marca de diseño que aprovechen estas tendencias."
+        )
+        suggestions = await self.llm.chat(trend_prompt)
+        
+        report = (
+            "### 🚀 Tendencias Detectadas (Viral Potential)\n\n"
+            f"- **{trends_detected[0]['name']}** ({trends_detected[0]['growth']} en {trends_detected[0]['platform']})\n"
+            f"- **{trends_detected[1]['name']}** ({trends_detected[1]['growth']} en {trends_detected[1]['platform']})\n\n"
+            f"💡 **Sugerencias de la IA**:\n{suggestions}"
+        )
+        
+        return {"status": "success", "message": report}
