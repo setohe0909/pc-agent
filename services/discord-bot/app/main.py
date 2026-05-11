@@ -188,38 +188,48 @@ async def main() -> None:
 
         if content == "!memory":
             try:
+                from datetime import datetime
+                today_str = datetime.now().strftime("%Y-%m-%d")
+                
+                # 1. Crear el hilo para la memoria
+                thread = await message.create_thread(
+                    name=f"🧠 Memoria de Inteligencia - {today_str}",
+                    auto_archive_duration=60
+                )
+                await thread.send("🔍 Extrayendo inteligencia recolectada hoy...")
+
                 base_url = _get_env("CONTROL_API_URL", "http://control-api:8000").rstrip("/")
                 async with httpx.AsyncClient(timeout=10) as client_http:
                     resp = await client_http.get(f"{base_url}/intelligence/memory/today")
                 
                 if resp.status_code == 200:
                     data = resp.json()
-                    print(f"[DEBUG MEMORY] Datos recibidos del API: {data}")
                     memory_list = data.get("memory", [])
                     if not memory_list:
-                        await message.reply("🧠 **Memoria vacía**: No he recolectado tendencias hoy todavía.")
+                        await thread.send("📭 No he recolectado tendencias hoy todavía.")
                         return
                     
-                    report = "🧠 **Memoria Reciente del Agente**\n"
-                    report += "-----------------------------------\n"
+                    full_report = f"## 🧠 Reporte de Inteligencia Diaria ({today_str})\n\n"
                     for item in memory_list:
                         category = item.get("category", "N/A").upper()
-                        date = item.get("date_key", "N/A")
-                        body = item.get("summary", "")
-                        # Truncamos si es muy largo para el reporte
-                        if len(body) > 300: body = body[:300] + "..."
-                        report += f"🔹 **{category}** ({date}):\n{body}\n\n"
+                        body = item.get("summary", "Sin contenido.")
+                        full_report += f"### 🔹 {category}\n{body}\n\n---\n\n"
                     
-                    # Usamos nuestra función de mensajes largos por si hay mucha memoria
-                    if len(report) > 1900:
-                        chunks = [report[i:i+1900] for i in range(0, len(report), 1900)]
-                        for chunk in chunks: await message.reply(chunk)
+                    # 3. Enviar al hilo (con soporte para mensajes muy largos)
+                    if len(full_report) > 1900:
+                        chunks = [full_report[i:i+1900] for i in range(0, len(full_report), 1900)]
+                        for i, chunk in enumerate(chunks):
+                            await thread.send(chunk)
                     else:
-                        await message.reply(report)
+                        await thread.send(full_report)
+                    
+                    await thread.send("✅ Reporte finalizado.")
                 else:
-                    await message.reply(f"Error al obtener memoria: HTTP {resp.status_code}")
+                    await thread.send(f"❌ Error al obtener memoria: HTTP {resp.status_code}")
+            except discord.Forbidden:
+                await message.reply("❌ Necesito permiso para 'Crear hilos públicos' para mostrarte la memoria.")
             except Exception as exc:
-                await message.reply(f"No pude conectar con el Control API: {exc}")
+                await message.reply(f"❌ Error crítico en memoria: {exc}")
             return
 
         if content == "!status":
