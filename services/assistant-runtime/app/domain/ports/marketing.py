@@ -10,5 +10,9 @@ class MarketingPort(ABC):
         pass
 
     @abstractmethod
+    async def send_dm(self, platform: str, user_id: str, text: str) -> bool:
+        pass
+
+    @abstractmethod
     async def get_competitor_data(self, platform: str, competitor_handle: str) -> dict:
         pass

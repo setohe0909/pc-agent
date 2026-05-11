@@ -12,7 +12,11 @@ class SocialMediaStubAdapter(MarketingPort):
         ]
 
     async def reply_to_comment(self, platform: str, comment_id: str, text: str) -> bool:
-        print(f"[STUB] Respondiendo en {platform} al comentario {comment_id}: {text}")
+        print(f"[STUB] Replying to {platform} comment {comment_id}: {text}")
+        return True
+
+    async def send_dm(self, platform: str, user_id: str, text: str) -> bool:
+        print(f"[STUB] Sending DM to {platform} user {user_id}: {text}")
         return True
 
     async def get_competitor_data(self, platform: str, competitor_handle: str) -> dict:

@@ -119,6 +119,18 @@ export function WikiView() {
                 <CardContent className="text-xs space-y-2">
                   <p><strong>!marketer respond</strong></p>
                   <p className="text-muted-foreground">Responde comentarios en Instagram con un tono empático.</p>
+                  <p><strong>!marketer qualify</strong></p>
+                  <p className="text-muted-foreground">Analiza interacciones para detectar leads de alta intención (Hot Leads).</p>
+                  <p><strong>!marketer magnet</strong></p>
+                  <p className="text-muted-foreground">Envía recursos (guías, catálogos) automáticamente por DM basado en palabras clave.</p>
+                  <p><strong>!marketer funnel [tema]</strong></p>
+                  <p className="text-muted-foreground">Diseña una estrategia de embudo de ventas (TOFU, MOFU, BOFU).</p>
+                  <p><strong>!marketer trends</strong></p>
+                  <p className="text-muted-foreground">Detecta tendencias virales en TikTok/IG y sugiere contenido adaptado.</p>
+                  <p><strong>!marketer sentiment</strong></p>
+                  <p className="text-muted-foreground">Analiza el tono de la comunidad y alerta sobre posibles crisis de reputación.</p>
+                  <p><strong>!marketer collab [marca]</strong></p>
+                  <p className="text-muted-foreground">Identifica micro-influencers y marcas para colaboraciones estratégicas.</p>
                   <p><strong>!marketer plan [tema]</strong></p>
                   <p className="text-muted-foreground">Planifica campañas basadas en tendencias e insights de diseño.</p>
                   <p><strong>!marketer research [competidor]</strong></p>
