@@ -25,6 +25,8 @@ class MarketingWorkflow:
             return await self._qualify_leads()
         elif sub_command == "magnet":
             return await self._process_lead_magnets()
+        elif sub_command == "funnel":
+            return await self._generate_funnel(prompt)
         else:
             # Default chat for marketing context
             return await self._marketing_chat(prompt)
@@ -177,4 +179,21 @@ class MarketingWorkflow:
         return {
             "status": "success", 
             "message": f"### 🧲 Automatización de Lead Magnets\n\n" + "\n".join(details) + f"\n\n**Total procesados:** {processed_count}"
+        }
+
+    async def _generate_funnel(self, prompt: str) -> dict:
+        funnel_prompt = (
+            f"Diseña un embudo de ventas (Sales Funnel) completo para una marca con este enfoque: {prompt}\n\n"
+            f"Estructura la respuesta en las siguientes etapas:\n"
+            f"1. **TOFU (Top of Funnel - Atracción)**: Ideas para Reels/TikToks virales, hashtags y ganchos (hooks).\n"
+            f"2. **MOFU (Middle of Funnel - Confianza)**: Contenido educativo para carruseles, Stories interactivos y testimonios.\n"
+            f"3. **BOFU (Bottom of Funnel - Venta)**: Estrategia de cierre, ofertas irresistibles y CTAs directos.\n\n"
+            f"Usa un tono profesional, estratégico y creativo."
+        )
+        
+        funnel_strategy = await self.llm.chat(funnel_prompt)
+        
+        return {
+            "status": "success",
+            "message": f"## 🗺️ Estrategia de Funnel de Ventas\n\n{funnel_strategy}"
         }
