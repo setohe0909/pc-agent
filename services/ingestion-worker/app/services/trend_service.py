@@ -8,6 +8,7 @@ from app.settings import settings
 
 class TrendService:
     def __init__(self):
+        print("[TRENDS] Inicializando TrendService...")
         self.settings = settings
         self.mentis = MentisClient(settings.langfuse_host)
         self.categories = [
@@ -18,18 +19,24 @@ class TrendService:
         ]
         # Configurar Gemini
         api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+        print(f"[TRENDS] Configurando Gemini (API Key: {'Presente' if api_key else 'Faltante'})...")
         genai.configure(api_key=api_key)
         
         # Configurar Tavily
         tavily_key = os.getenv("TAVILY_API_KEY")
+        print(f"[TRENDS] Configurando Tavily (API Key: {'Presente' if tavily_key else 'Faltante'})...")
         self.tavily = TavilyClient(api_key=tavily_key) if tavily_key else None
+        print("[TRENDS] TrendService inicializado correctamente.")
 
-    async def _generate_content_with_fallback(self, prompt: str):
+    async def _generate_content_with_fallback(self, prompt: str, response_mime_type: str = "text/plain"):
         """Intenta generar contenido probando varios modelos por si hay limites de cuota"""
+        import asyncio
         model_candidates = [
+            "models/gemini-1.5-flash",
+            "models/gemini-1.5-flash-8b",
             "models/gemini-flash-latest",
             "models/gemini-pro-latest",
-            "models/gemini-2.0-flash-lite"
+            "models/gemini-2.0-flash-lite-preview-02-05" # Intentando con el preview especifico
         ]
         
         last_error = None
@@ -37,18 +44,21 @@ class TrendService:
             try:
                 print(f"[LLM] Intentando con modelo: {model_name}...")
                 model = genai.GenerativeModel(model_name)
-                response = await model.generate_content_async(prompt)
+                gen_config = genai.GenerationConfig(response_mime_type=response_mime_type)
+                response = await model.generate_content_async(prompt, generation_config=gen_config)
                 return response.text
             except Exception as e:
                 last_error = e
                 if "429" in str(e):
-                    print(f"[LLM WARNING] Cuota agotada en {model_name}. Probando siguiente...")
+                    print(f"[LLM WARNING] Cuota agotada en {model_name}. Reintentando en 2s con el siguiente...")
+                    await asyncio.sleep(2)
                     continue
                 else:
                     raise e
         raise last_error
 
     async def run_daily_trends(self):
+        print("[TRENDS] Iniciando ejecucion de run_daily_trends...")
         if not self.tavily:
             print("[TRENDS ERROR] No hay TAVILY_API_KEY configurada.")
             return []
@@ -117,7 +127,7 @@ class TrendService:
                 resp = await client.get(f"{runtime_url}/health") # Por ahora simulamos hasta tener el endpoint de mercados
                 markets = ["FED Interest Rate", "NBA Winner", "Nasdaq Close", "Gas Prices"]
             
-            # 2. Gemini decide si hay oportunidad
+            # 2. Gemini decide si hay oportunidad (usando fallback)
             prompt = (
                 f"Basado en esta tendencia: '{trend_summary}'\n"
                 f"Y estos mercados disponibles en Kalshi: {markets}\n\n"
@@ -125,11 +135,11 @@ class TrendService:
                 "{\n  \"found\": bool,\n  \"market_name\": \"nombre del mercado\",\n  \"reason\": \"porque es una buena idea\",\n  \"trade_prompt\": \"instruccion para ejecutar el trade\"\n}"
             )
             
-            response = await self.model.generate_content_async(
+            response_text = await self._generate_content_with_fallback(
                 prompt, 
-                generation_config=genai.GenerationConfig(response_mime_type="application/json")
+                response_mime_type="application/json"
             )
-            decision = json.loads(response.text)
+            decision = json.loads(response_text)
             
             if decision.get("found"):
                 print(f"[ALERT] Oportunidad encontrada: {decision['market_name']}")

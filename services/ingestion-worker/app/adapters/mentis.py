@@ -10,7 +10,9 @@ class MentisClient:
 
     async def save_daily_knowledge(self, category: str, content: str):
         """Guarda conocimiento diario en Supabase (Mentis Storage)"""
-        today = datetime.now().strftime("%Y-%m-%d")
+        from datetime import timezone
+        now = datetime.now(timezone.utc)
+        today = now.strftime("%Y-%m-%d")
         headers = {
             "apikey": self.key,
             "Authorization": f"Bearer {self.key}",
@@ -18,12 +20,10 @@ class MentisClient:
             "Prefer": "return=minimal"
         }
         
-        # Intentamos guardar en una tabla de 'mentis_memory'
-        # Si la tabla no existe, Supabase nos dara un error, pero el worker seguira funcionando
         payload = {
             "category": category,
-            "content": content,
-            "created_at": datetime.now().isoformat(),
+            "summary": content,
+            "created_at": now.isoformat(),
             "date_key": today
         }
         

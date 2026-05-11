@@ -24,6 +24,7 @@ async def run_manual_job(target: str, background_tasks: BackgroundTasks):
     if target == "markets":
         background_tasks.add_task(ingest_enabled_sources)
     elif target == "trends":
+        print("[API] Programando tarea de tendencias en segundo plano...")
         service = TrendService()
         background_tasks.add_task(service.run_daily_trends)
     elif target == "mentis":

@@ -196,8 +196,11 @@ async def trigger_ingestion_run(request: TriggerIngestionRequest) -> dict:
             return {"status": "error", "message": f"No se pudo contactar al worker: {e}"}
 
 
-@router.get("/mentis/memory")
-async def get_mentis_memory():
+@router.get("/intelligence/memory/today")
+async def get_today_intelligence():
+    from datetime import datetime, timezone
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    
     url = settings.effective("supabase_url")
     key = settings.effective("supabase_service_role_key") or settings.effective("supabase_publishable_key")
     headers = {
@@ -206,9 +209,9 @@ async def get_mentis_memory():
     }
     async with httpx.AsyncClient() as client:
         try:
-            # Consultamos los últimos 10 registros de memoria
+            # Consultamos registros usando el date_key exacto
             response = await client.get(
-                f"{url}/rest/v1/mentis_memory?order=created_at.desc&limit=10",
+                f"{url}/rest/v1/mentis_memory?date_key=eq.{today}&order=created_at.desc",
                 headers=headers
             )
             if response.status_code != 200:
@@ -216,6 +219,11 @@ async def get_mentis_memory():
             return {"memory": response.json()}
         except Exception as e:
             return {"memory": [], "detail": str(e)}
+
+
+@router.get("/mentis/memory")
+async def get_mentis_memory():
+    return await get_today_intelligence()
 
 
 def _supabase_knowledge_base() -> SupabaseVectorKnowledgeBase:
