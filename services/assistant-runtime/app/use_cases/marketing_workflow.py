@@ -21,6 +21,8 @@ class MarketingWorkflow:
             return await self._research_competitors(prompt)
         elif sub_command == "status":
             return await self._get_status()
+        elif sub_command == "qualify":
+            return await self._qualify_leads()
         else:
             # Default chat for marketing context
             return await self._marketing_chat(prompt)
@@ -94,3 +96,51 @@ class MarketingWorkflow:
             "📅 Próxima campaña programada: Ninguna"
         )
         return {"status": "success", "message": status_report}
+
+    async def _qualify_leads(self) -> dict:
+        # 1. Obtener interacciones recientes
+        comments = await self.marketing.get_comments("instagram", "latest_post")
+        
+        leads_found = []
+        for comment in comments:
+            # 2. Analizar intención con LLM
+            analysis_prompt = (
+                f"Analiza la intención de compra de este comentario: \"{comment['text']}\". "
+                f"Responde en formato JSON con los campos: "
+                f"'intent_score' (0-10), 'category' (curious, interested, hot), 'reason' (breve)."
+            )
+            analysis_text = await self.llm.chat(analysis_prompt)
+            try:
+                # Intentar parsear JSON de la respuesta del LLM
+                # Nota: En una implementación real usaríamos structured outputs
+                import re
+                json_match = re.search(r'\{.*\}', analysis_text, re.DOTALL)
+                if json_match:
+                    analysis = json.loads(json_match.group(0))
+                else:
+                    analysis = {"intent_score": 5, "category": "interested", "reason": "No se pudo parsear JSON"}
+            except Exception:
+                analysis = {"intent_score": 0, "category": "curious", "reason": "Error en análisis"}
+
+            if analysis.get("intent_score", 0) >= 7:
+                leads_found.append({
+                    "user": comment["user"],
+                    "text": comment["text"],
+                    "analysis": analysis
+                })
+
+        if not leads_found:
+            return {"status": "success", "message": "No se encontraron leads de alta intención en las interacciones recientes."}
+
+        summary = "### 🎯 Leads Cualificados Detectados\n\n"
+        for lead in leads_found:
+            summary += (
+                f"👤 **{lead['user']}**: {lead['text']}\n"
+                f"🔥 **Intención**: {lead['analysis']['intent_score']}/10 ({lead['analysis']['category']})\n"
+                f"💡 **Razón**: {lead['analysis']['reason']}\n\n"
+            )
+            
+            # 3. Notificar vía Discord (simulado enviando al canal de notificaciones si estuviera conectado)
+            # Aquí podríamos disparar un evento que el discord-bot escuche.
+            
+        return {"status": "success", "message": summary}

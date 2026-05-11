@@ -119,6 +119,8 @@ export function WikiView() {
                 <CardContent className="text-xs space-y-2">
                   <p><strong>!marketer respond</strong></p>
                   <p className="text-muted-foreground">Responde comentarios en Instagram con un tono empático.</p>
+                  <p><strong>!marketer qualify</strong></p>
+                  <p className="text-muted-foreground">Analiza interacciones para detectar leads de alta intención (Hot Leads).</p>
                   <p><strong>!marketer plan [tema]</strong></p>
                   <p className="text-muted-foreground">Planifica campañas basadas en tendencias e insights de diseño.</p>
                   <p><strong>!marketer research [competidor]</strong></p>
