@@ -107,7 +107,7 @@ async def main() -> None:
             return
 
         content = message.content.strip()
-        command_list = ("!ask ", "!research ", "!approve_trade ", "!status", "!memory", "!run ", "!claw ", "!help")
+        command_list = ("!ask ", "!research ", "!approve_trade ", "!status", "!memory", "!run ", "!claw ", "!marketer ", "!marketer-status", "!help")
         if not content.startswith(command_list):
             return
 
@@ -119,6 +119,7 @@ async def main() -> None:
                 color=discord.Color.blue()
             )
             embed.add_field(name="🤖 Inteligencia Proactiva", value="`!memory`: Ver qué he aprendido hoy.\n`!run trends`: Forzar búsqueda de tendencias.", inline=False)
+            embed.add_field(name="📣 Marketing Sub-Agent", value="`!marketer-status`: Estado del marketer.\n`!marketer respond`: Responder comentarios.\n`!marketer plan <tema>`: Planear campaña.\n`!marketer research <competidor>`: Sondeo de competencia.", inline=False)
             embed.add_field(name="🧠 Asistente Open Claw", value="`!claw <pregunta>`: Abre un hilo de análisis profundo usando mi memoria diaria.", inline=False)
             embed.add_field(name="📊 Trading & Research", value="`!ask <duda>`: Pregunta rápida.\n`!research <tema>`: Investigación profunda.\n`!status`: Estado del sistema.", inline=False)
             embed.add_field(name="⚖️ Decisiones", value="`!approve_trade <id>`: Aprobar una operación sugerida.", inline=False)
@@ -250,6 +251,56 @@ async def main() -> None:
                     await message.reply(f"Error al obtener status: HTTP {resp.status_code}")
             except Exception as exc:
                 await message.reply(f"No pude conectar con el Control API: {exc}")
+            return
+
+        if content.startswith("!marketer-status"):
+            payload = {
+                "action_type": "marketing",
+                "prompt": "dame tu estado",
+                "source": {"platform": "discord", "channel_id": str(message.channel.id), "user_id": str(message.author.id)},
+                "payload": {"sub_command": "status"}
+            }
+            try:
+                result = await _send_assistant_request(payload)
+                await message.reply(result.get("message", "No pude obtener el estado del marketer."))
+            except Exception as e:
+                await message.reply(f"❌ Error al contactar al marketer: {e}")
+            return
+
+        if content.startswith("!marketer "):
+            raw_query = content.removeprefix("!marketer ").strip()
+            sub_command = "chat"
+            prompt = raw_query
+            
+            if raw_query.startswith("respond"):
+                sub_command = "respond"
+                prompt = "responde comentarios"
+            elif raw_query.startswith("plan "):
+                sub_command = "plan"
+                prompt = raw_query.removeprefix("plan ").strip()
+            elif raw_query.startswith("research "):
+                sub_command = "research"
+                prompt = raw_query.removeprefix("research ").strip()
+
+            payload = {
+                "action_type": "marketing",
+                "prompt": prompt,
+                "source": {"platform": "discord", "channel_id": str(message.channel.id), "user_id": str(message.author.id)},
+                "payload": {"sub_command": sub_command}
+            }
+            
+            await message.reply(f"📣 **Marketer Agent procesando `{sub_command}`...**")
+            try:
+                result = await _send_assistant_request(payload)
+                msg = result.get("message", "No hubo respuesta.")
+                if len(msg) > 1900:
+                    chunks = [msg[i:i+1900] for i in range(0, len(msg), 1900)]
+                    for chunk in chunks:
+                        await message.reply(chunk)
+                else:
+                    await message.reply(msg)
+            except Exception as e:
+                await message.reply(f"❌ Error en Marketer Agent: {e}")
             return
 
         action_type = "chat"

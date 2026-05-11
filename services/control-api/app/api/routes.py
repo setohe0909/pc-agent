@@ -127,7 +127,15 @@ async def get_runtime_config() -> dict:
 
 @router.put("/config/runtime", dependencies=[Depends(require_admin)])
 async def update_runtime_config(request: RuntimeConfigUpdate) -> dict:
-    return {"runtime": runtime_config_store.update(request)}
+    updated = runtime_config_store.update(request)
+    
+    # Intentar sincronizar con Supabase si está configurado
+    s_url = settings.effective("supabase_url")
+    s_key = settings.effective("supabase_service_role_key")
+    if s_url and s_key:
+        await runtime_config_store.sync_to_supabase(s_url, s_key)
+        
+    return {"runtime": updated}
 
 
 @router.get("/knowledge-sources")

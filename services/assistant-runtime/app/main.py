@@ -11,6 +11,7 @@ from app.adapters.kalshi import KalshiHttpAdapter
 from app.adapters.open_claw import OpenClawLLMAdapter
 from app.adapters.memory import MentisMemoryAdapter
 from app.use_cases.trading_workflow import TradingWorkflow
+from app.use_cases.marketing_workflow import MarketingWorkflow
 
 def load_runtime_config():
     config_path = os.getenv("RUNTIME_CONFIG_PATH", "/config/runtime-config.json")
@@ -40,6 +41,7 @@ class ActionType(str, Enum):
     research = "research"
     trade_decision = "trade_decision"
     open_position = "open_position"
+    marketing = "marketing"
 
 
 class Source(BaseModel):
@@ -83,10 +85,13 @@ async def assistant_request(request: AssistantRequest) -> dict:
     llm_port = OpenClawLLMAdapter()
     memory_port = MentisMemoryAdapter()
     workflow = TradingWorkflow(trading_port=trading_port, llm_port=llm_port, memory_port=memory_port)
+    marketing_workflow = MarketingWorkflow(llm_port=llm_port, memory_port=memory_port)
 
     try:
         if request.action_type in {ActionType.trade_decision, ActionType.open_position}:
             result = await workflow.execute_trade_decision(prompt=request.prompt, user_id=request.source.user_id)
+        elif request.action_type == ActionType.marketing:
+            result = await marketing_workflow.execute_marketing_action(prompt=request.prompt, payload=request.payload)
         else:
             result_text = await workflow.execute_chat(prompt=request.prompt, user_id=request.source.user_id)
             result = {"status": "success", "message": result_text}

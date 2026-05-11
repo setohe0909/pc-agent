@@ -35,6 +35,11 @@ SECRET_KEYS = {
     "gemini_api_key",
     "minimax_api_key",
     "discord_bot_token",
+    "instagram_access_token",
+    "tiktok_api_key",
+    "marketing_brand_type",
+    "marketing_tone",
+    "marketing_poll_frequency",
 }
 
 
@@ -63,6 +68,13 @@ class RuntimeConfigUpdate(BaseModel):
     openai_api_key: str | None = Field(default=None, max_length=4096)
     gemini_api_key: str | None = Field(default=None, max_length=4096)
     minimax_api_key: str | None = Field(default=None, max_length=4096)
+    instagram_access_token: str | None = Field(default=None, max_length=4096)
+    instagram_account_id: str | None = Field(default=None, max_length=4096)
+    tiktok_api_key: str | None = Field(default=None, max_length=4096)
+    tiktok_user_id: str | None = Field(default=None, max_length=4096)
+    marketing_brand_type: str | None = Field(default=None, max_length=80)
+    marketing_tone: str | None = Field(default=None, max_length=80)
+    marketing_poll_frequency: str | None = Field(default=None, max_length=80)
 
     @field_validator("open_claw_base_url", "mentis_base_url", "langfuse_host", "supabase_url", "ollama_base_url")
     @classmethod
@@ -100,3 +112,48 @@ class RuntimeConfigStore:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.write_text(json.dumps(current, indent=2, sort_keys=True), encoding="utf-8")
         return self.public_view()
+
+    async def sync_to_supabase(self, supabase_url: str, service_role_key: str) -> bool:
+        """Sincroniza el archivo local con la tabla system_config en Supabase."""
+        import httpx
+        current = self.read()
+        headers = {
+            "apikey": service_role_key,
+            "Authorization": f"Bearer {service_role_key}",
+            "Content-Type": "application/json",
+            "Prefer": "resolution=merge-duplicates"
+        }
+        endpoint = f"{supabase_url}/rest/v1/system_config"
+        payload = {
+            "id": "default",
+            "config": current
+        }
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.post(endpoint, headers=headers, json=payload)
+                return resp.status_code < 400
+        except Exception as e:
+            print(f"[ERROR] Fallo sincronización a Supabase: {e}")
+            return False
+
+    async def load_from_supabase(self, supabase_url: str, service_role_key: str) -> bool:
+        """Carga la configuración desde Supabase al archivo local."""
+        import httpx
+        headers = {
+            "apikey": service_role_key,
+            "Authorization": f"Bearer {service_role_key}",
+        }
+        endpoint = f"{supabase_url}/rest/v1/system_config?id=eq.default&select=config"
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.get(endpoint, headers=headers)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    if data and "config" in data[0]:
+                        remote_config = data[0]["config"]
+                        self.path.write_text(json.dumps(remote_config, indent=2, sort_keys=True), encoding="utf-8")
+                        return True
+            return False
+        except Exception as e:
+            print(f"[ERROR] Fallo carga desde Supabase: {e}")
+            return False

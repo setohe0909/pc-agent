@@ -1,5 +1,5 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, Globe, LayoutGrid } from "lucide-react";
+import { Activity, Globe, LayoutGrid, Megaphone } from "lucide-react";
 
 export function WikiView() {
   return (
@@ -107,6 +107,24 @@ export function WikiView() {
                     <li>Requiere aprobación del Agente Crítico.</li>
                     <li>Genera Embed visual en Discord.</li>
                   </ul>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-muted/30 border-pink-500/20">
+                <CardHeader>
+                  <CardTitle className="text-sm flex items-center gap-2 text-pink-500">
+                    <Megaphone className="h-4 w-4" /> Marketing Sub-Agent
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-xs space-y-2">
+                  <p><strong>!marketer respond</strong></p>
+                  <p className="text-muted-foreground">Responde comentarios en Instagram con un tono empático.</p>
+                  <p><strong>!marketer plan [tema]</strong></p>
+                  <p className="text-muted-foreground">Planifica campañas basadas en tendencias e insights de diseño.</p>
+                  <p><strong>!marketer research [competidor]</strong></p>
+                  <p className="text-muted-foreground">Analiza la competencia y propone estrategias de superación.</p>
+                  <p><strong>!marketer-status</strong></p>
+                  <p className="text-muted-foreground">Verifica conexión con Instagram Business y TikTok API.</p>
                 </CardContent>
               </Card>
             </div>
