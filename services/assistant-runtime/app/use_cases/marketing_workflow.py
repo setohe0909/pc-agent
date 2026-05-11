@@ -29,6 +29,8 @@ class MarketingWorkflow:
             return await self._generate_funnel(prompt)
         elif sub_command == "trends":
             return await self._monitor_trends()
+        elif sub_command == "sentiment":
+            return await self._analyze_sentiment()
         else:
             # Default chat for marketing context
             return await self._marketing_chat(prompt)
@@ -222,3 +224,44 @@ class MarketingWorkflow:
         )
         
         return {"status": "success", "message": report}
+
+    async def _analyze_sentiment(self) -> dict:
+        # 1. Obtener interacciones
+        comments = await self.marketing.get_comments("instagram", "latest_post")
+        
+        sentiments = {"positive": 0, "neutral": 0, "negative": 0}
+        alerts = []
+        
+        for comment in comments:
+            # 2. Clasificar sentimiento con LLM
+            sent_prompt = (
+                f"Clasifica el sentimiento de este comentario en una sola palabra (POSITIVE, NEUTRAL, NEGATIVE): "
+                f"\"{comment['text']}\""
+            )
+            res = await self.llm.chat(sent_prompt)
+            res = res.upper()
+            
+            if "POSITIVE" in res:
+                sentiments["positive"] += 1
+            elif "NEGATIVE" in res:
+                sentiments["negative"] += 1
+                alerts.append(f"🚩 **Negativo**: \"{comment['text']}\" (Usuario: {comment['user']})")
+            else:
+                sentiments["neutral"] += 1
+
+        total = len(comments)
+        summary = (
+            f"### 📊 Análisis de Sentimiento Reciente\n\n"
+            f"✅ **Positivos**: {sentiments['positive']} ({(sentiments['positive']/total)*100:.1f}%)\n"
+            f"😐 **Neutrales**: {sentiments['neutral']} ({(sentiments['neutral']/total)*100:.1f}%)\n"
+            f"❌ **Negativos**: {sentiments['negative']} ({(sentiments['negative']/total)*100:.1f}%)\n\n"
+        )
+        
+        if alerts:
+            summary += "⚠️ **Alertas de Reputación Detectadas:**\n" + "\n".join(alerts)
+            if sentiments["negative"] >= 2:
+                summary += "\n\n🚨 **ALERTA DE CRISIS**: Se detecta un volumen inusual de comentarios negativos. Se recomienda intervención inmediata."
+        else:
+            summary += "✨ El sentimiento general es saludable. ¡Sigue así!"
+
+        return {"status": "success", "message": summary}
