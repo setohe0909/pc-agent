@@ -179,17 +179,15 @@ async def main() -> None:
         # --- COMANDO HELP ---
         if content == "!help":
             embed = discord.Embed(
-                title="📖 Guía de Comandos - PC Agent", 
-                description="Aquí tienes todo lo que puedo hacer por ti:",
+                title="🤖 PC Agent v0.3.0 - Guía de Operaciones", 
+                description="Sistema de agentes autónomos con flujos de estados (LangGraph) y memoria proactiva.",
                 color=discord.Color.blue()
             )
-            embed.add_field(name="🤖 Inteligencia Proactiva", value="`!memory`: Ver qué he aprendido hoy.\n`!run trends`: Forzar búsqueda de tendencias.", inline=False)
-            embed.add_field(name="📣 Marketing Sub-Agent", value="`!marketer-status`: Estado del marketer.\n`!marketer memory`: Ver aprendizajes del marketer.\n`!marketer respond`: Responder comentarios.\n`!marketer qualify`: Detectar leads calientes.\n`!marketer magnet`: Lead Magnets (DM).\n`!marketer trends`: Buscar tendencias virales.\n`!marketer sentiment`: Análisis de sentimiento/crisis.\n`!marketer collab <marca>`: Buscar colaboraciones.\n`!marketer funnel <tema>`: Diseñar embudo de ventas.\n`!marketer plan <tema>`: Planear campaña.\n`!marketer research <competidor>`: Sondeo de competencia.", inline=False)
-            embed.add_field(name="✍️ Writer Sub-Agent", value="`!writer blog <es/en> <tema>`: Crear blog y guardar en Obsidian.\n`!writer story <es/en> <tema>`: Crear storytelling y guardar en Obsidian.\n`!writer <mensaje>`: Chat con el redactor.", inline=False)
-            embed.add_field(name="🧠 Asistente Open Claw", value="`!claw <pregunta>`: Abre un hilo de análisis profundo usando mi memoria diaria.", inline=False)
-            embed.add_field(name="📊 Trading & Research", value="`!ask <duda>`: Pregunta rápida.\n`!research <tema>`: Investigación profunda.\n`!status`: Estado del sistema.", inline=False)
-            embed.add_field(name="⚖️ Decisiones", value="`!approve_trade <id>`: Aprobar una operación sugerida.", inline=False)
-            embed.set_footer(text="PC Agent v2.0 - Autonomía y Análisis")
+            embed.add_field(name="🧠 Inteligencia & Memoria", value="`!memory`: Ver tendencias del día.\n`!memory --clean`: Borrar memoria general.\n`!run consolidation`: Forzar consolidación de memoria diaria.", inline=False)
+            embed.add_field(name="📣 Marketing (LangGraph)", value="`!marketer`: Centro de Control interactivo (Botones).\n`!marketer <petición>`: El agente decidirá qué herramienta usar (Native Tool Calling).\n`!marketer memory`: Ver aprendizajes consolidados.", inline=False)
+            embed.add_field(name="✍️ Redactor (Writer)", value="`!writer blog <tema>`: Crear blog y guardar en Obsidian.\n`!writer <mensaje>`: Chat con el redactor creativo.", inline=False)
+            embed.add_field(name="📊 Research & Trading", value="`!research <tema>`: Investigación profunda.\n`!status`: Estado de salud de los microservicios.\n`!approve_trade <id>`: Evaluar propuesta de inversión.", inline=False)
+            embed.set_footer(text="Usa los botones en los mensajes para una experiencia mejorada.")
             await message.reply(embed=embed)
             return
 
@@ -410,12 +408,41 @@ async def main() -> None:
             try:
                 result = await _send_assistant_request(payload)
                 msg = result.get("message", "No hubo respuesta.")
+                
+                if result.get("status") == "requires_approval":
+                    embed = discord.Embed(
+                        title="⚖️ Aprobación de Marketing Requerida",
+                        description=msg,
+                        color=discord.Color.orange()
+                    )
+                    approval_payload = payload.copy()
+                    approval_payload["payload"]["is_approved"] = True
+                    
+                    class MarketingApprovalView(View):
+                        def __init__(self, pld, author):
+                            super().__init__(timeout=120)
+                            self.pld = pld
+                            self.author = author
+                        @discord.ui.button(label="✅ Aprobar Ejecución", style=discord.ButtonStyle.green)
+                        async def approve(self, itn, btn):
+                            if str(itn.user.id) != str(self.author.id): return
+                            await itn.response.edit_message(content="⏳ Ejecutando acción aprobada...", view=None)
+                            res = await _send_assistant_request(self.pld)
+                            await itn.message.edit(content=res.get("message", "Acción completada."))
+                        @discord.ui.button(label="❌ Denegar", style=discord.ButtonStyle.red)
+                        async def deny(self, itn, btn):
+                            await itn.response.edit_message(content="🚫 Acción denegada.", embed=None, view=None)
+
+                    await message.reply(embed=embed, view=MarketingApprovalView(approval_payload, message.author))
+                    return
+
                 if len(msg) > 1900:
                     chunks = [msg[i:i+1900] for i in range(0, len(msg), 1900)]
                     for chunk in chunks:
                         await message.reply(chunk)
                 else:
                     await message.reply(msg)
+
             except Exception as e:
                 await message.reply(f"❌ Error en Marketer Agent: {e}")
             return

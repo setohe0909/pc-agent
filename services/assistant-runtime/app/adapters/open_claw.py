@@ -107,3 +107,54 @@ class OpenClawLLMAdapter(LLMPort):
             ]
             response = await acompletion(model=litellm_model, messages=messages, response_format={"type": "json_object"})
             return json.loads(response.choices[0].message.content)
+
+    async def get_tools_response(self, prompt: str, tools: list[dict], system_instruction: str | None = None) -> dict:
+        provider, model = self._get_provider_info(policy="smart")
+        
+        if provider == "gemini":
+            api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+            genai.configure(api_key=api_key)
+            
+            # Convertir esquemas de herramientas a formato Gemini
+            # Nota: Simplificado, Gemini espera objetos de tipo genai.types.Tool
+            # Por ahora usaremos el formato que espera el SDK de Google
+            
+            model_instance = genai.GenerativeModel(
+                model_name="models/gemini-pro", # Tool calling funciona mejor en pro
+                system_instruction=system_instruction,
+                tools=tools
+            )
+            
+            chat = model_instance.start_chat()
+            response = await chat.send_message_async(prompt)
+            
+            # Extraer llamadas a funciones
+            fc = response.candidates[0].content.parts[0].function_call
+            if fc:
+                return {
+                    "tool_name": fc.name,
+                    "arguments": dict(fc.args)
+                }
+            return {"message": response.text}
+        else:
+            # Fallback a LiteLLM (que soporta tool calling para OpenAI/Anthropic)
+            litellm_model = f"{provider}/{model}"
+            messages = [{"role": "user", "content": prompt}]
+            if system_instruction:
+                messages.insert(0, {"role": "system", "content": system_instruction})
+                
+            response = await acompletion(
+                model=litellm_model,
+                messages=messages,
+                tools=tools,
+                tool_choice="auto"
+            )
+            
+            message = response.choices[0].message
+            if message.tool_calls:
+                tc = message.tool_calls[0]
+                return {
+                    "tool_name": tc.function.name,
+                    "arguments": json.loads(tc.function.arguments)
+                }
+            return {"message": message.content}

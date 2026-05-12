@@ -1,6 +1,6 @@
 # PC Agent
 
-Version: `0.2.0`
+Version: `0.3.0`
 
 PC Agent es una plataforma modular para investigar mercados de Kalshi, acumular
 conocimiento en Supabase/pgvector, usar memoria operativa en MentisDB, observar
@@ -11,18 +11,20 @@ operacion.
 
 - UI de control en `http://localhost:8080`.
 - API de control para estado, configuracion runtime, Supabase y MentisDB.
-- Runtime del asistente con compuerta de seguridad para decisiones por Discord.
-- Bot de Discord con comandos iniciales.
+- Runtime del asistente basado en **LangGraph** para flujos de estados resilientes.
+- Soporte nativo para **Tool Calling** (Function Calling) con Gemini y OpenAI.
+- Memoria Proactiva: Consolidación diaria de aprendizajes mediante resúmenes de IA.
+- Bot de Discord interactivo con **Buttons** y **Embeds** para aprobaciones y marketing.
 - Worker de ingestion que lee fuentes, genera embeddings con Ollama y guarda en Supabase.
-- Migraciones Supabase para `knowledge_sources`, `knowledge_documents`, pgvector y busqueda semantica.
+- Migraciones Supabase para `knowledge_sources`, `knowledge_documents`, `mentis_memory` (pgvector).
 - Docker Compose con perfiles opcionales para Ollama y Langfuse.
 
 ## Servicios
 
 - `control-api`: API principal, health checks, configuracion runtime y fuentes de conocimiento.
-- `assistant-runtime`: runtime del asistente y compuerta para decisiones de trading.
-- `discord-bot`: puente con Discord para solicitudes, investigacion y aprobaciones.
-- `ingestion-worker`: crons de recoleccion y embeddings hacia Supabase.
+- `assistant-runtime`: runtime del asistente (LangGraph) y herramientas autónomas.
+- `discord-bot`: puente con Discord para solicitudes, investigacion y aprobaciones interactivas.
+- `ingestion-worker`: crons de recoleccion, embeddings y **consolidación de memoria**.
 - `ui`: consola web estatica estilo shadcn.
 - `supabase-vector-db`: Postgres + pgvector local para desarrollo.
 - `ollama`: runtime local opcional para embeddings.
@@ -201,8 +203,8 @@ docker compose --profile observability --profile embeddings config
 
 ## Roadmap
 
-- Adapter Kalshi demo/live con limites de riesgo.
-- Aprobacion humana completa desde Discord antes de ordenes reales.
-- Sincronizacion real Supabase -> MentisDB.
-- Integracion completa de Langfuse traces.
-- UI para historial de ingestion y documentos/chunks.
+- [x] Flujos de estados con LangGraph.
+- [x] Native Tool Calling (Gemini/LiteLLM).
+- [x] Consolidación proactiva de memoria.
+- [ ] Adapter Kalshi live con límites de riesgo.
+- [ ] UI avanzada para historial de consolidación de memoria.

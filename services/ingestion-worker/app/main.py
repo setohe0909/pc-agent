@@ -13,6 +13,7 @@ from app.embedding import OllamaEmbedder
 from app.settings import settings
 from app.supabase_store import KnowledgeDocument, SupabaseKnowledgeStore
 from app.services.trend_service import TrendService
+from app.services.memory_consolidation import MemoryConsolidationService
 from langfuse.decorators import observe
 
 # --- Servidor API para ejecuciones manuales ---
@@ -29,6 +30,9 @@ async def run_manual_job(target: str, background_tasks: BackgroundTasks):
         background_tasks.add_task(service.run_daily_trends)
     elif target == "mentis":
         background_tasks.add_task(sync_mentis_async)
+    elif target == "consolidation":
+        service = MemoryConsolidationService()
+        background_tasks.add_task(service.run_consolidation)
     elif target == "all":
         background_tasks.add_task(ingest_enabled_sources)
         service = TrendService()
@@ -111,10 +115,17 @@ def collect_trends_sync():
     service = TrendService()
     asyncio.run(service.run_daily_trends())
 
+def consolidate_memory_sync():
+    print("[JOB] Iniciando consolidacion de memoria via Scheduler...")
+    service = MemoryConsolidationService()
+    asyncio.run(service.run_consolidation())
+
 def main() -> None:
     scheduler = BackgroundScheduler(timezone="UTC")
     scheduler.add_job(collect_markets_sync, CronTrigger.from_crontab(settings.market_ingestion_cron))
     scheduler.add_job(collect_trends_sync, CronTrigger.from_crontab(settings.trends_ingestion_cron))
+    # Consolidacion diaria a las 00:00 UTC
+    scheduler.add_job(consolidate_memory_sync, CronTrigger.from_crontab("0 0 * * *"))
     scheduler.start()
 
     print("Ingestion worker activo con Scheduler y API en puerto 8000")
