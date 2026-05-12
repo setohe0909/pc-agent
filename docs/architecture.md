@@ -1,90 +1,105 @@
-# Arquitectura PC Agent
+# Arquitectura de Sistema - PC Agent Pro
 
-## Bounded contexts
+Esta documentación describe la orquestación completa, los servicios y la jerarquía de inteligencia del PC Agent.
 
-- `Prediction`: convierte datos de mercado y conocimiento recuperado en hipotesis,
-  probabilidades, confianza y razones.
-- `Trading`: decide si una prediccion puede convertirse en una operacion Kalshi,
-  aplicando limites, riesgo, idempotencia y modo demo/live.
-- `Knowledge`: recolecta fuentes, genera embeddings, guarda documentos en Supabase
-  y sincroniza memoria util hacia Mentis.
-- `Assistant`: coordina conversaciones, herramientas, memoria, proveedores LLM y
-  trazas de Langfuse.
-- `Content`: genera blogs y storytelling a través del sub-agente `!writer`, integrando
-  imágenes de Unsplash y persistencia en Obsidian.
-- `Ops`: expone estado de servidores, configuracion, canales Discord y salud de
-  integraciones.
-
-## Flujo principal
+## 1. Diagrama de Orquestación (Master Flow)
 
 ```mermaid
-flowchart LR
-  Discord["Discord requests channel"] --> Bot["discord-bot"]
-  UI["Control UI"] --> API["control-api"]
-  Bot --> API
-  API --> Assistant["assistant-runtime / Open-Claw"]
-  Assistant --> LLM["Gemini / MiniMax / GPT"]
-  Assistant --> Mentis["Mentis memory"]
-  Assistant --> Kalshi["Kalshi gateway"]
-  Assistant --> Obsidian["Obsidian Vault (Shared Volume)"]
-  Assistant --> Unsplash["Unsplash API"]
-  Assistant --> Langfuse["Langfuse traces"]
-  Worker["ingestion-worker crons"] --> Supabase["Supabase pgvector"]
-  Worker --> Mentis
-  Supabase --> Assistant
-  API --> DiscordOps["Discord notifications/status"]
+flowchart TD
+    subgraph "Interface Layer"
+        Discord["Discord Bot (discord-bot)"]
+        AdminUI["Admin Dashboard (ui)"]
+    end
+
+    subgraph "Logic & Intelligence (Sub-Agents)"
+        Runtime["Assistant Runtime (FastAPI)"]
+        Marketer["!marketer Sub-Agent"]
+        Writer["!writer Sub-Agent"]
+        Trader["Trading Logic (Open-Claw)"]
+        Runtime --> Marketer
+        Runtime --> Writer
+        Runtime --> Trader
+    end
+
+    subgraph "Data & Memory Layer"
+        Supabase["Supabase (pgvector)"]
+        Mentis["MentisDB (Social Memory)"]
+        Obsidian["Obsidian Vault (Shared FS)"]
+        Ollama["Ollama (Local Embeddings)"]
+    end
+
+    subgraph "External Services"
+        LLM["Gemini / MiniMax / OpenAI"]
+        Kalshi["Kalshi API (Trading)"]
+        Unsplash["Unsplash API (Visuals)"]
+    end
+
+    subgraph "Observability (Langfuse Stack)"
+        LF_Web["Langfuse Web"]
+        LF_Worker["Langfuse Worker"]
+        LF_DB[(Postgres/Clickhouse/Redis)]
+    end
+
+    %% Interactions
+    Discord <--> Runtime
+    AdminUI <--> Runtime
+    Runtime <--> LLM
+    Runtime <--> Mentis
+    Runtime <--> Obsidian
+    Runtime <--> Kalshi
+    Runtime <--> Unsplash
+    Runtime --> LF_Web
+    
+    %% Background Work
+    Worker["Ingestion Worker"] --> Supabase
+    Worker --> Ollama
+    Worker --> Mentis
+    Supabase -.-> Runtime
 ```
 
-## Capas
+## 2. Stack de Servicios (Docker Compose)
 
-```text
-domain
-  Entidades, value objects y eventos de negocio.
+El sistema se orquesta mediante **Docker Compose**, dividiéndose en los siguientes servicios clave:
 
-application
-  Casos de uso como CheckSystemStatus, RegisterKnowledgeSource,
-  VerifyMentisHealth y RouteAssistantRequest.
+| Servicio | Puerto | Descripción |
+| :--- | :--- | :--- |
+| `control-api` | 8000 | Orquestador central y API de administración. |
+| `assistant-runtime`| 8100 | Cerebro de los sub-agentes y ejecución de LLM. |
+| `discord-bot` | - | Interfaz de usuario principal vía Discord. |
+| `ui` | 8080 | Dashboard web para configuración y monitoreo. |
+| `obsidian` | 3010 | Interfaz web de Obsidian (KasmVNC) para gestión de notas. |
+| `ingestion-worker` | - | Procesos en segundo plano para recolección de tendencias. |
+| `supabase-vector-db`| 54322| Almacenamiento vectorial para RAG y conocimiento profundo. |
+| `ollama` | 11434| Motor local de embeddings (`mxbai-embed-large`). |
+| `mentisdb` | 9471 | Almacenamiento de memoria social y aprendizajes rápidos. |
+| `langfuse-*` | 3000 | Stack completo de observabilidad y trazabilidad de LLMs. |
 
-ports
-  Interfaces de salida: KalshiGateway, LlmRouter, MemoryStore,
-  EmbeddingKnowledgeBase, ConversationTracer, NotificationSender.
+## 3. Jerarquía de Sub-Agentes
 
-adapters
-  Implementaciones concretas para Kalshi, Supabase, Mentis, Langfuse,
-  Discord, Open-Claw y proveedores LLM.
+El `assistant-runtime` delega la inteligencia en agentes especializados:
 
-api / workers / bots
-  Adaptadores de entrada del sistema.
-```
+*   **!marketer**: Especializado en análisis de sentimientos, detección de tendencias en TikTok/Instagram y cualificación de leads.
+*   **!writer**: Especializado en Copywriting creativo, Storytelling y generación de Blogs con persistencia directa en Obsidian.
+*   **Trading Core**: Ejecuta la lógica de predicción asimétrica y gestión de órdenes en Kalshi.
 
-## Reglas de frontera
+## 4. Matriz de Modelos
 
-- El dominio no importa SDKs externos.
-- Los adaptadores convierten payloads externos a modelos internos.
-- Las decisiones de trading viven en `TradingPolicy`, no en Discord, API ni Kalshi.
-- Los crons alimentan Supabase primero y luego publican resumen curado hacia Mentis.
-- Langfuse observa conversaciones y llamadas a herramientas, pero no decide.
-- La publishable key de Supabase queda limitada a lectura/RLS; ingestion y escritura
-  requieren service role o conexion Postgres.
-- El conocimiento es visible publicamente desde la UI por decision de producto; las
-  mutaciones administrativas siguen protegidas por token/backend.
-- Toda decision de trading pasa por Discord y requiere aprobacion explicita antes de
-  llegar a cualquier adapter Kalshi.
-- Los embeddings usan Ollama `mxbai-embed-large` por defecto para mantener una ruta
-  local/gratis con vectores de 1024 dimensiones.
+| Tarea | Modelo Principal | Proveedor |
+| :--- | :--- | :--- |
+| **Razonamiento / Chat** | `gemini-1.5-flash` | Google (Vía Open-Claw) |
+| **Embeddings** | `mxbai-embed-large`| Ollama (Local) |
+| **Fallback / Research** | `gpt-4o` / `minimax` | OpenAI / MiniMax |
 
-## Canales Discord recomendados
+## 5. Capas de Tecnología y Persistencia
 
-- `kalshi-requests`: solicitudes del usuario al asistente.
-- `kalshi-ops`: notificaciones de ingestion, prediccion, ordenes y errores.
-- `kalshi-status`: health checks, estado de configuracion y disponibilidad.
+1.  **Capa de Entrada**: Discord (Event-driven) y React UI (Polling/Websockets).
+2.  **Capa de Aplicación**: FastAPI con Inyección de Dependencias (Hexagonal).
+3.  **Capa de Memoria**: 
+    *   *Memoria a Largo Plazo*: Supabase (Vectores).
+    *   *Memoria de Trabajo*: MentisDB (JSON Store).
+    *   *Memoria Documental*: Obsidian (Markdown).
+4.  **Capa de Observabilidad**: Langfuse para debugging de cadenas de pensamiento y optimización de costos.
 
-## Roadmap tecnico
+## 6. Configuración de Red
 
-1. Completar credenciales y probar health checks.
-2. Implementar adaptador Kalshi demo antes de live trading.
-3. Conectar Open-Claw real y router LLM con politicas de costo/modelo.
-4. Crear migraciones Supabase para documentos, embeddings y fuentes.
-5. Implementar ingestion por fuente con trazas Langfuse.
-6. Activar Discord bot con permisos de canal limitados.
-7. Agregar aprobacion humana antes de ejecutar ordenes reales.
+Todos los servicios residen en una red interna de Docker, permitiendo la comunicación por hostname (ej: `http://assistant-runtime:8100`). La persistencia se garantiza mediante volúmenes compartidos como `obsidian-vault`, que permite la escritura en tiempo real entre el sub-agente escritor y la interfaz de usuario.

@@ -1,5 +1,5 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, Globe, LayoutGrid, Megaphone } from "lucide-react";
+import { Activity, Globe, LayoutGrid, Megaphone, PenTool, Files } from "lucide-react";
 
 export function WikiView() {
   return (
@@ -21,9 +21,9 @@ export function WikiView() {
           <CardTitle className="text-lg">2. Configuración</CardTitle>
         </CardHeader>
         <CardContent>
-          <CardDescription className="mb-4">En la pestaña Configuración define URLs de assistant-runtime, MentisDB, Langfuse, Ollama y Supabase.</CardDescription>
+          <CardDescription className="mb-4">Define URLs de servicios. Para Obsidian usa el puerto 3010 y el volumen compartido /vault.</CardDescription>
           <code className="bg-secondary text-secondary-foreground text-xs p-2 rounded block break-words font-mono">
-            http://localhost:8100 · http://localhost:9471 · http://localhost:3000
+            RT: 8100 · Obsidian: 3010 · LF: 3000
           </code>
         </CardContent>
       </Card>
@@ -139,6 +139,27 @@ export function WikiView() {
                   <p className="text-muted-foreground">Analiza la competencia y propone estrategias de superación.</p>
                   <p><strong>!marketer-status</strong></p>
                   <p className="text-muted-foreground">Verifica conexión con Instagram Business y TikTok API.</p>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-muted/30 border-indigo-500/20">
+                <CardHeader>
+                  <CardTitle className="text-sm flex items-center gap-2 text-indigo-500">
+                    <PenTool className="h-4 w-4" /> Writer Sub-Agent (Obsidian)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-xs space-y-2">
+                  <p><strong>!writer blog [es/en] [tema]</strong></p>
+                  <p className="text-muted-foreground">Genera un blog optimizado y lo guarda en la carpeta /Blog de Obsidian.</p>
+                  <p><strong>!writer story [es/en] [tema]</strong></p>
+                  <p className="text-muted-foreground">Genera una narrativa de marca y la guarda en /Story-telling.</p>
+                  <p><strong>!writer [mensaje]</strong></p>
+                  <p className="text-muted-foreground">Chat directo con el redactor para lluvia de ideas creativa.</p>
+                  <div className="bg-indigo-500/10 p-2 rounded mt-2 border border-indigo-500/20">
+                    <p className="flex items-center gap-1 font-semibold text-[10px] text-indigo-400">
+                      <Files className="w-3 h-3" /> Tip: Usa las imágenes automáticas de Unsplash incluidas en cada post.
+                    </p>
+                  </div>
                 </CardContent>
               </Card>
             </div>
