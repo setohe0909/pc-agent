@@ -10,6 +10,8 @@
   y sincroniza memoria util hacia Mentis.
 - `Assistant`: coordina conversaciones, herramientas, memoria, proveedores LLM y
   trazas de Langfuse.
+- `Content`: genera blogs y storytelling a través del sub-agente `!writer`, integrando
+  imágenes de Unsplash y persistencia en Obsidian.
 - `Ops`: expone estado de servidores, configuracion, canales Discord y salud de
   integraciones.
 
@@ -24,6 +26,8 @@ flowchart LR
   Assistant --> LLM["Gemini / MiniMax / GPT"]
   Assistant --> Mentis["Mentis memory"]
   Assistant --> Kalshi["Kalshi gateway"]
+  Assistant --> Obsidian["Obsidian Vault (Shared Volume)"]
+  Assistant --> Unsplash["Unsplash API"]
   Assistant --> Langfuse["Langfuse traces"]
   Worker["ingestion-worker crons"] --> Supabase["Supabase pgvector"]
   Worker --> Mentis
