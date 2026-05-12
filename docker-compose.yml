@@ -32,8 +32,10 @@ services:
     volumes:
       - ./services/assistant-runtime:/app
       - runtime-config:/config
+      - obsidian-vault:/vault
     environment:
       - RUNTIME_CONFIG_PATH=/config/runtime-config.json
+      - OBSIDIAN_VAULT_PATH=/vault
       - PYTHONUNBUFFERED=1
     command: python -m app.main
 
@@ -201,6 +203,22 @@ services:
       - langfuse-minio-data:/data
     ports:
       - "9001:9001"
+      
+  obsidian:
+    image: lscr.io/linuxserver/obsidian:latest
+    container_name: obsidian
+    shm_size: "1gb"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+    volumes:
+      - obsidian-config:/config
+      - obsidian-vault:/vault
+    ports:
+      - "3010:3000"
+      - "3011:3001"
+    restart: unless-stopped
 
 volumes:
   supabase-vector-data:
@@ -209,3 +227,5 @@ volumes:
   langfuse-clickhouse-data:
   langfuse-minio-data:
   runtime-config:
+  obsidian-config:
+  obsidian-vault:

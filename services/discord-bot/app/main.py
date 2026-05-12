@@ -9,7 +9,7 @@ import uvicorn
 
 async def _send_assistant_request(payload: dict) -> dict:
     base_url = _get_env("OPEN_CLAW_BASE_URL", "http://assistant-runtime:8100").rstrip("/")
-    async with httpx.AsyncClient(timeout=15) as client:
+    async with httpx.AsyncClient(timeout=60) as client:
         response = await client.post(f"{base_url}/assistant/request", json=payload)
     response.raise_for_status()
     return response.json()
@@ -107,7 +107,7 @@ async def main() -> None:
             return
 
         content = message.content.strip()
-        command_list = ("!ask ", "!research ", "!approve_trade ", "!status", "!memory", "!run ", "!claw ", "!marketer ", "!marketer-status", "!help")
+        command_list = ("!ask ", "!research ", "!approve_trade ", "!status", "!memory", "!run ", "!claw ", "!marketer ", "!marketer-status", "!writer ", "!help")
         if not content.startswith(command_list):
             return
 
@@ -119,7 +119,8 @@ async def main() -> None:
                 color=discord.Color.blue()
             )
             embed.add_field(name="🤖 Inteligencia Proactiva", value="`!memory`: Ver qué he aprendido hoy.\n`!run trends`: Forzar búsqueda de tendencias.", inline=False)
-            embed.add_field(name="📣 Marketing Sub-Agent", value="`!marketer-status`: Estado del marketer.\n`!marketer respond`: Responder comentarios.\n`!marketer qualify`: Detectar leads calientes.\n`!marketer magnet`: Lead Magnets (DM).\n`!marketer trends`: Buscar tendencias virales.\n`!marketer sentiment`: Análisis de sentimiento/crisis.\n`!marketer collab <marca>`: Buscar colaboraciones/influencers.\n`!marketer funnel <tema>`: Diseñar embudo de ventas.\n`!marketer plan <tema>`: Planear campaña.\n`!marketer research <competidor>`: Sondeo de competencia.", inline=False)
+            embed.add_field(name="📣 Marketing Sub-Agent", value="`!marketer-status`: Estado del marketer.\n`!marketer memory`: Ver aprendizajes del marketer.\n`!marketer respond`: Responder comentarios.\n`!marketer qualify`: Detectar leads calientes.\n`!marketer magnet`: Lead Magnets (DM).\n`!marketer trends`: Buscar tendencias virales.\n`!marketer sentiment`: Análisis de sentimiento/crisis.\n`!marketer collab <marca>`: Buscar colaboraciones.\n`!marketer funnel <tema>`: Diseñar embudo de ventas.\n`!marketer plan <tema>`: Planear campaña.\n`!marketer research <competidor>`: Sondeo de competencia.", inline=False)
+            embed.add_field(name="✍️ Writer Sub-Agent", value="`!writer blog <es/en> <tema>`: Crear blog y guardar en Obsidian.\n`!writer story <es/en> <tema>`: Crear storytelling y guardar en Obsidian.\n`!writer <mensaje>`: Chat con el redactor.", inline=False)
             embed.add_field(name="🧠 Asistente Open Claw", value="`!claw <pregunta>`: Abre un hilo de análisis profundo usando mi memoria diaria.", inline=False)
             embed.add_field(name="📊 Trading & Research", value="`!ask <duda>`: Pregunta rápida.\n`!research <tema>`: Investigación profunda.\n`!status`: Estado del sistema.", inline=False)
             embed.add_field(name="⚖️ Decisiones", value="`!approve_trade <id>`: Aprobar una operación sugerida.", inline=False)
@@ -301,6 +302,9 @@ async def main() -> None:
             elif raw_query.startswith("collab "):
                 sub_command = "collab"
                 prompt = raw_query.removeprefix("collab ").strip()
+            elif raw_query.startswith("memory"):
+                sub_command = "memory"
+                prompt = "ver memoria"
 
             payload = {
                 "action_type": "marketing",
@@ -321,6 +325,48 @@ async def main() -> None:
                     await message.reply(msg)
             except Exception as e:
                 await message.reply(f"❌ Error en Marketer Agent: {e}")
+            return
+
+        if content.startswith("!writer "):
+            raw_query = content.removeprefix("!writer ").strip()
+            sub_command = "chat"
+            language = "es"
+            prompt = raw_query
+            
+            parts = raw_query.split(" ", 2)
+            if len(parts) >= 1:
+                cmd = parts[0].lower()
+                if cmd in ["blog", "story", "storytelling"]:
+                    sub_command = "blog" if cmd == "blog" else "storytelling"
+                    if len(parts) >= 2:
+                        lang_part = parts[1].lower()
+                        if lang_part in ["es", "en", "español", "ingles", "english"]:
+                            language = "es" if lang_part in ["es", "español"] else "en"
+                            prompt = parts[2] if len(parts) > 2 else f"crea un {sub_command}"
+                        else:
+                            prompt = " ".join(parts[1:])
+                    else:
+                        prompt = f"crea un {sub_command}"
+
+            payload = {
+                "action_type": "writer",
+                "prompt": prompt,
+                "source": {"platform": "discord", "channel_id": str(message.channel.id), "user_id": str(message.author.id)},
+                "payload": {"sub_command": sub_command, "language": language}
+            }
+            
+            await message.reply(f"✍️ **Writer Sub-Agent procesando `{sub_command}` en `{language}`...**")
+            try:
+                result = await _send_assistant_request(payload)
+                msg = result.get("message", "No hubo respuesta.")
+                if len(msg) > 1900:
+                    chunks = [msg[i:i+1900] for i in range(0, len(msg), 1900)]
+                    for chunk in chunks:
+                        await message.reply(chunk)
+                else:
+                    await message.reply(msg)
+            except Exception as e:
+                await message.reply(f"❌ Error en Writer Agent: {e}")
             return
 
         action_type = "chat"

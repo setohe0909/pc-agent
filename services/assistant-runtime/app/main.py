@@ -12,6 +12,7 @@ from app.adapters.open_claw import OpenClawLLMAdapter
 from app.adapters.memory import MentisMemoryAdapter
 from app.use_cases.trading_workflow import TradingWorkflow
 from app.use_cases.marketing_workflow import MarketingWorkflow
+from app.use_cases.writer_workflow import WriterWorkflow
 
 def load_runtime_config():
     config_path = os.getenv("RUNTIME_CONFIG_PATH", "/config/runtime-config.json")
@@ -42,6 +43,7 @@ class ActionType(str, Enum):
     trade_decision = "trade_decision"
     open_position = "open_position"
     marketing = "marketing"
+    writer = "writer"
 
 
 class Source(BaseModel):
@@ -86,6 +88,7 @@ async def assistant_request(request: AssistantRequest) -> dict:
     memory_port = MentisMemoryAdapter()
     workflow = TradingWorkflow(trading_port=trading_port, llm_port=llm_port, memory_port=memory_port)
     marketing_workflow = MarketingWorkflow(llm_port=llm_port, memory_port=memory_port)
+    writer_workflow = WriterWorkflow(llm_port=llm_port, memory_port=memory_port)
 
     try:
         if request.action_type in {ActionType.trade_decision, ActionType.open_position}:
@@ -93,6 +96,9 @@ async def assistant_request(request: AssistantRequest) -> dict:
         elif request.action_type == ActionType.marketing:
             print(f"[DEBUG] Entrando a MarketingWorkflow con prompt: {request.prompt}")
             result = await marketing_workflow.execute_marketing_action(prompt=request.prompt, payload=request.payload)
+        elif request.action_type == ActionType.writer:
+            print(f"[DEBUG] Entrando a WriterWorkflow con prompt: {request.prompt}")
+            result = await writer_workflow.execute_writer_action(prompt=request.prompt, payload=request.payload)
         else:
             result_text = await workflow.execute_chat(prompt=request.prompt, user_id=request.source.user_id)
             result = {"status": "success", "message": result_text}

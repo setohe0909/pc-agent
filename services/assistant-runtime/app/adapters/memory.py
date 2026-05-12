@@ -35,3 +35,33 @@ class MentisMemoryAdapter:
     async def save_interaction(self, user_id: str, data: dict) -> None:
         """Pendiente: Guardar interacciones de chat en una tabla de historial si se desea"""
         pass
+
+    async def save_memory(self, category: str, summary: str) -> bool:
+        """Guarda un fragmento de conocimiento/aprendizaje en la tabla mentis_memory"""
+        if not self.supabase_url or not self.supabase_key:
+            return False
+
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
+        
+        url = f"{self.supabase_url}/rest/v1/mentis_memory"
+        headers = {
+            "apikey": self.supabase_key,
+            "Authorization": f"Bearer {self.supabase_key}",
+            "Content-Type": "application/json",
+            "Prefer": "return=minimal"
+        }
+        
+        payload = {
+            "category": category,
+            "summary": summary,
+            "created_at": now.isoformat()
+        }
+        
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.post(url, headers=headers, json=payload)
+                return resp.status_code == 201
+        except Exception as e:
+            print(f"[MEMORY SAVE ERROR] {e}")
+            return False
