@@ -11,7 +11,15 @@ class MentisMemoryAdapter:
         if not self.supabase_url or not self.supabase_key:
             return ""
             
-        url = f"{self.supabase_url}/rest/v1/mentis_memory?select=category,summary&order=created_at.desc&limit=5"
+        # Determinar filtro segun el contexto
+        if user_id == "marketer":
+            # Para el marketer, solo traemos lo que sea de marketing
+            category_filter = "category=ilike.marketing_*"
+        else:
+            # Para el resto (general, writer), traemos lo que NO sea de marketing
+            category_filter = "category=not.ilike.marketing_*"
+            
+        url = f"{self.supabase_url}/rest/v1/mentis_memory?{category_filter}&select=category,summary&order=created_at.desc&limit=5"
         headers = {
             "apikey": self.supabase_key,
             "Authorization": f"Bearer {self.supabase_key}"
@@ -23,7 +31,7 @@ class MentisMemoryAdapter:
                 if resp.status_code == 200:
                     data = resp.json()
                     if not data: return ""
-                    context = "\n\n--- MEMORIA RECIENTE (INTELIGENCIA DEL DIA) ---\n"
+                    context = f"\n\n--- MEMORIA RECIENTE ({user_id.upper()}) ---\n"
                     for item in data:
                         context += f"Categoría: {item['category']}\nResumen: {item['summary']}\n\n"
                     return context

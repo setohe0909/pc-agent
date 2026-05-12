@@ -12,10 +12,10 @@ class TrendService:
         self.settings = settings
         self.mentis = MentisClient(settings.langfuse_host)
         self.categories = [
-            "mercados de trading",
-            "TV shows",
-            "Soccer, nba, futbol america",
-            "politica"
+            "global trading markets & macroeconomics",
+            "world soccer & nba (results, stats, betting sentiment)",
+            "global politics & market impact decisions",
+            "entertainment & tv show scandals"
         ]
         # Configurar Gemini
         api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
@@ -67,14 +67,28 @@ class TrendService:
         
         try:
             for category in self.categories:
-                print(f"[TRENDS] Buscando tendencias para: {category}...")
-                search_query = f"trending topics and news on X twitter about {category} today"
+                print(f"[TRENDS] Buscando inteligencia para: {category}...")
+                
+                # Queries mas especificas para obtener datos de decision
+                if "soccer" in category:
+                    search_query = "latest major soccer and NBA results, key statistics, and fan betting sentiment today"
+                elif "politics" in category:
+                    search_query = "breaking global political news and their predicted impact on financial markets today"
+                elif "markets" in category:
+                    search_query = "macroeconomic trends, inflation data, and major stock market movements today"
+                else:
+                    search_query = f"trending topics and scandals in {category} today"
+                
                 search_result = self.tavily.search(query=search_query, search_depth="advanced")
                 
                 prompt = (
-                    f"Analiza estas noticias reales sobre '{category}' en Twitter/X:\n"
+                    f"Analiza esta información estratégica sobre '{category}':\n"
                     f"{json.dumps(search_result['results'])}\n\n"
-                    "Genera un resumen ejecutivo de 3 puntos para un agente de trading."
+                    "Genera un REPORTE DE DECISIÓN que incluya:\n"
+                    "1. RESULTADOS/HECHOS: Datos duros, marcadores o decisiones tomadas.\n"
+                    "2. SENTIMIENTO: Qué dice la comunidad, a quién apoyan o qué miedo/avaricia hay en el mercado.\n"
+                    "3. IMPACTO: Cómo afecta esto al mercado o qué oportunidad de contenido/trading genera.\n"
+                    "Sé extremadamente conciso pero con datos de alto valor."
                 )
                 
                 # Usamos el nuevo helper con fallback
@@ -83,7 +97,7 @@ class TrendService:
                 await self.mentis.save_daily_knowledge(category, summary)
                 results.append({"category": category, "summary": summary})
 
-                if category in ["mercados de trading", "politica", "Soccer, nba, futbol america"]:
+                if any(x in category for x in ["markets", "politics", "soccer"]):
                     await self._check_proactive_opportunities(category, summary)
             
             # --- Notificacion de Exito ---

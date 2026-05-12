@@ -202,7 +202,7 @@ async def main() -> None:
 
                 base_url = _get_env("CONTROL_API_URL", "http://control-api:8000").rstrip("/")
                 async with httpx.AsyncClient(timeout=10) as client_http:
-                    resp = await client_http.get(f"{base_url}/intelligence/memory/today")
+                    resp = await client_http.get(f"{base_url}/intelligence/memory/today?context=general")
                 
                 if resp.status_code == 200:
                     data = resp.json()

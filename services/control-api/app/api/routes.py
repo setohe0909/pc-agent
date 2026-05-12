@@ -205,7 +205,7 @@ async def trigger_ingestion_run(request: TriggerIngestionRequest) -> dict:
 
 
 @router.get("/intelligence/memory/today")
-async def get_today_intelligence():
+async def get_today_intelligence(context: str | None = None):
     from datetime import datetime, timezone
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     
@@ -215,13 +215,19 @@ async def get_today_intelligence():
         "apikey": key,
         "Authorization": f"Bearer {key}",
     }
+    
+    # Determinar filtro segun el contexto
+    if context == "marketer":
+        category_filter = "&category=ilike.marketing_*"
+    else:
+        # Por defecto excluimos marketing para la memoria de inteligencia general
+        category_filter = "&category=not.ilike.marketing_*"
+
     async with httpx.AsyncClient() as client:
         try:
-            # Consultamos registros de hoy usando el rango de created_at
-            response = await client.get(
-                f"{url}/rest/v1/mentis_memory?created_at=gte.{today}T00:00:00Z&order=created_at.desc",
-                headers=headers
-            )
+            # Consultamos registros de hoy usando el rango de created_at y el filtro de categoria
+            query_url = f"{url}/rest/v1/mentis_memory?created_at=gte.{today}T00:00:00Z{category_filter}&order=created_at.desc"
+            response = await client.get(query_url, headers=headers)
             if response.status_code != 200:
                 return {"memory": [], "detail": f"Error de Supabase: {response.text}"}
             return {"memory": response.json()}
@@ -230,8 +236,8 @@ async def get_today_intelligence():
 
 
 @router.get("/mentis/memory")
-async def get_mentis_memory():
-    return await get_today_intelligence()
+async def get_mentis_memory(context: str | None = None):
+    return await get_today_intelligence(context)
 
 
 def _supabase_knowledge_base() -> SupabaseVectorKnowledgeBase:
