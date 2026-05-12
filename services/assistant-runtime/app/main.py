@@ -10,8 +10,9 @@ from pydantic import BaseModel, Field
 from app.adapters.kalshi import KalshiHttpAdapter
 from app.adapters.open_claw import OpenClawLLMAdapter
 from app.adapters.memory import MentisMemoryAdapter
+from app.adapters.marketing import SocialMediaStubAdapter
 from app.use_cases.trading_workflow import TradingWorkflow
-from app.use_cases.marketing_workflow import MarketingWorkflow
+from app.use_cases.marketing_graph import MarketingGraph
 from app.use_cases.writer_workflow import WriterWorkflow
 
 def load_runtime_config():
@@ -87,15 +88,15 @@ async def assistant_request(request: AssistantRequest) -> dict:
     llm_port = OpenClawLLMAdapter()
     memory_port = MentisMemoryAdapter()
     workflow = TradingWorkflow(trading_port=trading_port, llm_port=llm_port, memory_port=memory_port)
-    marketing_workflow = MarketingWorkflow(llm_port=llm_port, memory_port=memory_port)
-    writer_workflow = WriterWorkflow(llm_port=llm_port, memory_port=memory_port)
+    marketing_workflow = MarketingGraph(llm=llm_port, memory=memory_port, marketing=SocialMediaStubAdapter())
+    writer_workflow = WriterWorkflow(llm_port=llm_port, memory=memory_port)
 
     try:
         if request.action_type in {ActionType.trade_decision, ActionType.open_position}:
             result = await workflow.execute_trade_decision(prompt=request.prompt, user_id=request.source.user_id)
         elif request.action_type == ActionType.marketing:
-            print(f"[DEBUG] Entrando a MarketingWorkflow con prompt: {request.prompt}")
-            result = await marketing_workflow.execute_marketing_action(prompt=request.prompt, payload=request.payload)
+            print(f"[DEBUG] Entrando a MarketingGraph con prompt: {request.prompt}")
+            result = await marketing_workflow.run(prompt=request.prompt, payload=request.payload)
         elif request.action_type == ActionType.writer:
             print(f"[DEBUG] Entrando a WriterWorkflow con prompt: {request.prompt}")
             result = await writer_workflow.execute_writer_action(prompt=request.prompt, payload=request.payload)

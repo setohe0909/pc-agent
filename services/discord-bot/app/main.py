@@ -93,6 +93,42 @@ async def main() -> None:
         async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
             await interaction.response.edit_message(content="🚫 Orden cancelada y descartada.", embed=None, view=None)
 
+    class MarketingView(View):
+        def __init__(self, message_author):
+            super().__init__(timeout=60)
+            self.message_author = message_author
+
+        @discord.ui.button(label="🎯 Qualify Leads", style=discord.ButtonStyle.primary)
+        async def qualify(self, interaction: discord.Interaction, button: discord.ui.Button):
+            await self._run_marketing(interaction, "qualify", "cualifica leads")
+
+        @discord.ui.button(label="🚀 Trends", style=discord.ButtonStyle.success)
+        async def trends(self, interaction: discord.Interaction, button: discord.ui.Button):
+            await self._run_marketing(interaction, "trends", "busca tendencias")
+
+        @discord.ui.button(label="📊 Sentiment", style=discord.ButtonStyle.secondary)
+        async def sentiment(self, interaction: discord.Interaction, button: discord.ui.Button):
+            await self._run_marketing(interaction, "sentiment", "analiza sentimiento")
+
+        async def _run_marketing(self, interaction, sub_cmd, prompt):
+            if str(interaction.user.id) != str(self.message_author.id):
+                await interaction.response.send_message("No autorizado.", ephemeral=True)
+                return
+            
+            await interaction.response.edit_message(content=f"⏳ Procesando `{sub_cmd}` vía LangGraph...", view=None)
+            payload = {
+                "action_type": "marketing",
+                "prompt": prompt,
+                "source": {"platform": "discord", "channel_id": str(interaction.channel_id), "user_id": str(interaction.user.id)},
+                "payload": {"sub_command": sub_cmd}
+            }
+            try:
+                result = await _send_assistant_request(payload)
+                msg = result.get("message", "No hubo respuesta.")
+                await interaction.message.edit(content=msg)
+            except Exception as e:
+                await interaction.message.edit(content=f"❌ Error: {e}")
+
     class ConfirmationView(View):
         def __init__(self, context: str, message_author):
             super().__init__(timeout=60)
@@ -323,6 +359,15 @@ async def main() -> None:
             sub_command = "chat"
             prompt = raw_query
             
+            if not raw_query or raw_query.strip() == "":
+                embed = discord.Embed(
+                    title="📣 Centro de Control de Marketing",
+                    description="Selecciona una acción rápida o escribe un comando después de `!marketer`.",
+                    color=discord.Color.purple()
+                )
+                await message.reply(embed=embed, view=MarketingView(message.author))
+                return
+
             if raw_query.startswith("respond"):
                 sub_command = "respond"
                 prompt = "responde comentarios"
