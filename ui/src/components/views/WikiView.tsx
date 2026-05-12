@@ -117,6 +117,8 @@ export function WikiView() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="text-xs space-y-2">
+                  <p><strong>!marketer memory</strong></p>
+                  <p className="text-muted-foreground">Muestra los aprendizajes y hallazgos recientes del sub-agente.</p>
                   <p><strong>!marketer respond</strong></p>
                   <p className="text-muted-foreground">Responde comentarios en Instagram con un tono empático.</p>
                   <p><strong>!marketer qualify</strong></p>

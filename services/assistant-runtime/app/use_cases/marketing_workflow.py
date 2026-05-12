@@ -33,15 +33,23 @@ class MarketingWorkflow:
             return await self._analyze_sentiment()
         elif sub_command == "collab":
             return await self._find_collaborations(prompt)
+        elif sub_command == "memory":
+            return await self._get_marketing_memory()
         else:
             # Default chat for marketing context
             return await self._marketing_chat(prompt)
 
     async def _marketing_chat(self, prompt: str) -> dict:
+        # Recuperar memoria relevante
+        memory_context = ""
+        if self.memory:
+            memory_context = await self.memory.get_context("marketer")
+
         system_instructions = (
             "Eres un experto en marketing digital y redes sociales (Instagram y TikTok). "
             "Tu tono es siempre empático, positivo y profesional. "
-            "Ayudas a planificar campañas, responder comentarios y analizar la competencia."
+            "Ayudas a planificar campañas, responder comentarios y analizar la competencia.\n"
+            f"{memory_context}"
         )
         full_prompt = f"{system_instructions}\n\nUsuario: {prompt}"
         response = await self.llm.chat(full_prompt)
@@ -153,6 +161,13 @@ class MarketingWorkflow:
             # 3. Notificar vía Discord (simulado enviando al canal de notificaciones si estuviera conectado)
             # Aquí podríamos disparar un evento que el discord-bot escuche.
             
+            # 4. Guardar en memoria de aprendizaje
+            if self.memory:
+                await self.memory.save_memory(
+                    category="marketing_lead",
+                    summary=f"Lead cualificado detectado: {lead['user']} con interés '{lead['analysis']['category']}'"
+                )
+            
         return {"status": "success", "message": summary}
 
     async def _process_lead_magnets(self) -> dict:
@@ -225,7 +240,24 @@ class MarketingWorkflow:
             f"💡 **Sugerencias de la IA**:\n{suggestions}"
         )
         
+        # Guardar tendencia en memoria
+        if self.memory:
+            await self.memory.save_memory(
+                category="marketing_trend",
+                summary=f"Tendencia detectada: {trends_detected[0]['name']} ({trends_detected[0]['growth']})"
+            )
+        
         return {"status": "success", "message": report}
+
+    async def _get_marketing_memory(self) -> dict:
+        if not self.memory:
+            return {"status": "error", "message": "Memoria de Mentis no disponible."}
+        
+        context = await self.memory.get_context("marketer")
+        if not context:
+            return {"status": "success", "message": "El Marketer aún no tiene aprendizajes guardados."}
+            
+        return {"status": "success", "message": f"### 🧠 Memoria de Aprendizaje (Marketer)\n\n{context}"}
 
     async def _analyze_sentiment(self) -> dict:
         # 1. Obtener interacciones
