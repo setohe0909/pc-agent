@@ -93,6 +93,35 @@ async def main() -> None:
         async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
             await interaction.response.edit_message(content="🚫 Orden cancelada y descartada.", embed=None, view=None)
 
+    class ConfirmationView(View):
+        def __init__(self, context: str, message_author):
+            super().__init__(timeout=60)
+            self.context = context
+            self.message_author = message_author
+
+        @discord.ui.button(label="✅ Sí, Borrar Memoria", style=discord.ButtonStyle.danger)
+        async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+            if str(interaction.user.id) != str(self.message_author.id):
+                await interaction.response.send_message("No estás autorizado.", ephemeral=True)
+                return
+            
+            await interaction.response.edit_message(content=f"⏳ Borrando memoria ({self.context})...", view=None)
+            try:
+                base_url = _get_env("CONTROL_API_URL", "http://control-api:8000").rstrip("/")
+                async with httpx.AsyncClient(timeout=10) as client_http:
+                    resp = await client_http.delete(f"{base_url}/intelligence/memory/today?context={self.context}")
+                
+                if resp.status_code == 200:
+                    await interaction.message.edit(content=f"✅ **Memoria ({self.context}) borrada con éxito.**")
+                else:
+                    await interaction.message.edit(content=f"❌ Error al borrar: HTTP {resp.status_code}")
+            except Exception as e:
+                await interaction.message.edit(content=f"❌ Error técnico: {e}")
+
+        @discord.ui.button(label="❌ Cancelar", style=discord.ButtonStyle.secondary)
+        async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+            await interaction.message.edit(content="🚫 Acción cancelada. La memoria sigue intacta.", view=None)
+
     intents = discord.Intents.default()
     intents.message_content = True
     client = discord.Client(intents=intents)
@@ -188,7 +217,16 @@ async def main() -> None:
                 await message.reply(f"⚠️ Error de Conexión: No pude contactar al cerebro del sistema ({e})")
             return
 
-        if content == "!memory":
+        if content.startswith("!memory"):
+            if "--clean" in content:
+                embed = discord.Embed(
+                    title="⚠️ Confirmación de Borrado",
+                    description="¿Estás seguro de que deseas borrar la **memoria general** de hoy? Esta acción no se puede deshacer.",
+                    color=discord.Color.red()
+                )
+                await message.reply(embed=embed, view=ConfirmationView("general", message.author))
+                return
+
             try:
                 from datetime import datetime
                 today_str = datetime.now().strftime("%Y-%m-%d")
@@ -272,6 +310,16 @@ async def main() -> None:
 
         if content.startswith("!marketer "):
             raw_query = content.removeprefix("!marketer ").strip()
+            
+            if "memory --clean" in raw_query:
+                embed = discord.Embed(
+                    title="⚠️ Confirmación de Borrado (Marketer)",
+                    description="¿Estás seguro de que deseas borrar la **memoria de marketing** de hoy? Esta acción no se puede deshacer.",
+                    color=discord.Color.red()
+                )
+                await message.reply(embed=embed, view=ConfirmationView("marketer", message.author))
+                return
+
             sub_command = "chat"
             prompt = raw_query
             

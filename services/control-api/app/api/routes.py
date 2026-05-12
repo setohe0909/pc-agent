@@ -240,6 +240,32 @@ async def get_mentis_memory(context: str | None = None):
     return await get_today_intelligence(context)
 
 
+@router.delete("/intelligence/memory/today")
+async def clear_today_intelligence(context: str | None = None):
+    url = settings.effective("supabase_url")
+    key = settings.effective("supabase_service_role_key")
+    headers = {
+        "apikey": key,
+        "Authorization": f"Bearer {key}",
+    }
+    
+    # Determinar filtro segun el contexto
+    if context == "marketer":
+        category_filter = "category=ilike.marketing_*"
+    else:
+        category_filter = "category=not.ilike.marketing_*"
+
+    async with httpx.AsyncClient() as client:
+        try:
+            query_url = f"{url}/rest/v1/mentis_memory?{category_filter}"
+            response = await client.delete(query_url, headers=headers)
+            if response.status_code not in [200, 204]:
+                raise HTTPException(status_code=response.status_code, detail=response.text)
+            return {"status": "success", "message": f"Memoria ({context or 'general'}) eliminada correctamente."}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+
 def _supabase_knowledge_base() -> SupabaseVectorKnowledgeBase:
     return SupabaseVectorKnowledgeBase(
         url=settings.effective("supabase_url"),

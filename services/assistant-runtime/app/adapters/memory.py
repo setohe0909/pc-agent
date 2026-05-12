@@ -73,3 +73,29 @@ class MentisMemoryAdapter:
         except Exception as e:
             print(f"[MEMORY SAVE ERROR] {e}")
             return False
+
+    async def clear_memory(self, user_id: str) -> bool:
+        """Borra los fragmentos de memoria segun el contexto"""
+        if not self.supabase_url or not self.supabase_key:
+            return False
+            
+        # Determinar filtro segun el contexto (misma logica que get_context)
+        if user_id == "marketer":
+            category_filter = "category=ilike.marketing_*"
+        else:
+            category_filter = "category=not.ilike.marketing_*"
+            
+        url = f"{self.supabase_url}/rest/v1/mentis_memory?{category_filter}"
+        headers = {
+            "apikey": self.supabase_key,
+            "Authorization": f"Bearer {self.supabase_key}"
+        }
+        
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.delete(url, headers=headers)
+                # PostgREST devuelve 204 No Content en DELETE exitosos
+                return resp.status_code in [200, 204]
+        except Exception as e:
+            print(f"[MEMORY CLEAR ERROR] {e}")
+            return False
