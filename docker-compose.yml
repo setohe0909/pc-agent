@@ -207,6 +207,7 @@ services:
   obsidian:
     image: lscr.io/linuxserver/obsidian:latest
     container_name: obsidian
+    shm_size: "1gb"
     environment:
       - PUID=1000
       - PGID=1000
