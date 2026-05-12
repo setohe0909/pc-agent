@@ -26,7 +26,21 @@ El agente de marketing es el más avanzado actualmente.
 *   `!marketer`: Abre el panel de botones para acciones rápidas.
 *   `!marketer memory`: Consulta los aprendizajes que el agente ha consolidado sobre tu marca.
 
-## 3. Inteligencia Proactiva
+## 3. Generación de Imágenes (!picture)
+
+El agente de imágenes utiliza **DALL-E 3** y memoria proactiva para generar contenido visual de alta calidad.
+
+### Características
+- **Memoria de Estilo**: El agente recuerda tus preferencias estéticas y estilos anteriores guardados en la memoria `picture`.
+- **Multimodalidad**: Puedes adjuntar imágenes en Discord; el agente las analizará (Vision) y las usará como referencia para la nueva generación.
+- **Hilos de Conversación**: Cada solicitud crea un hilo dedicado para no saturar el canal principal.
+
+### Comandos
+- `!picture <descripción>`: Genera una imagen basada en tu texto y contexto.
+- `!picture memory`: Muestra un resumen de los estilos y preferencias guardadas.
+- `!picture memory --clean`: Limpia la memoria operativa de imágenes.
+
+## 4. Inteligencia Proactiva
 
 El sistema aprende mientras duermes:
 *   **Consolidación Diaria**: Cada medianoche (UTC), el `ingestion-worker` toma todas las memorias del día y genera un resumen ejecutivo.

@@ -212,25 +212,21 @@ class MarketingGraph:
             return {"errors": [str(e)]}
 
     async def _finalize_node(self, state: MarketingState) -> dict:
-        print(f"[GRAPH][FINALIZE] State keys: {state.keys()}")
-        print(f"[GRAPH][FINALIZE] requires_approval: {state.get('requires_approval')}, is_approved: {state.get('is_approved')}")
-        
         if state.get("errors"):
             return {"results": {"status": "error", "message": str(state["errors"])}}
         
-        # Si venimos de un nodo que requiere aprobación y no ha sido aprobado,
-        # tool_results tendrá el estado requires_approval.
+        # Debug: Incluir llaves del estado si falla
+        keys = list(state.keys())
+        status = "requires_approval" if state.get("requires_approval") and not state.get("is_approved") else "success"
+        
         if state.get("tool_results"):
             return {"results": state["tool_results"]}
         
-        # Si hay un mensaje final (ej. del refiner o human approval) pero no hay resultados de herramientas
         if state.get("final_message"):
-            # Si el mensaje indica que requiere aprobación, mantenemos ese estado
-            status = "requires_approval" if state.get("requires_approval") and not state.get("is_approved") else "success"
             return {"results": {"status": status, "message": state["final_message"]}}
         
         res = await self.llm.chat(state["prompt"], context={"brand": state["context"]})
-        return {"results": {"status": "success", "message": res}}
+        return {"results": {"status": "success", "message": f"[KEYS: {keys}] [REQ: {state.get('requires_approval')}] [APP: {state.get('is_approved')}]\n\n{res}"}}
 
     async def run(self, prompt: str, payload: dict, images: List[bytes] = None) -> dict:
         initial_state = {
@@ -256,7 +252,6 @@ class MarketingGraph:
     async def _qualify_leads_and_save(self) -> dict:
         comments = await self.marketing.get_comments("instagram", "latest")
         for c in comments:
-            # Simulación de guardado real en Supabase (Lead Auto-Pilot)
             await self.marketing.save_lead({
                 "platform": "instagram",
                 "external_user": c["user"],

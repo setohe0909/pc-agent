@@ -1,6 +1,6 @@
 # PC Agent
 
-Version: `0.3.0`
+Version: `0.4.0`
 
 PC Agent es una plataforma modular para investigar mercados de Kalshi, acumular
 conocimiento en Supabase/pgvector, usar memoria operativa en MentisDB, observar
@@ -157,6 +157,8 @@ Comandos iniciales:
 !ask pregunta general
 !research solicitud de investigacion
 !approve_trade decision aprobada para evaluar
+!picture generacion de imagenes con IA y memoria proactiva
+!marketer centro de control de marketing
 ```
 
 Importante: PC Agent `0.2.0` todavia no ejecuta ordenes reales de Kalshi. La
