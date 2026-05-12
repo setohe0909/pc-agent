@@ -15,9 +15,12 @@ class MentisMemoryAdapter:
         if user_id == "marketer":
             # Para el marketer, solo traemos lo que sea de marketing
             category_filter = "category=ilike.marketing_*"
+        elif user_id == "picture":
+            # Para el picture agent, traemos lo relacionado con imagenes
+            category_filter = "category=ilike.picture_*"
         else:
-            # Para el resto (general, writer), traemos lo que NO sea de marketing
-            category_filter = "category=not.ilike.marketing_*"
+            # Para el resto (general, writer), traemos lo que NO sea de marketing ni picture
+            category_filter = "category=not.ilike.marketing_*,category=not.ilike.picture_*"
             
         url = f"{self.supabase_url}/rest/v1/mentis_memory?{category_filter}&select=category,summary&order=created_at.desc&limit=5"
         headers = {
@@ -82,8 +85,10 @@ class MentisMemoryAdapter:
         # Determinar filtro segun el contexto (misma logica que get_context)
         if user_id == "marketer":
             category_filter = "category=ilike.marketing_*"
+        elif user_id == "picture":
+            category_filter = "category=ilike.picture_*"
         else:
-            category_filter = "category=not.ilike.marketing_*"
+            category_filter = "category=not.ilike.marketing_*,category=not.ilike.picture_*"
             
         url = f"{self.supabase_url}/rest/v1/mentis_memory?{category_filter}"
         headers = {

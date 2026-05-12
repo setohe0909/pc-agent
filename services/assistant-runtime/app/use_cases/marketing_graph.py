@@ -134,7 +134,7 @@ class MarketingGraph:
         return {"context": existing_context + context}
 
     async def _analyze_intent_node(self, state: MarketingState) -> dict:
-        print(f"[GRAPH][INTENT] Analizando: {state['prompt']}")
+        print(f"[GRAPH][INTENT] Analizando: {state['prompt']} (Sub: {state['sub_command']})")
         
         forced_cmds = ["qualify", "trends", "sentiment", "plan"]
         if state["sub_command"] in forced_cmds:
@@ -142,6 +142,7 @@ class MarketingGraph:
             if tool_name == "qualify": tool_name = "qualify_leads"
             if tool_name == "plan": tool_name = "plan_campaign"
             
+            print(f"[GRAPH][INTENT] Comando forzado detectado: {tool_name}")
             return {
                 "suggested_action": {"tool_name": tool_name, "arguments": {"topic": state["prompt"]}},
                 "requires_approval": tool_name == "plan_campaign"
@@ -211,6 +212,9 @@ class MarketingGraph:
             return {"errors": [str(e)]}
 
     async def _finalize_node(self, state: MarketingState) -> dict:
+        print(f"[GRAPH][FINALIZE] State keys: {state.keys()}")
+        print(f"[GRAPH][FINALIZE] requires_approval: {state.get('requires_approval')}, is_approved: {state.get('is_approved')}")
+        
         if state.get("errors"):
             return {"results": {"status": "error", "message": str(state["errors"])}}
         

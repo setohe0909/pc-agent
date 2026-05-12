@@ -172,19 +172,20 @@ async def main() -> None:
             return
 
         content = message.content.strip()
-        command_list = ("!ask ", "!research ", "!approve_trade ", "!status", "!memory", "!run ", "!claw ", "!marketer ", "!marketer-status", "!writer ", "!help")
-        if not content.startswith(command_list):
+        command_list = ("!ask ", "!research ", "!approve_trade ", "!status", "!memory", "!run ", "!claw ", "!marketer ", "!marketer-status", "!writer ", "!picture ", "!help")
+        if not content.startswith(command_list) and not content == "!picture":
             return
 
         # --- COMANDO HELP ---
         if content == "!help":
             embed = discord.Embed(
-                title="🤖 PC Agent v0.3.0 - Guía de Operaciones", 
+                title="🤖 PC Agent v0.3.5 - Guía de Operaciones", 
                 description="Sistema de agentes autónomos con flujos de estados (LangGraph) y memoria proactiva.",
                 color=discord.Color.blue()
             )
             embed.add_field(name="🧠 Inteligencia & Memoria", value="`!memory`: Ver tendencias del día.\n`!memory --clean`: Borrar memoria general.\n`!run consolidation`: Forzar consolidación de memoria diaria.", inline=False)
-            embed.add_field(name="📣 Marketing (LangGraph)", value="`!marketer`: Centro de Control interactivo (Botones).\n`!marketer <petición>`: El agente decidirá qué herramienta usar (Native Tool Calling).\n`!marketer memory`: Ver aprendizajes consolidados.", inline=False)
+            embed.add_field(name="📣 Marketing (LangGraph)", value="`!marketer`: Centro de Control interactivo (Botones).\n`!marketer memory`: Ver aprendizajes consolidados.", inline=False)
+            embed.add_field(name="🎨 Imagenes (!picture)", value="`!picture <petición>`: Generar imágenes usando DALL-E 3 con memoria proactiva.\n`!picture memory`: Ver estilos recordados.\n`!picture memory --clean`: Limpiar memoria de imágenes.", inline=False)
             embed.add_field(name="✍️ Redactor (Writer)", value="`!writer blog <tema>`: Crear blog y guardar en Obsidian.\n`!writer <mensaje>`: Chat con el redactor creativo.", inline=False)
             embed.add_field(name="📊 Research & Trading", value="`!research <tema>`: Investigación profunda.\n`!status`: Estado de salud de los microservicios.\n`!approve_trade <id>`: Evaluar propuesta de inversión.", inline=False)
             embed.set_footer(text="Usa los botones en los mensajes para una experiencia mejorada.")
@@ -502,6 +503,91 @@ async def main() -> None:
                     await message.reply(msg)
             except Exception as e:
                 await message.reply(f"❌ Error en Writer Agent: {e}")
+            return
+
+        if content.startswith("!picture"):
+            raw_query = content.removeprefix("!picture").strip()
+            
+            # Gestión de Memoria
+            if "memory --clean" in raw_query:
+                embed = discord.Embed(
+                    title="⚠️ Confirmación de Borrado (Picture)",
+                    description="¿Estás seguro de que deseas borrar la **memoria de imágenes**? Esta acción no se puede deshacer.",
+                    color=discord.Color.red()
+                )
+                await message.reply(embed=embed, view=ConfirmationView("picture", message.author))
+                return
+
+            if raw_query == "memory":
+                try:
+                    base_url = _get_env("CONTROL_API_URL", "http://control-api:8000").rstrip("/")
+                    async with httpx.AsyncClient(timeout=10) as client_http:
+                        resp = await client_http.get(f"{base_url}/intelligence/memory/today?context=picture")
+                    
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        memory_list = data.get("memory", [])
+                        if not memory_list:
+                            await message.reply("📭 No hay memoria de imágenes guardada hoy.")
+                        else:
+                            report = "### 🎨 Memoria de Picture Agent\n"
+                            for item in memory_list:
+                                report += f"- {item['summary']}\n"
+                            await message.reply(report)
+                    else:
+                        await message.reply(f"❌ Error al obtener memoria: HTTP {resp.status_code}")
+                except Exception as e:
+                    await message.reply(f"❌ Error: {e}")
+                return
+
+            if not raw_query:
+                await message.reply("🎨 Por favor, añade una descripción para generar la imagen. Ejemplo: `!picture un gato astronauta`.")
+                return
+
+            # Crear Hilo para la generación
+            try:
+                thread = await message.create_thread(name=f"🎨 Imagen: {raw_query[:30]}...")
+                await thread.send("⏳ **Picture Agent** está procesando tu solicitud con memoria proactiva...")
+
+                # Capturar imágenes adjuntas
+                images_b64 = []
+                if message.attachments:
+                    import base64
+                    for att in message.attachments:
+                        if any(att.filename.lower().endswith(ext) for ext in [".png", ".jpg", ".jpeg", ".webp"]):
+                            img_data = await att.read()
+                            images_b64.append(base64.b64encode(img_data).decode("utf-8"))
+
+                payload = {
+                    "action_type": "picture",
+                    "prompt": raw_query,
+                    "source": {"platform": "discord", "channel_id": str(message.channel.id), "user_id": str(message.author.id)},
+                    "images": images_b64,
+                    "payload": {}
+                }
+
+                result = await _send_assistant_request(payload)
+                msg = result.get("message", "No hubo respuesta.")
+                
+                # Extraer URL de la imagen si está presente en el mensaje
+                # El formato del mensaje es: Prompt... \n\n URL
+                parts = msg.split("\n\n")
+                if len(parts) > 1:
+                    image_url = parts[-1].strip()
+                    text_msg = "\n\n".join(parts[:-1])
+                    
+                    await thread.send(text_msg)
+                    # Enviar la imagen como un embed para que se vea mejor
+                    embed = discord.Embed(title="Resultado Final", color=discord.Color.brand_green())
+                    embed.set_image(url=image_url)
+                    await thread.send(embed=embed)
+                else:
+                    await thread.send(msg)
+
+            except discord.Forbidden:
+                await message.reply("❌ Necesito permiso para 'Crear hilos públicos'.")
+            except Exception as e:
+                await message.reply(f"❌ Error en Picture Agent: {e}")
             return
 
         action_type = "chat"

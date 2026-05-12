@@ -35,7 +35,7 @@ async def test_marketing_v04():
             
             print("\n--- RESULTADO DEL GRAFO ---")
             print(f"Status: {result.get('status')}")
-            print(f"Message: {result.get('message')[:500]}...") # Mostrar solo el inicio
+            print(f"Message: {result.get('message')}") 
             
             if result.get("status") == "requires_approval":
                 print("\n✅ TEST EXITOSO: El grafo detectó que se requiere aprobación para el plan de campaña.")

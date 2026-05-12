@@ -45,6 +45,7 @@ class ActionType(str, Enum):
     open_position = "open_position"
     marketing = "marketing"
     writer = "writer"
+    picture = "picture"
 
 
 class Source(BaseModel):
@@ -91,6 +92,8 @@ async def assistant_request(request: AssistantRequest) -> dict:
     workflow = TradingWorkflow(trading_port=trading_port, llm_port=llm_port, memory_port=memory_port)
     marketing_workflow = MarketingGraph(llm=llm_port, memory=memory_port, marketing=SocialMediaStubAdapter())
     writer_workflow = WriterWorkflow(llm_port=llm_port, memory=memory_port)
+    from app.use_cases.picture_graph import PictureGraph
+    picture_workflow = PictureGraph(llm=llm_port, memory=memory_port)
 
     try:
         if request.action_type in {ActionType.trade_decision, ActionType.open_position}:
@@ -103,6 +106,11 @@ async def assistant_request(request: AssistantRequest) -> dict:
         elif request.action_type == ActionType.writer:
             print(f"[DEBUG] Entrando a WriterWorkflow con prompt: {request.prompt}")
             result = await writer_workflow.execute_writer_action(prompt=request.prompt, payload=request.payload)
+        elif request.action_type == ActionType.picture:
+            print(f"[DEBUG] Entrando a PictureGraph con prompt: {request.prompt}")
+            import base64
+            image_data = [base64.b64decode(img) for img in request.images]
+            result = await picture_workflow.run(prompt=request.prompt, payload=request.payload, images=image_data)
         else:
             result_text = await workflow.execute_chat(prompt=request.prompt, user_id=request.source.user_id)
             result = {"status": "success", "message": result_text}

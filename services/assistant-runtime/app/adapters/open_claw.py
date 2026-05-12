@@ -162,3 +162,21 @@ class OpenClawLLMAdapter(LLMPort):
                     "arguments": json.loads(tc.function.arguments)
                 }
             return {"message": message.content}
+
+    async def generate_image(self, prompt: str) -> str:
+        from litellm import image_generation
+        provider, _ = self._get_provider_info(policy="smart")
+        
+        # Por ahora usamos dall-e-3 como estandar de alta calidad
+        model = "dall-e-3"
+        if provider == "openai":
+            model = "dall-e-3"
+        
+        print(f"[OPEN CLAW] Generando imagen con {model}...")
+        response = await image_generation(
+            model=model,
+            prompt=prompt,
+            size="1024x1024",
+            quality="hd"
+        )
+        return response.data[0].url
