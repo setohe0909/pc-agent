@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Activity, BookOpen, Brain, Database, RefreshCw, Settings, TerminalSquare, Megaphone, PenTool } from "lucide-react";
+import { Activity, BookOpen, Brain, Database, RefreshCw, Settings, TerminalSquare, Megaphone, PenTool, Camera } from "lucide-react";
 import { getJson, saveRuntimeConfig } from "@/lib/api";
 
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { ArchitectureView } from "@/components/views/ArchitectureView";
 import { WikiView } from "@/components/views/WikiView";
 import { MarketerView } from "@/components/views/MarketerView";
 import { WriterView } from "@/components/views/WriterView";
+import { PictureView } from "@/components/views/PictureView";
 
 export default function App() {
   const [data, setData] = useState<any>(null);
@@ -66,6 +67,7 @@ export default function App() {
       case "architecture": return <ArchitectureView />;
       case "marketing": return <MarketerView data={data} adminToken={adminToken} onSave={handleSaveConfig} />;
       case "writer": return <WriterView data={data} adminToken={adminToken} onSave={handleSaveConfig} />;
+      case "picture": return <PictureView data={data} adminToken={adminToken} onSave={handleSaveConfig} />;
       case "wiki": return <WikiView />;
       default: return null;
     }
@@ -102,6 +104,9 @@ export default function App() {
               </TabsTrigger>
               <TabsTrigger value="writer" className="justify-start px-4 py-2 data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
                 <PenTool className="w-4 h-4 mr-2" /> Redactor
+              </TabsTrigger>
+              <TabsTrigger value="picture" className="justify-start px-4 py-2 data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
+                <Camera className="w-4 h-4 mr-2" /> Imágenes
               </TabsTrigger>
               <div className="my-2 border-t border-border"></div>
               <TabsTrigger value="architecture" className="justify-start px-4 py-2 data-[state=active]:bg-primary/10 data-[state=active]:text-primary">

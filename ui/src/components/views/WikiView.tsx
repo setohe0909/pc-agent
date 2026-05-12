@@ -155,11 +155,22 @@ export function WikiView() {
                   <p className="text-muted-foreground">Genera una narrativa de marca y la guarda en /Story-telling.</p>
                   <p><strong>!writer [mensaje]</strong></p>
                   <p className="text-muted-foreground">Chat directo con el redactor para lluvia de ideas creativa.</p>
-                  <div className="bg-indigo-500/10 p-2 rounded mt-2 border border-indigo-500/20">
-                    <p className="flex items-center gap-1 font-semibold text-[10px] text-indigo-400">
-                      <Files className="w-3 h-3" /> Tip: Usa las imágenes automáticas de Unsplash incluidas en cada post.
-                    </p>
-                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-muted/30 border-amber-500/20">
+                <CardHeader>
+                  <CardTitle className="text-sm flex items-center gap-2 text-amber-500">
+                    <Camera className="h-4 w-4" /> Picture Sub-Agent (DALL-E 3)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-xs space-y-2">
+                  <p><strong>!picture [descripción]</strong></p>
+                  <p className="text-muted-foreground">Genera una imagen usando memoria proactiva y hilos de conversación.</p>
+                  <p><strong>!picture memory</strong></p>
+                  <p className="text-muted-foreground">Ver estilos y preferencias visuales consolidadas.</p>
+                  <p><strong>!picture memory --clean</strong></p>
+                  <p className="text-muted-foreground">Limpia la memoria operativa de imágenes.</p>
                 </CardContent>
               </Card>
             </div>
