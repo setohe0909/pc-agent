@@ -243,7 +243,7 @@ async def get_mentis_memory(context: str | None = None):
 @router.delete("/intelligence/memory/today")
 async def clear_today_intelligence(context: str | None = None):
     url = settings.effective("supabase_url")
-    key = settings.effective("supabase_service_role_key")
+    key = settings.effective("supabase_service_role_key") or settings.effective("supabase_publishable_key")
     headers = {
         "apikey": key,
         "Authorization": f"Bearer {key}",
@@ -260,9 +260,13 @@ async def clear_today_intelligence(context: str | None = None):
             query_url = f"{url}/rest/v1/mentis_memory?{category_filter}"
             response = await client.delete(query_url, headers=headers)
             if response.status_code not in [200, 204]:
-                raise HTTPException(status_code=response.status_code, detail=response.text)
+                print(f"[MEMORY DELETE ERROR] Supabase returned {response.status_code}: {response.text}")
+                raise HTTPException(status_code=response.status_code, detail=f"Supabase Error: {response.text}")
             return {"status": "success", "message": f"Memoria ({context or 'general'}) eliminada correctamente."}
+        except HTTPException:
+            raise
         except Exception as e:
+            print(f"[MEMORY DELETE ERROR] Unexpected error: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
 
