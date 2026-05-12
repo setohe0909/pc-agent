@@ -136,11 +136,15 @@ class MarketingGraph:
     async def _analyze_intent_node(self, state: MarketingState) -> dict:
         print(f"[GRAPH][INTENT] Analizando: {state['prompt']}")
         
-        forced_cmds = ["qualify", "trends", "sentiment"]
+        forced_cmds = ["qualify", "trends", "sentiment", "plan"]
         if state["sub_command"] in forced_cmds:
+            tool_name = state["sub_command"]
+            if tool_name == "qualify": tool_name = "qualify_leads"
+            if tool_name == "plan": tool_name = "plan_campaign"
+            
             return {
-                "suggested_action": {"tool_name": f"{state['sub_command']}_leads" if state["sub_command"]=="qualify" else state["sub_command"], "arguments": {}},
-                "requires_approval": False
+                "suggested_action": {"tool_name": tool_name, "arguments": {"topic": state["prompt"]}},
+                "requires_approval": tool_name == "plan_campaign"
             }
 
         tools = self._get_marketing_tools()
@@ -209,10 +213,17 @@ class MarketingGraph:
     async def _finalize_node(self, state: MarketingState) -> dict:
         if state.get("errors"):
             return {"results": {"status": "error", "message": str(state["errors"])}}
+        
+        # Si venimos de un nodo que requiere aprobación y no ha sido aprobado,
+        # tool_results tendrá el estado requires_approval.
         if state.get("tool_results"):
             return {"results": state["tool_results"]}
+        
+        # Si hay un mensaje final (ej. del refiner o human approval) pero no hay resultados de herramientas
         if state.get("final_message"):
-            return {"results": {"status": "success", "message": state["final_message"]}}
+            # Si el mensaje indica que requiere aprobación, mantenemos ese estado
+            status = "requires_approval" if state.get("requires_approval") and not state.get("is_approved") else "success"
+            return {"results": {"status": status, "message": state["final_message"]}}
         
         res = await self.llm.chat(state["prompt"], context={"brand": state["context"]})
         return {"results": {"status": "success", "message": res}}
