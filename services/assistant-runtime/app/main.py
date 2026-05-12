@@ -65,6 +65,7 @@ class AssistantRequest(BaseModel):
     prompt: str = Field(min_length=1, max_length=8000)
     source: Source
     approval: Approval | None = None
+    images: list[str] = Field(default_factory=list) # Base64 images
     payload: dict = Field(default_factory=dict)
 
 
@@ -96,7 +97,9 @@ async def assistant_request(request: AssistantRequest) -> dict:
             result = await workflow.execute_trade_decision(prompt=request.prompt, user_id=request.source.user_id)
         elif request.action_type == ActionType.marketing:
             print(f"[DEBUG] Entrando a MarketingGraph con prompt: {request.prompt}")
-            result = await marketing_workflow.run(prompt=request.prompt, payload=request.payload)
+            import base64
+            image_data = [base64.b64decode(img) for img in request.images]
+            result = await marketing_workflow.run(prompt=request.prompt, payload=request.payload, images=image_data)
         elif request.action_type == ActionType.writer:
             print(f"[DEBUG] Entrando a WriterWorkflow con prompt: {request.prompt}")
             result = await writer_workflow.execute_writer_action(prompt=request.prompt, payload=request.payload)

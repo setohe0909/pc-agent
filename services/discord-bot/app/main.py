@@ -366,6 +366,15 @@ async def main() -> None:
                 await message.reply(embed=embed, view=MarketingView(message.author))
                 return
 
+            # Capturar imágenes adjuntas
+            images_b64 = []
+            if message.attachments:
+                import base64
+                for att in message.attachments:
+                    if any(att.filename.lower().endswith(ext) for ext in [".png", ".jpg", ".jpeg", ".webp"]):
+                        img_data = await att.read()
+                        images_b64.append(base64.b64encode(img_data).decode("utf-8"))
+
             if raw_query.startswith("respond"):
                 sub_command = "respond"
                 prompt = "responde comentarios"
@@ -401,6 +410,7 @@ async def main() -> None:
                 "action_type": "marketing",
                 "prompt": prompt,
                 "source": {"platform": "discord", "channel_id": str(message.channel.id), "user_id": str(message.author.id)},
+                "images": images_b64,
                 "payload": {"sub_command": sub_command}
             }
             

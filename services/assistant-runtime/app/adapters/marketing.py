@@ -28,3 +28,26 @@ class SocialMediaStubAdapter(MarketingPort):
                 {"text": "Ofertas relámpago este fin de semana", "engagement": "medium"}
             ]
         }
+
+    async def save_lead(self, lead_data: dict) -> bool:
+        url = os.getenv("SUPABASE_URL")
+        key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_PUBLISHABLE_KEY")
+        if not url or not key:
+            print("[STUB] Error: Supabase config missing for save_lead")
+            return False
+        
+        print(f"[STUB] Guardando lead de {lead_data['external_user']} en Supabase...")
+        import httpx
+        headers = {
+            "apikey": key,
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json",
+            "Prefer": "return=minimal"
+        }
+        async with httpx.AsyncClient() as client:
+            try:
+                resp = await client.post(f"{url}/rest/v1/marketing_leads", headers=headers, json=lead_data)
+                return resp.status_code in [200, 201, 204]
+            except Exception as e:
+                print(f"[STUB ERROR] {e}")
+                return False

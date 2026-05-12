@@ -51,7 +51,13 @@ class OpenClawLLMAdapter(LLMPort):
                 print(f"[OPEN CLAW] Intentando con modelo: {model_name}...")
                 model = genai.GenerativeModel(model_name, system_instruction=system_instruction)
                 gen_config = genai.GenerationConfig(response_mime_type=response_mime_type)
-                response = await model.generate_content_async(prompt, generation_config=gen_config)
+                
+                content = [prompt]
+                if "images" in kwargs and kwargs["images"]:
+                    for img_bytes in kwargs["images"]:
+                        content.append({"mime_type": "image/jpeg", "data": img_bytes})
+                
+                response = await model.generate_content_async(content, generation_config=gen_config)
                 return response.text
             except Exception as e:
                 last_error = e
@@ -62,7 +68,7 @@ class OpenClawLLMAdapter(LLMPort):
                     raise e
         raise last_error
 
-    async def chat(self, prompt: str, context: dict | None = None) -> str:
+    async def chat(self, prompt: str, context: dict | None = None, images: list[bytes] | None = None) -> str:
         provider, model = self._get_provider_info(policy="cheap")
         
         if provider == "gemini":
@@ -70,7 +76,7 @@ class OpenClawLLMAdapter(LLMPort):
             if context:
                 full_prompt = f"Contexto:\n{json.dumps(context)}\n\nPregunta: {prompt}"
             
-            return await self._generate_with_fallback(full_prompt)
+            return await self._generate_with_fallback(full_prompt, images=images)
         else:
             # Fallback a litellm para otros proveedores
             litellm_model = f"{provider}/{model}" if provider != "openai" else f"openai/{model}"

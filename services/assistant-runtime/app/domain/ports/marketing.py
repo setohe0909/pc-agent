@@ -16,3 +16,7 @@ class MarketingPort(ABC):
     @abstractmethod
     async def get_competitor_data(self, platform: str, competitor_handle: str) -> dict:
         pass
+
+    @abstractmethod
+    async def save_lead(self, lead_data: dict) -> bool:
+        pass
