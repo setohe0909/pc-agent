@@ -94,11 +94,10 @@ class MarketingGraph:
         if state.get("errors"):
             return "just_chat"
         
-        suggested = state.get("suggest_action") # Nota: hubo un typo en el dict, corregido abajo
         if not state.get("suggested_action"):
             return "just_chat"
         
-        if state["requires_approval"]:
+        if state["requires_approval"] and not state["is_approved"]:
             return "needs_approval"
         
         return "direct_execution"
@@ -219,7 +218,7 @@ class MarketingGraph:
             "payload": payload,
             "sub_command": payload.get("sub_command", "chat"),
             "context": "",
-            "suggested_action": None,
+            "suggested_action": payload.get("suggested_action"),
             "tool_results": None,
             "requires_approval": False,
             "is_approved": payload.get("is_approved", False),

@@ -425,7 +425,12 @@ async def main() -> None:
                             self.author = author
                         @discord.ui.button(label="✅ Aprobar Ejecución", style=discord.ButtonStyle.green)
                         async def approve(self, itn, btn):
-                            if str(itn.user.id) != str(self.author.id): return
+                            approvers = _approvers()
+                            if approvers and str(itn.user.id) not in approvers:
+                                if str(itn.user.id) != str(self.author.id):
+                                    await itn.response.send_message("No estás autorizado como aprobador.", ephemeral=True)
+                                    return
+                            
                             await itn.response.edit_message(content="⏳ Ejecutando acción aprobada...", view=None)
                             res = await _send_assistant_request(self.pld)
                             await itn.message.edit(content=res.get("message", "Acción completada."))

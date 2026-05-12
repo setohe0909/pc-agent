@@ -116,11 +116,9 @@ class OpenClawLLMAdapter(LLMPort):
             genai.configure(api_key=api_key)
             
             # Convertir esquemas de herramientas a formato Gemini
-            # Nota: Simplificado, Gemini espera objetos de tipo genai.types.Tool
-            # Por ahora usaremos el formato que espera el SDK de Google
             
             model_instance = genai.GenerativeModel(
-                model_name="models/gemini-pro", # Tool calling funciona mejor en pro
+                model_name=model, 
                 system_instruction=system_instruction,
                 tools=tools
             )

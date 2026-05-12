@@ -50,22 +50,31 @@ class MemoryConsolidationService:
                 consolidated_summaries = []
                 for cat, texts in grouped.items():
                     print(f"[MEMORY] Consolidando categoría: {cat} ({len(texts)} items)")
-                    full_text = "\n---\n".join(texts)
-                    prompt = (
-                        f"A continuación tienes una lista de eventos/aprendizajes registrados hoy para la categoría '{cat}'. "
-                        f"Resume los puntos más importantes de manera concisa y genera 'Aprendizajes Permanentes' "
-                        f"que sirvan para el futuro del agente.\n\n"
-                        f"MEMORIAS:\n{full_text}"
-                    )
                     
-                    response = await self.model.generate_content_async(prompt)
-                    summary = response.text
-                    
-                    consolidated_summaries.append({
-                        "category": f"consolidated_{cat}",
-                        "summary": summary,
-                        "metadata": {"type": "daily_consolidation", "date": datetime.now(timezone.utc).strftime("%Y-%m-%d")}
-                    })
+                    # Batching: Máximo 50 memorias por llamada al LLM
+                    batch_size = 50
+                    for i in range(0, len(texts), batch_size):
+                        batch = texts[i:i + batch_size]
+                        full_text = "\n---\n".join(batch)
+                        prompt = (
+                            f"A continuación tienes una lista de eventos/aprendizajes registrados hoy para la categoría '{cat}' (Parte {i//batch_size + 1}). "
+                            f"Resume los puntos más importantes de manera concisa y genera 'Aprendizajes Permanentes' "
+                            f"que sirvan para el futuro del agente.\n\n"
+                            f"MEMORIAS:\n{full_text}"
+                        )
+                        
+                        response = await self.model.generate_content_async(prompt)
+                        summary = response.text
+                        
+                        consolidated_summaries.append({
+                            "category": f"consolidated_{cat}",
+                            "summary": summary,
+                            "metadata": {
+                                "type": "daily_consolidation", 
+                                "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                                "batch": i//batch_size + 1
+                            }
+                        })
 
                 # 4. Guardar los resúmenes consolidados en Supabase (usando la misma tabla por ahora con un flag de consolidado)
                 # O podríamos guardarlos en una tabla de 'knowledge' dedicada
