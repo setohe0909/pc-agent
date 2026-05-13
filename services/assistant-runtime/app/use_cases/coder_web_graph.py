@@ -80,6 +80,7 @@ class CoderWebGraph:
             return {}
         
         sys_instr = "Eres Pilot, un experto en diseño UI/UX y arquitectura de e-commerce. Tu tarea es analizar visualmente mockups."
+        prompt = "Analiza este mockup o referencia para un ecommerce. Describe el layout, colores, tipografía y elementos clave de UI/UX que Pilot debe implementar."
         vision_analysis = await self.llm.chat(prompt, images=state["images"], system_instruction=sys_instr)
         return {"context": f"ANÁLISIS DE MOCKUP:\n{vision_analysis}\n\n"}
 
@@ -92,6 +93,7 @@ class CoderWebGraph:
         
         print(f"[CODER-WEB GRAPH][REFERENCES] Detectadas {len(urls)} URLs de referencia.")
         sys_instr = "Eres Pilot, experto en análisis de la competencia y UX Research."
+        prompt = f"El usuario ha proporcionado estos links como referencia de diseño: {', '.join(urls)}. Basado en el nombre de los dominios y la descripción del usuario, infiere estilos y patrones UX."
         analysis = await self.llm.chat(prompt, system_instruction=sys_instr)
         return {"context": state.get("context", "") + f"ANÁLISIS DE REFERENCIAS EXTERNAS:\n{analysis}\n\n"}
 
@@ -134,6 +136,10 @@ class CoderWebGraph:
     async def _plan_review_node(self, state: CoderWebState) -> dict:
         print("[CODER-WEB GRAPH][REVIEW] Validando plan de Pilot...")
         plan_str = json.dumps(state["plan"])
+        prompt = (
+            f"Como experto arquitecto, revisa este plan de Pilot para un proyecto {state['project_type']}:\n{plan_str}\n\n"
+            f"Asegúrate de que el stack {state['stack']} se use correctamente. Sugiere mejoras si faltan componentes críticos de e-commerce."
+        )
         sys_instr = "Eres el Arquitecto Pilot. Revisa y optimiza planes de desarrollo web."
         review = await self.llm.chat(prompt, context={"project_context": state["context"]}, system_instruction=sys_instr)
         # Inyectamos la revisión en el plan para la ejecución
