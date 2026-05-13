@@ -48,11 +48,14 @@ export default function App() {
   }, []);
 
   const handleSaveConfig = async (payload: any) => {
+    console.log("[CONFIG] Intentando guardar payload:", payload);
     try {
-      await saveRuntimeConfig(payload, adminToken);
+      const result = await saveRuntimeConfig(payload, adminToken);
+      console.log("[CONFIG] Resultado del servidor:", result);
       refresh();
       alert("Configuración guardada exitosamente");
     } catch (err: any) {
+      console.error("[CONFIG] Error al guardar:", err);
       alert("Error guardando configuración: " + err.message);
     }
   };

@@ -26,6 +26,8 @@ PUBLIC_KEYS = {
     "coder_web_stack",
     "coder_web_autonomy",
     "coder_web_perf",
+    "wix_site_id",
+    "github_org",
 }
 
 SECRET_KEYS = {
@@ -44,9 +46,7 @@ SECRET_KEYS = {
     "marketing_tone",
     "marketing_poll_frequency",
     "wix_api_key",
-    "wix_site_id",
     "github_token",
-    "github_org",
 }
 
 

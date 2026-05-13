@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 export function CoderWebView({ data, onSave }: { data: any, adminToken: string, onSave: (payload: any) => Promise<void> }) {
   const { runtime } = data;
   const currentRuntime = runtime?.runtime || {};
+  const secrets = currentRuntime.secrets || {};
 
   const handleSave = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -20,6 +21,7 @@ export function CoderWebView({ data, onSave }: { data: any, adminToken: string, 
       if (payload[key] === "") delete payload[key];
     });
 
+    console.log("[CODER-WEB] Saving payload:", payload);
     await onSave(payload);
   };
 
@@ -29,12 +31,12 @@ export function CoderWebView({ data, onSave }: { data: any, adminToken: string, 
         <div>
           <h2 className="text-xl font-bold flex items-center gap-2">
             <Code className="w-5 h-5 text-blue-500" />
-            Coder Web Sub-Agent Portal
+            Coder Web Agent (Pilot)
           </h2>
-          <p className="text-xs text-muted-foreground">Gestiona la creación de e-commerce y proyectos de código puro.</p>
+          <p className="text-xs text-muted-foreground">Configuración avanzada de despliegue y automatización.</p>
         </div>
         <Button type="submit" className="gap-2 shadow-lg bg-blue-600 hover:bg-blue-700">
-          <Save className="w-4 h-4" /> Guardar Configuración
+          <Save className="w-4 h-4" /> Guardar Cambios
         </Button>
       </div>
 
@@ -43,9 +45,9 @@ export function CoderWebView({ data, onSave }: { data: any, adminToken: string, 
           <CardHeader>
             <CardTitle className="text-md flex items-center gap-2">
               <Globe className="w-5 h-5 text-blue-500" />
-              Wix E-commerce Integration
+              Wix Platform Settings
             </CardTitle>
-            <CardDescription>Conexión vía Wix Velo / API para gestión de UI y e-commerce.</CardDescription>
+            <CardDescription>Conexión vía API Velo para ajustes automáticos.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
@@ -53,17 +55,18 @@ export function CoderWebView({ data, onSave }: { data: any, adminToken: string, 
               <Input 
                 name="wix_api_key" 
                 type="password" 
-                placeholder="wix_..." 
-                defaultValue={currentRuntime.wix_api_key}
+                placeholder={secrets.wix_api_key ? "••••••••••••••••" : "wix_..."}
               />
+              {secrets.wix_api_key && <p className="text-[10px] text-green-500">✓ API Key guardada en el servidor</p>}
             </div>
             <div className="space-y-2">
               <Label>Wix Site ID</Label>
               <Input 
                 name="wix_site_id" 
-                placeholder="xxxx-xxxx-xxxx" 
-                defaultValue={currentRuntime.wix_site_id}
+                placeholder="uuid-..." 
+                defaultValue={currentRuntime.wix_site_id || ""}
               />
+              {currentRuntime.wix_site_id && <p className="text-[10px] text-blue-500">ID: {currentRuntime.wix_site_id}</p>}
             </div>
           </CardContent>
         </Card>
@@ -78,21 +81,22 @@ export function CoderWebView({ data, onSave }: { data: any, adminToken: string, 
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label>GitHub Personal Access Token</Label>
+              <Label>GitHub Personal Token</Label>
               <Input 
                 name="github_token" 
                 type="password" 
-                placeholder="ghp_..." 
-                defaultValue={currentRuntime.github_token}
+                placeholder={secrets.github_token ? "••••••••••••••••" : "ghp_..."}
               />
+              {secrets.github_token && <p className="text-[10px] text-green-500">✓ Token guardado exitosamente</p>}
             </div>
             <div className="space-y-2">
-              <Label>Default Org / Username</Label>
+              <Label>GitHub Organization / User</Label>
               <Input 
                 name="github_org" 
-                placeholder="mi-organizacion" 
-                defaultValue={currentRuntime.github_org}
+                placeholder="tu-org"
+                defaultValue={currentRuntime.github_org || ""}
               />
+              {currentRuntime.github_org && <p className="text-[10px] text-blue-500">User/Org: {currentRuntime.github_org}</p>}
             </div>
           </CardContent>
         </Card>
