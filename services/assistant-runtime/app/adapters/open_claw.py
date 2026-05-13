@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 from pathlib import Path
 import google.generativeai as genai
 from litellm import acompletion
@@ -41,7 +42,6 @@ class OpenClawLLMAdapter(LLMPort):
         return "openai", "gpt-4o-mini"
 
     async def _generate_with_fallback(self, prompt: str, system_instruction: str | None = None, response_mime_type: str = "text/plain", **kwargs) -> str:
-        import sys
         # Enfocamos en los modelos más estables y probables de tener cuota
         model_candidates = [
             "models/gemini-1.5-flash",
