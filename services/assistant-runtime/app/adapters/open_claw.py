@@ -42,11 +42,13 @@ class OpenClawLLMAdapter(LLMPort):
 
     async def _generate_with_fallback(self, prompt: str, system_instruction: str | None = None, response_mime_type: str = "text/plain", **kwargs) -> str:
         model_candidates = [
-            "models/gemini-2.0-flash-exp", 
-            "models/gemini-1.5-flash", 
+            "models/gemini-2.0-flash",
+            "models/gemini-2.0-flash-lite-preview-02-05",
+            "models/gemini-1.5-flash",
             "models/gemini-1.5-pro",
-            "models/gemini-flash-latest", 
-            "models/gemini-pro-latest"
+            "models/gemini-flash-latest",
+            "models/gemini-pro-latest",
+            "models/gemini-1.0-pro"
         ]
         api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
         genai.configure(api_key=api_key)
@@ -89,14 +91,10 @@ class OpenClawLLMAdapter(LLMPort):
             try:
                 return await self._generate_with_fallback(full_prompt, images=images, system_instruction=system_instruction)
             except Exception as e:
-                if "429" in str(e):
-                    print(f"[OPEN CLAW CRITICAL] Cuota de Gemini agotada. Intentando fallback a OpenAI/LiteLLM...")
-                    provider = "openai" # Forzar cambio de provider
-                    model = "gpt-4o-mini"
-                else:
-                    raise e
+                # Si falla Gemini, relanzamos el error (el usuario pidió no usar otros modelos)
+                raise e
 
-        # Fallback a litellm para otros proveedores o si Gemini falló
+        # Fallback a litellm para otros proveedores
         litellm_model = f"{provider}/{model}" if provider != "openai" else f"openai/{model}"
         messages = [{"role": "user", "content": prompt}]
         if system_instruction:
