@@ -196,16 +196,21 @@ class OpenClawLLMAdapter(LLMPort):
         from litellm import image_generation
         provider, _ = self._get_provider_info(policy="smart")
         
-        # Por ahora usamos dall-e-3 como estandar de alta calidad
-        model = "dall-e-3"
-        if provider == "openai":
+        # Seleccionar modelo basado en el proveedor
+        if provider == "gemini":
+            model = "gemini/imagen-4.0-generate-001"
+            api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+            print(f"[OPEN CLAW] Generando imagen con Gemini ({model})...")
+        else:
             model = "dall-e-3"
-        
-        print(f"[OPEN CLAW] Generando imagen con {model}...")
+            api_key = os.getenv("OPENAI_API_KEY")
+            if not api_key:
+                raise Exception("Falta 'OPENAI_API_KEY' en el archivo .env. Esta llave es necesaria para generar imágenes con DALL-E 3.")
+            print(f"[OPEN CLAW] Generando imagen con OpenAI ({model})...")
+
         response = await image_generation(
             model=model,
             prompt=prompt,
-            size="1024x1024",
-            quality="hd"
+            api_key=api_key
         )
         return response.data[0].url

@@ -190,23 +190,17 @@ class CoderWebGraph:
         else:
             v_info = f"\n❌ **Fallo Versión Wix:** {v_status.get('message', 'Desconocido')}"
             
-        res_info = f"\n🔗 **Resultado:** {res.get('repo_url') or res.get('summary')}"
-
-        steps = state['plan'].get('steps', [])
-        formatted_steps = []
-        for s in steps:
-            if isinstance(s, dict):
-                formatted_steps.append(s.get("description") or s.get("name") or str(s))
-            else:
-                formatted_steps.append(str(s))
+        res_info = f"🔗 **Resultado:** {res.get('repo_url') or res.get('summary')}"
+        if res.get("preview_url"):
+            res_info += f"\n🌐 **Link de Previsualización:** {res.get('preview_url')}"
 
         msg = (
             f"✅ **Pilot ha completado la tarea con éxito**\n\n"
             f"🛠️ **Tipo de Proyecto:** {state['project_type'].upper()}\n"
             f"📚 **Stack:** {state['stack']}\n"
-            f"📝 **Plan Ejecutado:** {', '.join(formatted_steps)}\n"
-            f"{v_info}\n\n"
-            f"🔗 **Resultado:** {res.get('repo_url') or res.get('summary')}"
+            f"📝 **Plan Ejecutado:** {', '.join(formatted_steps)}\n\n"
+            f"{v_info}\n"
+            f"{res_info}"
         )
         
         return {"results": {"status": "success", "message": msg, "warnings": warning_list}}

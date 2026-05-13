@@ -14,6 +14,8 @@ class PictureState(TypedDict):
     image_url: Optional[str]
     final_message: Optional[str]
     errors: List[str]
+    results: Optional[dict]
+
 
 class PictureGraph:
     def __init__(self, llm: LLMPort, memory: MemoryPort):
@@ -111,7 +113,8 @@ class PictureGraph:
             "generation_prompt": None,
             "image_url": None,
             "final_message": None,
-            "errors": []
+            "errors": [],
+            "results": None
         }
         final_state = await self._graph.ainvoke(initial_state)
         return final_state.get("results")

@@ -22,6 +22,8 @@ class MarketingState(TypedDict):
     refined_message: Optional[str]
     final_message: Optional[str]
     errors: List[str]
+    results: Optional[dict]
+
 
 class MarketingGraph:
     def __init__(self, llm: LLMPort, memory: MemoryPort, marketing: MarketingPort):
@@ -248,7 +250,8 @@ class MarketingGraph:
             "critic_feedback": None,
             "refined_message": None,
             "final_message": None,
-            "errors": []
+            "errors": [],
+            "results": None
         }
         final_state = await self._graph.ainvoke(initial_state)
         return final_state.get("results")
