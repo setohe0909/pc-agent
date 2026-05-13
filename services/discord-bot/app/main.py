@@ -9,7 +9,7 @@ import uvicorn
 
 async def _send_assistant_request(payload: dict) -> dict:
     base_url = _get_env("OPEN_CLAW_BASE_URL", "http://assistant-runtime:8100").rstrip("/")
-    async with httpx.AsyncClient(timeout=60) as client:
+    async with httpx.AsyncClient(timeout=300) as client:
         response = await client.post(f"{base_url}/assistant/request", json=payload)
     response.raise_for_status()
     return response.json()
