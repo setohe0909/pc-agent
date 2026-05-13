@@ -239,11 +239,16 @@ async def main() -> None:
                 inline=False
             )
             embed.add_field(
+                name="🎨 Picture Sub-Agent", 
+                value="`!picture <descripción>`: Generar imágenes con DALL-E 3 y memoria proactiva.\n`!picture memory`: Ver estilo y aprendizajes visuales.\n`!picture memory --clean`: Limpiar memoria de imágenes.", 
+                inline=False
+            )
+            embed.add_field(
                 name="💻 Coder Web Sub-Agent", 
                 value="`!coder-web <descripción>`: Crear/ajustar e-commerce (Wix o Repo).\n`!coder-web memory`: Ver aprendizajes del desarrollador web.\n`!coder-web memory --clean`: Borrar memoria del día.", 
                 inline=False
             )
-            embed.set_footer(text="PC Agent v0.5.0 - Autonomía y Análisis")
+            embed.set_footer(text="PC Agent v0.6.0 - Autonomía y Análisis")
             await message.reply(embed=embed)
             return
 

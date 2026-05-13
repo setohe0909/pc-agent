@@ -49,9 +49,10 @@ class PilotWebAdapter(CoderWebPort):
         patterns = []
         if service == "revision":
             patterns = [
+                f"https://www.wixapis.com/studio/v1/projects/{site_id}/revisions",
                 f"https://www.wixapis.com/site-management/v2/sites/{site_id}/revisions",
                 f"https://www.wixapis.com/site-management/v1/sites/{site_id}/revisions",
-                "https://www.wixapis.com/site-revisions/v2/revisions",
+                f"https://api.wix.com/site-management/v1/sites/{site_id}/revisions",
                 "https://www.wixapis.com/site-revisions/v1/revisions",
                 "https://www.wixapis.com/site-revision/v1/revisions"
             ]
@@ -60,7 +61,7 @@ class PilotWebAdapter(CoderWebPort):
             patterns = [
                 f"https://www.wixapis.com/site-management/v2/sites/{site_id}/{path_suffix}",
                 f"https://www.wixapis.com/site-management/v1/sites/{site_id}/{path_suffix}",
-                f"https://www.wixapis.com/sites/v1/sites/{site_id}/{path_suffix}"
+                f"https://api.wix.com/site-management/v1/sites/{site_id}/{path_suffix}"
             ]
         
         last_error = None
@@ -110,6 +111,7 @@ class PilotWebAdapter(CoderWebPort):
         try:
             print(f"[PILOT] Creando Snapshot OFICIAL en Wix: {label}")
             data = await self._call_wix_api("revision", "POST", "", {
+                "siteId": site_id or self._get_wix_config().get("wix_site_id"),
                 "revision": {"label": label}
             })
             return {"status": "success", "version_id": data.get("revision", {}).get("id")}
@@ -120,7 +122,9 @@ class PilotWebAdapter(CoderWebPort):
         try:
             print(f"[PILOT] Publicando actualización OFICIAL al BORRADOR de Wix Site")
             plan_summary = ", ".join(changes.get("steps", []))[:200]
+            site_id = site_id or self._get_wix_config().get("wix_site_id")
             data = await self._call_wix_api("revision", "POST", "", {
+                "siteId": site_id,
                 "revision": {
                     "label": f"Pilot Commit: {plan_summary}",
                     "metaData": {"plan": json.dumps(changes)}
