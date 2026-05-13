@@ -193,24 +193,41 @@ class OpenClawLLMAdapter(LLMPort):
             return {"message": message.content}
 
     async def generate_image(self, prompt: str) -> str:
-        from litellm import image_generation
+        from litellm import aimage_generation
         provider, _ = self._get_provider_info(policy="smart")
         
-        # Seleccionar modelo basado en el proveedor
         if provider == "gemini":
-            model = "gemini/imagen-4.0-generate-001"
+            # Candidatos de Imagen (Google AI Studio)
+            candidates = [
+                "gemini/imagen-3.0-generate-001",
+                "gemini/imagen-3.0-fast-generate-001",
+                "gemini/imagen-4.0-generate-001"
+            ]
             api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
-            print(f"[OPEN CLAW] Generando imagen con Gemini ({model})...")
-        else:
-            model = "dall-e-3"
-            api_key = os.getenv("OPENAI_API_KEY")
-            if not api_key:
-                raise Exception("Falta 'OPENAI_API_KEY' en el archivo .env. Esta llave es necesaria para generar imágenes con DALL-E 3.")
-            print(f"[OPEN CLAW] Generando imagen con OpenAI ({model})...")
+            
+            for model in candidates:
+                try:
+                    print(f"[OPEN CLAW] Intentando generar imagen con Gemini ({model})...")
+                    response = await aimage_generation(
+                        model=model,
+                        prompt=prompt,
+                        api_key=api_key
+                    )
+                    if response.data and len(response.data) > 0:
+                        return response.data[0].url
+                except Exception as e:
+                    print(f"[OPEN CLAW WARNING] Falló Imagen {model}: {e}")
+                    continue
 
-        response = await image_generation(
-            model=model,
-            prompt=prompt,
-            api_key=api_key
-        )
-        return response.data[0].url
+        # Backup a DALL-E 3 si existe la key de OpenAI
+        openai_key = os.getenv("OPENAI_API_KEY")
+        if openai_key:
+            print(f"[OPEN CLAW] Usando DALL-E 3 como backup...")
+            response = await aimage_generation(
+                model="dall-e-3",
+                prompt=prompt,
+                api_key=openai_key
+            )
+            return response.data[0].url
+            
+        raise Exception("No se pudo generar la imagen con Gemini Imagen y no hay 'OPENAI_API_KEY' configurada para DALL-E 3.")

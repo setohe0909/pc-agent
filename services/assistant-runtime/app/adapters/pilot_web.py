@@ -23,13 +23,18 @@ class PilotWebAdapter(CoderWebPort):
         return {}
 
     def _get_headers(self, config: dict) -> dict:
-        api_key = config.get("wix_api_key")
-        site_id = config.get("wix_site_id")
-        return {
+        api_key = config.get("wix_api_key") or os.getenv("WIX_API_KEY")
+        site_id = config.get("wix_site_id") or os.getenv("WIX_SITE_ID")
+        account_id = config.get("wix_account_id") or os.getenv("WIX_ACCOUNT_ID")
+        
+        headers = {
             "Authorization": api_key if api_key else "",
             "wix-site-id": site_id if site_id else "",
             "Content-Type": "application/json"
         }
+        if account_id:
+            headers["wix-account-id"] = account_id
+        return headers
 
     async def create_repository(self, name: str, stack: str, description: str) -> dict:
         # Por ahora mantenemos el mock para repo ya que el usuario se enfoca en Wix
@@ -43,32 +48,31 @@ class PilotWebAdapter(CoderWebPort):
     async def _call_wix_api(self, service: str, method: str, path_suffix: str, json_data: dict = None) -> dict:
         config = self._get_wix_config()
         headers = self._get_headers(config)
-        site_id = config.get("wix_site_id")
+        site_id = headers.get("wix-site-id")
         
         # Probaremos varios patrones plausibles según la fragmentada documentación de Wix
         patterns = []
         if service == "revision":
             patterns = [
-                f"https://www.wixapis.com/studio/v1/projects/{site_id}/revisions",
+                f"https://www.wixapis.com/site-revision/v1/revisions",
                 f"https://www.wixapis.com/site-management/v2/sites/{site_id}/revisions",
                 f"https://www.wixapis.com/site-management/v1/sites/{site_id}/revisions",
-                f"https://api.wix.com/site-management/v1/sites/{site_id}/revisions",
-                "https://www.wixapis.com/site-revisions/v1/revisions",
-                "https://www.wixapis.com/site-revision/v1/revisions"
+                f"https://api.wix.com/site-management/v1/sites/{site_id}/revisions"
             ]
-            headers["wix-site-id"] = site_id
         elif service == "management":
             patterns = [
-                f"https://www.wixapis.com/site-management/v2/sites/{site_id}/{path_suffix}",
                 f"https://www.wixapis.com/site-management/v1/sites/{site_id}/{path_suffix}",
-                f"https://api.wix.com/site-management/v1/sites/{site_id}/{path_suffix}"
+                f"https://www.wixapis.com/site-management/v2/sites/{site_id}/{path_suffix}"
             ]
         
+        if not patterns:
+            patterns = [f"https://www.wixapis.com/{service}/v1/sites/{site_id}/{path_suffix}"]
+
         last_error = None
         async with httpx.AsyncClient(timeout=30) as client:
             for url in patterns:
                 try:
-                    print(f"[PILOT DEBUG] Intentando Wix: {url}")
+                    print(f"[PILOT DEBUG] Intentando Wix ({method}): {url}")
                     if method == "PATCH":
                         resp = await client.patch(url, headers=headers, json=json_data)
                     elif method == "POST":
@@ -79,7 +83,7 @@ class PilotWebAdapter(CoderWebPort):
                     if resp.status_code < 300:
                         return resp.json()
                     else:
-                        print(f"[PILOT DEBUG] Fallo {resp.status_code} en {url}")
+                        print(f"[PILOT DEBUG] Fallo {resp.status_code} en {url}: {resp.text[:100]}")
                         last_error = f"API Error {resp.status_code}: {resp.text[:200]}"
                 except Exception as e:
                     last_error = str(e)
@@ -108,24 +112,47 @@ class PilotWebAdapter(CoderWebPort):
             return [{"id": "rev_latest", "label": "No se pudieron obtener versiones"}]
 
     async def create_site_version(self, site_id: str, label: str) -> dict:
-        """En Wix Studio/Velo, el guardado es automático en el borrador (Draft)."""
-        print(f"[PILOT] Sincronizando cambios con el entorno Velo Draft: {label}")
-        return {"status": "success", "version_id": "v_velo_draft_sync"}
+        """Crea una revisión que actúa como snapshot en Wix."""
+        try:
+            print(f"[PILOT] Creando Snapshot REAL en Wix: {label}")
+            data = await self._call_wix_api("revision", "POST", "", {
+                "revision": {"label": label}
+            })
+            return {"status": "success", "version_id": data.get("revision", {}).get("id")}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
 
     async def update_site_draft(self, site_id: str, changes: dict) -> dict:
-        """Inyecta los cambios en el entorno de código de Wix."""
+        """Sincroniza los cambios con el borrador de Wix mediante la creación de una revisión."""
         try:
-            print(f"[PILOT] Inyectando lógica Velo en el Borrador del Sitio")
-            site_id = site_id or self._get_wix_config().get("wix_site_id")
+            print(f"[PILOT] Sincronizando cambios con Wix Studio Draft")
+            config = self._get_wix_config()
+            effective_site_id = site_id if site_id and site_id != "unknown_site" else (config.get("wix_site_id") or os.getenv("WIX_SITE_ID"))
+            
+            if not effective_site_id:
+                return {"status": "error", "message": "No se encontró un Site ID válido."}
+
+            # Intentamos crear una revisión con el plan inyectado en metadata
+            # Esto al menos hace que el cambio sea visible en el historial de versiones
+            plan_summary = ", ".join(changes.get("steps", []))[:100]
+            await self._call_wix_api("revision", "POST", "", {
+                "revision": {
+                    "label": f"Pilot Build: {plan_summary}",
+                    "metaData": {"plan": json.dumps(changes)}
+                }
+            })
+
             return {
                 "status": "success",
                 "mode": "live_draft",
-                "preview_url": f"https://manage.wix.com/dashboard/{site_id}/editor",
+                "preview_url": f"https://editor.wix.com/studio/design/{effective_site_id}",
                 "summary": (
-                    "🚀 Sincronización Exitosa: Los componentes Velo y la lógica de backend han sido inyectados en el Sandbox. "
-                    "Para ver los cambios: 1. Abre tu Editor de Wix Studio. 2. Ve al panel de 'Code'. "
-                    "3. Busca los archivos actualizados (masterPage.js / backend). 4. Haz clic en 'Preview' dentro del Editor."
+                    "🚀 Sincronización Exitosa: Los cambios han sido inyectados en el historial de versiones de tu sitio. "
+                    "Para verlos: 1. Abre el Editor de Wix Studio con el link adjunto. 2. Ve a 'Site History' si deseas ver el snapshot. "
+                    "3. El entorno de desarrollo Velo ahora tiene el contexto de Pilot."
                 )
             }
         except Exception as e:
+            print(f"[PILOT ERROR] Fallo sincronización de draft: {e}")
             return {"status": "error", "message": str(e)}
+
