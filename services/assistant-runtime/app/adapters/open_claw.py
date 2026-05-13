@@ -41,11 +41,16 @@ class OpenClawLLMAdapter(LLMPort):
         return "openai", "gpt-4o-mini"
 
     async def _generate_with_fallback(self, prompt: str, system_instruction: str | None = None, response_mime_type: str = "text/plain", **kwargs) -> str:
+        import sys
         model_candidates = [
             "models/gemini-2.0-flash",
-            "models/gemini-2.0-flash-lite-preview-02-05",
-            "models/gemini-1.5-flash-latest",
-            "models/gemini-1.5-pro-latest"
+            "models/gemini-2.0-flash-lite",
+            "models/gemini-2.5-flash",
+            "models/gemini-2.5-pro",
+            "models/gemini-3-flash-preview",
+            "models/gemini-3-pro-preview",
+            "models/gemini-flash-latest",
+            "models/gemini-pro-latest"
         ]
         api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
         genai.configure(api_key=api_key)
@@ -53,14 +58,13 @@ class OpenClawLLMAdapter(LLMPort):
         last_error = None
         for model_name in model_candidates:
             try:
-                print(f"[OPEN CLAW] Intentando con modelo: {model_name}...")
+                print(f"[OPEN CLAW] Intentando con modelo: {model_name}...", file=sys.stderr)
                 model = genai.GenerativeModel(model_name, system_instruction=system_instruction)
                 gen_config = genai.GenerationConfig(response_mime_type=response_mime_type)
                 
                 content = [prompt]
                 if "images" in kwargs and kwargs["images"]:
                     for img_bytes in kwargs["images"]:
-                        # Convertir bytes a formato PIL o usar el diccionario de Gemini
                         content.append({
                             "mime_type": "image/jpeg",
                             "data": img_bytes
@@ -72,7 +76,7 @@ class OpenClawLLMAdapter(LLMPort):
                 last_error = e
                 # Si es 429 (cuota) o 404 (no encontrado/no soportado), saltamos al siguiente
                 if "429" in str(e) or "404" in str(e):
-                    print(f"[OPEN CLAW WARNING] Error en {model_name}: {e}. Saltando...")
+                    print(f"[OPEN CLAW WARNING] Error en {model_name}: {e}. Saltando...", file=sys.stderr)
                     continue
                 else:
                     raise e

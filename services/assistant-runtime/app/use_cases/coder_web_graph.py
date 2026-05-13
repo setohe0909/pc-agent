@@ -188,11 +188,19 @@ class CoderWebGraph:
         if state.get("versioning_status"):
             v_info = f"\n📦 **Versión Wix Guardada:** {state['versioning_status'].get('version_id')}"
 
+        steps = state['plan'].get('steps', [])
+        formatted_steps = []
+        for s in steps:
+            if isinstance(s, dict):
+                formatted_steps.append(s.get("description") or s.get("name") or str(s))
+            else:
+                formatted_steps.append(str(s))
+
         msg = (
             f"✅ **Pilot ha completado la tarea con éxito**\n\n"
             f"🛠️ **Tipo de Proyecto:** {state['project_type'].upper()}\n"
             f"📚 **Stack:** {state['stack']}\n"
-            f"📝 **Plan Ejecutado:** {', '.join(state['plan'].get('steps', []))}\n"
+            f"📝 **Plan Ejecutado:** {', '.join(formatted_steps)}\n"
             f"{v_info}\n\n"
             f"🔗 **Resultado:** {res.get('repo_url') or res.get('summary')}"
         )
