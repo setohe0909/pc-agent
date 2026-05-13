@@ -21,3 +21,8 @@ class CoderWebPort(ABC):
     async def create_site_version(self, site_id: str, label: str) -> dict:
         """Crea una nueva versión/snapshot del sitio."""
         pass
+
+    @abstractmethod
+    async def update_site_draft(self, site_id: str, changes: dict) -> dict:
+        """Actualiza el borrador (draft) sin publicar."""
+        pass

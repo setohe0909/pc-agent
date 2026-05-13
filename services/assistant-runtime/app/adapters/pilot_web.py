@@ -33,3 +33,14 @@ class PilotWebAdapter(CoderWebPort):
     async def create_site_version(self, site_id: str, label: str) -> dict:
         print(f"[PILOT] Creando versión en Wix: {label}")
         return {"status": "success", "version_id": f"v_{label.replace(' ', '_').lower()}"}
+
+    async def update_site_draft(self, site_id: str, changes: dict) -> dict:
+        print(f"[PILOT] Actualizando BORRADOR (Draft) en Wix Site {site_id}")
+        await asyncio.sleep(1)
+        return {
+            "status": "success",
+            "mode": "draft_mode",
+            "is_published": False,
+            "preview_url": f"https://www.wix.com/preview/{site_id}?draft=true",
+            "summary": "Estilos actualizados en el borrador interno."
+        }

@@ -18,6 +18,7 @@ class CoderWebState(TypedDict):
     versioning_status: Optional[dict]
     payload: dict
     errors: List[str]
+    warnings: List[str]
 
 class CoderWebGraph:
     def __init__(self, llm: LLMPort, memory: MemoryPort, coder_web: CoderWebPort):
@@ -32,6 +33,7 @@ class CoderWebGraph:
         # Definir Nodos
         workflow.add_node("initialize", self._initialize_node)
         workflow.add_node("analyze_mockup", self._analyze_mockup_node)
+        workflow.add_node("analyze_references", self._analyze_references_node)
         workflow.add_node("retrieve_context", self._retrieve_context_node)
         workflow.add_node("analyze_request", self._analyze_request_node)
         workflow.add_node("plan_review", self._plan_review_node)
@@ -42,7 +44,8 @@ class CoderWebGraph:
         # Definir Flujo
         workflow.set_entry_point("initialize")
         workflow.add_edge("initialize", "analyze_mockup")
-        workflow.add_edge("analyze_mockup", "retrieve_context")
+        workflow.add_edge("analyze_mockup", "analyze_references")
+        workflow.add_edge("analyze_references", "retrieve_context")
         workflow.add_edge("retrieve_context", "analyze_request")
         workflow.add_edge("analyze_request", "plan_review")
         
@@ -69,7 +72,7 @@ class CoderWebGraph:
 
     async def _initialize_node(self, state: CoderWebState) -> dict:
         print("[CODER-WEB GRAPH] v0.2.0 - Iniciando...")
-        return {"errors": [], "stack": "React/TypeScript + Tailwind + Supabase"}
+        return {"errors": [], "warnings": [], "stack": "React/TypeScript + Tailwind + Supabase"}
 
     async def _analyze_mockup_node(self, state: CoderWebState) -> dict:
         if not state.get("images"):
@@ -79,6 +82,19 @@ class CoderWebGraph:
         prompt = "Analiza este mockup o referencia para un ecommerce. Describe el layout, colores, tipografía y elementos clave de UI/UX que Pilot debe implementar."
         vision_analysis = await self.llm.chat(prompt, images=state["images"])
         return {"context": f"ANÁLISIS DE MOCKUP:\n{vision_analysis}\n\n"}
+
+    async def _analyze_references_node(self, state: CoderWebState) -> dict:
+        import re
+        urls = re.findall(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', state["prompt"])
+        
+        if not urls:
+            return {}
+        
+        print(f"[CODER-WEB GRAPH][REFERENCES] Detectadas {len(urls)} URLs de referencia.")
+        # Aquí simularíamos un scraping. Por ahora le pedimos al LLM que analice las intenciones basadas en los links
+        prompt = f"El usuario ha proporcionado estos links como referencia de diseño: {', '.join(urls)}. Basado en el nombre de los dominios y la descripción del usuario, infiere estilos y patrones UX."
+        analysis = await self.llm.chat(prompt)
+        return {"context": state.get("context", "") + f"ANÁLISIS DE REFERENCIAS EXTERNAS:\n{analysis}\n\n"}
 
     async def _retrieve_context_node(self, state: CoderWebState) -> dict:
         print("[CODER-WEB GRAPH] Recuperando memoria operativa...")
@@ -148,7 +164,8 @@ class CoderWebGraph:
                 )
             else:
                 site_id = state["payload"].get("site_id", "unknown_site")
-                res = await self.coder_web.adjust_wix_ui(site_id, json.dumps(plan))
+                # Siempre trabajamos en DRAFT por defecto para iteración segura
+                res = await self.coder_web.update_site_draft(site_id, plan)
             
             await self.memory.save_memory("coder-web", f"Tarea completada ({project_type}): {state['prompt'][:50]}")
             return {"task_result": res}
@@ -156,8 +173,11 @@ class CoderWebGraph:
             return {"errors": [f"Error en ejecución Pilot: {str(e)}"]}
 
     async def _finalize_node(self, state: CoderWebState) -> dict:
-        if state.get("errors"):
-            return {"results": {"status": "error", "message": "\n".join(state["errors"])}}
+        error_list = state.get("errors", [])
+        warning_list = state.get("warnings", [])
+        
+        if error_list:
+            return {"results": {"status": "error", "message": "\n".join(error_list), "warnings": warning_list}}
         
         res = state["task_result"]
         v_info = ""
@@ -173,7 +193,7 @@ class CoderWebGraph:
             f"🔗 **Resultado:** {res.get('repo_url') or res.get('summary')}"
         )
         
-        return {"results": {"status": "success", "message": msg}}
+        return {"results": {"status": "success", "message": msg, "warnings": warning_list}}
 
     async def run(self, prompt: str, payload: dict, images: List[bytes] = None) -> dict:
         initial_state = {
@@ -186,7 +206,8 @@ class CoderWebGraph:
             "task_result": None,
             "versioning_status": None,
             "payload": payload,
-            "errors": []
+            "errors": [],
+            "warnings": []
         }
         final_state = await self._graph.ainvoke(initial_state)
         return final_state.get("results")
