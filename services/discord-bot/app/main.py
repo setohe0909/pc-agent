@@ -662,12 +662,22 @@ async def main() -> None:
             # Crear Hilo para el proyecto
             try:
                 thread = await message.create_thread(name=f"💻 Proyecto: {raw_query[:30]}...")
-                await thread.send("⏳ **Coder Web Agent** está analizando la arquitectura y preparando el stack...")
+                await thread.send("⏳ **Coder Web Agent** (Pilot) está analizando la arquitectura y preparando el stack...")
+
+                # Capturar imágenes adjuntas (Mockups/Referencias)
+                images_b64 = []
+                if message.attachments:
+                    import base64
+                    for att in message.attachments:
+                        if any(att.filename.lower().endswith(ext) for ext in [".png", ".jpg", ".jpeg", ".webp"]):
+                            img_data = await att.read()
+                            images_b64.append(base64.b64encode(img_data).decode("utf-8"))
 
                 payload = {
                     "action_type": "coder-web",
                     "prompt": raw_query,
                     "source": {"platform": "discord", "channel_id": str(message.channel.id), "user_id": str(message.author.id)},
+                    "images": images_b64,
                     "payload": {}
                 }
 

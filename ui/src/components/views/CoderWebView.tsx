@@ -176,22 +176,31 @@ export function CoderWebView({ data, onSave }: { data: any, adminToken: string, 
           <CardHeader>
             <CardTitle className="text-sm flex items-center gap-2">
               <Zap className="w-4 h-4 text-blue-500" />
-              Estado del Sub-Agent
+              Operaciones en Tiempo Real (Pilot Monitor)
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-              <div className="flex items-center gap-2 p-2 rounded bg-background border">
-                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                <span>Pilot Engine: **Online**</span>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                <div className="flex items-center gap-2 p-2 rounded bg-background border">
+                  <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                  <span>Pilot Engine: **Online**</span>
+                </div>
+                <div className="flex items-center gap-2 p-2 rounded bg-background border">
+                  <Database className="w-3 h-3 text-muted-foreground" />
+                  <span>Sync Supabase: **Conectado**</span>
+                </div>
+                <div className="flex items-center gap-2 p-2 rounded bg-background border">
+                  <Globe className="w-3 h-3 text-muted-foreground" />
+                  <span>Wix Webhooks: **Activos**</span>
+                </div>
               </div>
-              <div className="flex items-center gap-2 p-2 rounded bg-background border">
-                <Database className="w-3 h-3 text-muted-foreground" />
-                <span>Sync Supabase: **Conectado**</span>
-              </div>
-              <div className="flex items-center gap-2 p-2 rounded bg-background border">
-                <Globe className="w-3 h-3 text-muted-foreground" />
-                <span>Wix Webhooks: **Activos**</span>
+              
+              <div className="p-4 rounded-lg bg-black text-green-400 font-mono text-[10px] space-y-1">
+                <p>{">"} [SYSTEM] Pilot initialized.</p>
+                <p>{">"} [INFO] Monitoring repository ecommerce-3a2f...</p>
+                <p>{">"} [WIX] Snapshot v_pre_update_cafe created.</p>
+                <p>{">"} [STATUS] Awaiting next instruction...</p>
               </div>
             </div>
           </CardContent>
