@@ -44,11 +44,8 @@ class OpenClawLLMAdapter(LLMPort):
         model_candidates = [
             "models/gemini-2.0-flash",
             "models/gemini-2.0-flash-lite-preview-02-05",
-            "models/gemini-1.5-flash",
-            "models/gemini-1.5-pro",
-            "models/gemini-flash-latest",
-            "models/gemini-pro-latest",
-            "models/gemini-1.0-pro"
+            "models/gemini-1.5-flash-latest",
+            "models/gemini-1.5-pro-latest"
         ]
         api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
         genai.configure(api_key=api_key)
@@ -73,8 +70,9 @@ class OpenClawLLMAdapter(LLMPort):
                 return response.text
             except Exception as e:
                 last_error = e
+                # Si es 429 (cuota) o 404 (no encontrado/no soportado), saltamos al siguiente
                 if "429" in str(e) or "404" in str(e):
-                    print(f"[OPEN CLAW WARNING] Error en {model_name}. Saltando...")
+                    print(f"[OPEN CLAW WARNING] Error en {model_name}: {e}. Saltando...")
                     continue
                 else:
                     raise e
