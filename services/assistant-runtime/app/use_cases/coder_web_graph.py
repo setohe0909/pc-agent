@@ -19,6 +19,7 @@ class CoderWebState(TypedDict):
     payload: dict
     errors: List[str]
     warnings: List[str]
+    results: Optional[dict]
 
 class CoderWebGraph:
     def __init__(self, llm: LLMPort, memory: MemoryPort, coder_web: CoderWebPort):
@@ -179,7 +180,9 @@ class CoderWebGraph:
         if error_list:
             return {"results": {"status": "error", "message": "\n".join(error_list), "warnings": warning_list}}
         
-        res = state["task_result"]
+        res = state.get("task_result")
+        if not res:
+            return {"results": {"status": "error", "message": "Pilot no pudo generar un resultado válido.", "warnings": warning_list}}
         v_info = ""
         if state.get("versioning_status"):
             v_info = f"\n📦 **Versión Wix Guardada:** {state['versioning_status'].get('version_id')}"
@@ -207,7 +210,8 @@ class CoderWebGraph:
             "versioning_status": None,
             "payload": payload,
             "errors": [],
-            "warnings": []
+            "warnings": [],
+            "results": None
         }
         final_state = await self._graph.ainvoke(initial_state)
         return final_state.get("results")

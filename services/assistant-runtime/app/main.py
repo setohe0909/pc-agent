@@ -133,6 +133,10 @@ async def assistant_request(request: AssistantRequest) -> dict:
             result_text = await workflow.execute_chat(prompt=request.prompt, user_id=request.source.user_id)
             result = {"status": "success", "message": result_text}
 
+        # Fallback if result is None
+        if result is None:
+            result = {"status": "error", "message": "El sub-agente no devolvió ningún resultado."}
+
         # DEBUG: Ver que esta devolviendo el workflow
         print(f"[DEBUG] Workflow result: {result}")
 
@@ -142,6 +146,7 @@ async def assistant_request(request: AssistantRequest) -> dict:
             "message": result.get("message") or "El asistente no pudo generar una respuesta de texto.",
             "order": result.get("order"),
             "critic_note": result.get("critic_note"),
+            "warnings": result.get("warnings", []),
             "input": request.model_dump(),
         }
     except Exception as exc:
