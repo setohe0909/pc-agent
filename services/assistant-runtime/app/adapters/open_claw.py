@@ -41,7 +41,13 @@ class OpenClawLLMAdapter(LLMPort):
         return "openai", "gpt-4o-mini"
 
     async def _generate_with_fallback(self, prompt: str, system_instruction: str | None = None, response_mime_type: str = "text/plain", **kwargs) -> str:
-        model_candidates = ["models/gemini-flash-latest", "models/gemini-pro-latest", "models/gemini-2.0-flash-lite"]
+        model_candidates = [
+            "models/gemini-2.0-flash-exp", 
+            "models/gemini-1.5-flash", 
+            "models/gemini-1.5-pro",
+            "models/gemini-flash-latest", 
+            "models/gemini-pro-latest"
+        ]
         api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
         genai.configure(api_key=api_key)
         
@@ -80,18 +86,26 @@ class OpenClawLLMAdapter(LLMPort):
             if context:
                 full_prompt = f"Contexto:\n{json.dumps(context)}\n\nPregunta: {prompt}"
             
-            return await self._generate_with_fallback(full_prompt, images=images, system_instruction=system_instruction)
-        else:
-            # Fallback a litellm para otros proveedores
-            litellm_model = f"{provider}/{model}" if provider != "openai" else f"openai/{model}"
-            messages = [{"role": "user", "content": prompt}]
-            if system_instruction:
-                messages.insert(0, {"role": "system", "content": system_instruction})
-            if context:
-                messages.insert(0, {"role": "system", "content": f"Contexto: {json.dumps(context)}"})
-            
-            response = await acompletion(model=litellm_model, messages=messages)
-            return response.choices[0].message.content
+            try:
+                return await self._generate_with_fallback(full_prompt, images=images, system_instruction=system_instruction)
+            except Exception as e:
+                if "429" in str(e):
+                    print(f"[OPEN CLAW CRITICAL] Cuota de Gemini agotada. Intentando fallback a OpenAI/LiteLLM...")
+                    provider = "openai" # Forzar cambio de provider
+                    model = "gpt-4o-mini"
+                else:
+                    raise e
+
+        # Fallback a litellm para otros proveedores o si Gemini falló
+        litellm_model = f"{provider}/{model}" if provider != "openai" else f"openai/{model}"
+        messages = [{"role": "user", "content": prompt}]
+        if system_instruction:
+            messages.insert(0, {"role": "system", "content": system_instruction})
+        if context:
+            messages.insert(0, {"role": "system", "content": f"Contexto: {json.dumps(context)}"})
+        
+        response = await acompletion(model=litellm_model, messages=messages)
+        return response.choices[0].message.content
 
     async def analyze_trade(self, market_data: dict, prompt: str) -> dict:
         provider, model = self._get_provider_info(policy="smart")
