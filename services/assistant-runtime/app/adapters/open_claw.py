@@ -71,11 +71,16 @@ class OpenClawLLMAdapter(LLMPort):
                         })
                 
                 response = await model.generate_content_async(content, generation_config=gen_config)
+                
+                if not response.candidates or not response.candidates[0].content.parts:
+                    print(f"[OPEN CLAW WARNING] Modelo {model_name} no devolvió contenido (Reason: {response.candidates[0].finish_reason if response.candidates else 'N/A'}).", file=sys.stderr)
+                    continue
+                    
                 return response.text
             except Exception as e:
                 last_error = e
-                # Si es 429 (cuota) o 404 (no encontrado/no soportado), saltamos al siguiente
-                if "429" in str(e) or "404" in str(e):
+                # Si es 429 (cuota), 404 (no encontrado/no soportado) o error de acceso a texto, saltamos al siguiente
+                if "429" in str(e) or "404" in str(e) or "response.text" in str(e):
                     print(f"[OPEN CLAW WARNING] Error en {model_name}: {e}. Saltando...", file=sys.stderr)
                     continue
                 else:
