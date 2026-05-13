@@ -221,9 +221,11 @@ async def get_today_intelligence(context: str | None = None):
         category_filter = "&category=ilike.marketing_*"
     elif context == "picture":
         category_filter = "&category=ilike.picture_*"
+    elif context == "coder-web":
+        category_filter = "&category=ilike.coder-web_*"
     else:
-        # Por defecto excluimos marketing y picture para la memoria de inteligencia general
-        category_filter = "&category=not.ilike.marketing_*,category=not.ilike.picture_*"
+        # Por defecto excluimos marketing, picture y coder-web para la memoria de inteligencia general
+        category_filter = "&category=not.ilike.marketing_*,category=not.ilike.picture_*,category=not.ilike.coder-web_*"
 
     async with httpx.AsyncClient() as client:
         try:
@@ -257,8 +259,10 @@ async def clear_today_intelligence(context: str | None = None):
         category_filter = "category=ilike.marketing_*"
     elif context == "picture":
         category_filter = "category=ilike.picture_*"
+    elif context == "coder-web":
+        category_filter = "category=ilike.coder-web_*"
     else:
-        category_filter = "category=not.ilike.marketing_*,category=not.ilike.picture_*"
+        category_filter = "category=not.ilike.marketing_*,category=not.ilike.picture_*,category=not.ilike.coder-web_*"
 
     async with httpx.AsyncClient() as client:
         try:
