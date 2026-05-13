@@ -150,12 +150,13 @@ async def assistant_request(request: AssistantRequest) -> dict:
             "input": request.model_dump(),
         }
     except Exception as exc:
-        print(f"[ERROR] Exception in assistant_request: {exc}")
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"[CRITICAL ERROR] {exc}\n{error_trace}")
         return {
             "status": "error",
-            "reason": str(exc),
-            "message": f"Error interno: {str(exc)}",
-            "input": request.model_dump(),
+            "message": f"Error interno en el servidor: {str(exc)}",
+            "debug_trace": error_trace
         }
 
 
