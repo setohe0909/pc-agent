@@ -42,24 +42,19 @@ class OpenClawLLMAdapter(LLMPort):
 
     async def _generate_with_fallback(self, prompt: str, system_instruction: str | None = None, response_mime_type: str = "text/plain", **kwargs) -> str:
         import sys
+        # Enfocamos en los modelos más estables y probables de tener cuota
         model_candidates = [
-            "models/gemini-2.0-flash",
-            "models/gemini-2.0-flash-lite",
-            "models/gemini-2.5-flash",
-            "models/gemini-2.5-pro",
-            "models/gemini-3-flash-preview",
-            "models/gemini-3-pro-preview",
-            "models/gemini-3.1-flash-lite",
-            "models/gemini-3.1-pro-preview",
             "models/gemini-1.5-flash",
             "models/gemini-1.5-pro",
-            "models/gemini-flash-latest",
-            "models/gemini-pro-latest"
+            "models/gemini-2.0-flash",
+            "models/gemini-2.0-flash-lite"
         ]
         api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
         genai.configure(api_key=api_key)
         
         last_error = None
+        quota_errors_count = 0
+        
         for model_name in model_candidates:
             try:
                 print(f"[OPEN CLAW] Intentando con modelo: {model_name}...", file=sys.stderr)
@@ -77,19 +72,31 @@ class OpenClawLLMAdapter(LLMPort):
                 response = await model.generate_content_async(content, generation_config=gen_config)
                 
                 if not response.candidates or not response.candidates[0].content.parts:
-                    print(f"[OPEN CLAW WARNING] Modelo {model_name} no devolvió contenido (Reason: {response.candidates[0].finish_reason if response.candidates else 'N/A'}).", file=sys.stderr)
+                    print(f"[OPEN CLAW WARNING] Modelo {model_name} no devolvió contenido.", file=sys.stderr)
                     continue
                     
                 return response.text
             except Exception as e:
                 last_error = e
-                # Si es 429 (cuota), 404 (no encontrado/no soportado) o error de acceso a texto, saltamos al siguiente
-                if "429" in str(e) or "404" in str(e) or "response.text" in str(e):
-                    print(f"[OPEN CLAW WARNING] Error en {model_name}: {e}. Saltando...", file=sys.stderr)
+                err_str = str(e)
+                print(f"[OPEN CLAW WARNING] Error en {model_name}: {err_str}", file=sys.stderr)
+                
+                if "429" in err_str:
+                    quota_errors_count += 1
+                    if quota_errors_count >= 2:
+                        print("[OPEN CLAW CRITICAL] Demasiados errores de cuota (429). Abortando para evitar timeout.", file=sys.stderr)
+                        break
+                    continue
+                elif "404" in err_str or "not found" in err_str.lower():
                     continue
                 else:
+                    # Otros errores (como 400 Bad Request) deben lanzarse inmediatamente
                     raise e
-        raise last_error
+        
+        if last_error and "429" in str(last_error):
+             raise Exception("⚠️ Todos los modelos de Gemini han agotado su cuota (429). Por favor, intenta más tarde o configura una OPENAI_API_KEY en el .env")
+        raise last_error or Exception("No se pudo obtener respuesta de ningún modelo configurado.")
+
 
     async def chat(self, prompt: str, context: dict | None = None, images: list[bytes] | None = None, system_instruction: str | None = None) -> str:
         provider, model = self._get_provider_info(policy="cheap")
@@ -102,10 +109,16 @@ class OpenClawLLMAdapter(LLMPort):
             try:
                 return await self._generate_with_fallback(full_prompt, images=images, system_instruction=system_instruction)
             except Exception as e:
-                # Si falla Gemini, relanzamos el error (el usuario pidió no usar otros modelos)
+                # Si falla Gemini y tenemos OpenAI, intentamos el fallback
+                openai_key = os.getenv("OPENAI_API_KEY")
+                if openai_key:
+                    print(f"[OPEN CLAW] Gemini falló ({e}). Intentando fallback con OpenAI...", file=sys.stderr)
+                    return await self._chat_with_litellm("openai", "gpt-4o-mini", prompt, context, system_instruction)
                 raise e
 
-        # Fallback a litellm para otros proveedores
+        return await self._chat_with_litellm(provider, model, prompt, context, system_instruction)
+
+    async def _chat_with_litellm(self, provider: str, model: str, prompt: str, context: dict | None = None, system_instruction: str | None = None) -> str:
         litellm_model = f"{provider}/{model}" if provider != "openai" else f"openai/{model}"
         messages = [{"role": "user", "content": prompt}]
         if system_instruction:
@@ -132,16 +145,24 @@ class OpenClawLLMAdapter(LLMPort):
                     response_mime_type="application/json"
                 )
                 return json.loads(response_text)
-            except:
-                return {"decision": "Error procesando JSON de Gemini", "should_trade": False}
+            except Exception as e:
+                openai_key = os.getenv("OPENAI_API_KEY")
+                if openai_key:
+                    print(f"[OPEN CLAW] Gemini falló en análisis ({e}). Intentando fallback con OpenAI...", file=sys.stderr)
+                    return await self._analyze_trade_with_litellm("openai", "gpt-4o", user_content, system_prompt)
+                return {"decision": f"Error Gemini: {e}", "should_trade": False}
         else:
-            litellm_model = f"{provider}/{model}" if provider != "openai" else f"openai/{model}"
-            messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_content}
-            ]
-            response = await acompletion(model=litellm_model, messages=messages, response_format={"type": "json_object"})
-            return json.loads(response.choices[0].message.content)
+            return await self._analyze_trade_with_litellm(provider, model, user_content, system_prompt)
+
+    async def _analyze_trade_with_litellm(self, provider: str, model: str, user_content: str, system_prompt: str) -> dict:
+        litellm_model = f"{provider}/{model}" if provider != "openai" else f"openai/{model}"
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_content}
+        ]
+        response = await acompletion(model=litellm_model, messages=messages, response_format={"type": "json_object"})
+        return json.loads(response.choices[0].message.content)
+
 
     async def get_tools_response(self, prompt: str, tools: list[dict], system_instruction: str | None = None) -> dict:
         provider, model = self._get_provider_info(policy="smart")
@@ -198,9 +219,11 @@ class OpenClawLLMAdapter(LLMPort):
         
         if provider == "gemini":
             # Candidatos de Imagen (Google AI Studio)
+            # Priorizamos modelos 'fast' y 'v3' que suelen ser más accesibles en free tier
             candidates = [
-                "gemini/imagen-3.0-generate-001",
                 "gemini/imagen-3.0-fast-generate-001",
+                "gemini/imagen-3.0-generate-001",
+                "gemini/imagen-4.0-fast-generate-001",
                 "gemini/imagen-4.0-generate-001"
             ]
             api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
@@ -208,15 +231,25 @@ class OpenClawLLMAdapter(LLMPort):
             for model in candidates:
                 try:
                     print(f"[OPEN CLAW] Intentando generar imagen con Gemini ({model})...")
+                    # Intentar con timeout extendido para imágenes
                     response = await aimage_generation(
                         model=model,
                         prompt=prompt,
                         api_key=api_key
                     )
                     if response.data and len(response.data) > 0:
-                        return response.data[0].url
+                        url = response.data[0].url
+                        if url:
+                            return url
+                        # Si LiteLLM devolvió bytes en lugar de URL, esto fallará con 'list index out of range'
+                        # o devolverá None.
+                    print(f"[OPEN CLAW WARNING] {model} no devolvió una URL válida.")
                 except Exception as e:
-                    print(f"[OPEN CLAW WARNING] Falló Imagen {model}: {e}")
+                    # Capturar el error 429 específicamente para informar al usuario
+                    if "429" in str(e):
+                        print(f"[OPEN CLAW ERROR] Quota Exceeded para {model}. Reintenta en unos minutos.")
+                    else:
+                        print(f"[OPEN CLAW ERROR] Falló Imagen {model}: {str(e)}")
                     continue
 
         # Backup a DALL-E 3 si existe la key de OpenAI
