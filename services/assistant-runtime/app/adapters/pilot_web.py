@@ -45,38 +45,44 @@ class PilotWebAdapter(CoderWebPort):
         headers = self._get_headers(config)
         site_id = config.get("wix_site_id")
         
-        # Wix usa dominios por servicio o rutas específicas en el subdominio principal
-        # Documentación oficial: 
-        # Revisions -> site-revision/v1/revisions
-        # Settings -> site-management/v1/sites/{site_id}/settings
-        
+        # Probaremos varios patrones plausibles según la fragmentada documentación de Wix
+        patterns = []
         if service == "revision":
-            url = f"https://www.wixapis.com/site-revision/v1/revisions"
-            # Site ID debe ir en el header para este endpoint específico
+            patterns = [
+                "https://www.wixapis.com/site-revisions/v1/revisions",
+                "https://www.wixapis.com/site-revision/v1/revisions",
+                f"https://www.wixapis.com/site-management/v1/sites/{site_id}/revisions",
+                f"https://www.wixapis.com/v1/sites/{site_id}/revisions"
+            ]
             headers["wix-site-id"] = site_id
         elif service == "management":
-            url = f"https://www.wixapis.com/site-management/v1/sites/{site_id}/{path_suffix}"
-        else:
-            url = f"https://www.wixapis.com/{service}/v1/sites/{site_id}/{path_suffix}"
-            
+            patterns = [
+                f"https://www.wixapis.com/site-management/v1/sites/{site_id}/{path_suffix}",
+                f"https://www.wixapis.com/sites/v1/sites/{site_id}/{path_suffix}"
+            ]
+        
+        last_error = None
         async with httpx.AsyncClient(timeout=30) as client:
-            try:
-                print(f"[PILOT DEBUG] Llamando a Wix ({service}): {url}")
-                if method == "PATCH":
-                    resp = await client.patch(url, headers=headers, json=json_data)
-                elif method == "POST":
-                    resp = await client.post(url, headers=headers, json=json_data)
-                else:
-                    resp = await client.get(url, headers=headers)
-                
-                if resp.status_code >= 400:
-                    print(f"[PILOT ERROR] Wix API {resp.status_code}: {resp.text}")
-                    resp.raise_for_status()
+            for url in patterns:
+                try:
+                    print(f"[PILOT DEBUG] Intentando Wix: {url}")
+                    if method == "PATCH":
+                        resp = await client.patch(url, headers=headers, json=json_data)
+                    elif method == "POST":
+                        resp = await client.post(url, headers=headers, json=json_data)
+                    else:
+                        resp = await client.get(url, headers=headers)
                     
-                return resp.json()
-            except Exception as e:
-                print(f"[PILOT ERROR] Error fatal en {url}: {e}")
-                raise e
+                    if resp.status_code < 300:
+                        return resp.json()
+                    else:
+                        print(f"[PILOT DEBUG] Fallo {resp.status_code} en {url}")
+                        last_error = f"API Error {resp.status_code}: {resp.text[:200]}"
+                except Exception as e:
+                    last_error = str(e)
+                    print(f"[PILOT DEBUG] Error conexión en {url}: {e}")
+        
+        raise Exception(last_error or "No se pudo contactar con ningún endpoint de Wix.")
 
     async def adjust_wix_ui(self, site_id: str, changes: str) -> dict:
         try:
