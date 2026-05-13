@@ -71,7 +71,7 @@ class CoderWebGraph:
         return "repo_flow"
 
     async def _initialize_node(self, state: CoderWebState) -> dict:
-        print("[CODER-WEB GRAPH] v0.2.0 - Iniciando...")
+        print("[CODER-WEB GRAPH] v0.6.0 - Iniciando...")
         return {"errors": [], "warnings": [], "stack": "React/TypeScript + Tailwind + Supabase"}
 
     async def _analyze_mockup_node(self, state: CoderWebState) -> dict:

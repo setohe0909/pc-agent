@@ -89,7 +89,7 @@ export default function App() {
             <TerminalSquare className="w-6 h-6" />
             PC Agent
           </h1>
-          <p className="text-xs text-muted-foreground mt-1">Control Panel v2.3.0</p>
+          <p className="text-xs text-muted-foreground mt-1">Control Panel v0.6.0</p>
         </div>
 
         <div className="p-4 flex-1 overflow-y-auto">

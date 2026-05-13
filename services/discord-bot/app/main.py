@@ -179,7 +179,7 @@ async def main() -> None:
         # --- COMANDO HELP ---
         if content == "!help":
             embed = discord.Embed(
-                title="🤖 PC Agent v0.5.0 - Guía de Operaciones", 
+                title="🤖 PC Agent v0.6.0 - Guía de Operaciones", 
                 description="Aquí tienes todo lo que puedo hacer por ti:",
                 color=discord.Color.blue()
             )
