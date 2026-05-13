@@ -49,14 +49,16 @@ class PilotWebAdapter(CoderWebPort):
         patterns = []
         if service == "revision":
             patterns = [
-                "https://www.wixapis.com/site-revisions/v1/revisions",
-                "https://www.wixapis.com/site-revision/v1/revisions",
+                f"https://www.wixapis.com/site-management/v2/sites/{site_id}/revisions",
                 f"https://www.wixapis.com/site-management/v1/sites/{site_id}/revisions",
-                f"https://www.wixapis.com/v1/sites/{site_id}/revisions"
+                "https://www.wixapis.com/site-revisions/v2/revisions",
+                "https://www.wixapis.com/site-revisions/v1/revisions",
+                "https://www.wixapis.com/site-revision/v1/revisions"
             ]
             headers["wix-site-id"] = site_id
         elif service == "management":
             patterns = [
+                f"https://www.wixapis.com/site-management/v2/sites/{site_id}/{path_suffix}",
                 f"https://www.wixapis.com/site-management/v1/sites/{site_id}/{path_suffix}",
                 f"https://www.wixapis.com/sites/v1/sites/{site_id}/{path_suffix}"
             ]
@@ -124,6 +126,14 @@ class PilotWebAdapter(CoderWebPort):
                     "metaData": {"plan": json.dumps(changes)}
                 }
             })
+            msg = (
+                f"✅ **Pilot ha completado la tarea con éxito**\n\n"
+                f"🛠️ **Tipo de Proyecto:** {state['project_type'].upper()}\n"
+                f"📚 **Stack:** {state['stack']}\n"
+                f"📝 **Plan Ejecutado:** {', '.join(formatted_steps)}\n"
+                f"{v_info}\n"
+                f"{res_info}"
+            )
             return {
                 "status": "success",
                 "mode": "live_draft",

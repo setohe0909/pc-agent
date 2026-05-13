@@ -184,9 +184,13 @@ class CoderWebGraph:
         res = state.get("task_result")
         if not res:
             return {"results": {"status": "error", "message": "Pilot no pudo generar un resultado válido.", "warnings": warning_list}}
-        v_info = ""
-        if state.get("versioning_status"):
-            v_info = f"\n📦 **Versión Wix Guardada:** {state['versioning_status'].get('version_id')}"
+        v_status = state.get("versioning_status", {})
+        if v_status.get("status") == "success":
+            v_info = f"\n📦 **Versión Wix Guardada:** {v_status.get('version_id')}"
+        else:
+            v_info = f"\n❌ **Fallo Versión Wix:** {v_status.get('message', 'Desconocido')}"
+            
+        res_info = f"\n🔗 **Resultado:** {res.get('repo_url') or res.get('summary')}"
 
         steps = state['plan'].get('steps', [])
         formatted_steps = []
