@@ -40,106 +40,89 @@ class PilotWebAdapter(CoderWebPort):
             "stack": stack
         }
 
-    async def adjust_wix_ui(self, site_id: str, changes: str) -> dict:
+    async def _call_wix_api(self, service: str, method: str, path_suffix: str, json_data: dict = None) -> dict:
         config = self._get_wix_config()
         headers = self._get_headers(config)
-        site_id = site_id or config.get("wix_site_id")
+        site_id = config.get("wix_site_id")
         
-        if not site_id or site_id == "unknown_site":
-             return {"status": "error", "message": "Falta wix_site_id en la configuración."}
-
-        print(f"[PILOT] Ejecutando ajuste UI REAL en Wix Site {site_id}")
-        url = f"{self.base_url}/sites/v1/sites/{site_id}/settings"
+        # Wix usa dominios por servicio o rutas específicas en el subdominio principal
+        # Documentación oficial: 
+        # Revisions -> site-revision/v1/revisions
+        # Settings -> site-management/v1/sites/{site_id}/settings
         
+        if service == "revision":
+            url = f"https://www.wixapis.com/site-revision/v1/revisions"
+            # Site ID debe ir en el header para este endpoint específico
+            headers["wix-site-id"] = site_id
+        elif service == "management":
+            url = f"https://www.wixapis.com/site-management/v1/sites/{site_id}/{path_suffix}"
+        else:
+            url = f"https://www.wixapis.com/{service}/v1/sites/{site_id}/{path_suffix}"
+            
         async with httpx.AsyncClient(timeout=30) as client:
-            # Actualizamos la descripción del sitio o metadatos como prueba de vida
             try:
-                response = await client.patch(url, headers=headers, json={
-                    "siteSettings": {
-                        "description": f"Actualizado por Pilot Agent: {changes[:100]}..."
-                    }
-                })
-                response.raise_for_status()
-                return {
-                    "status": "success",
-                    "change_id": response.json().get("id", "wix_api_res_001"),
-                    "summary": "Ajustes de UI procesados via Wix Dev API."
-                }
+                print(f"[PILOT DEBUG] Llamando a Wix ({service}): {url}")
+                if method == "PATCH":
+                    resp = await client.patch(url, headers=headers, json=json_data)
+                elif method == "POST":
+                    resp = await client.post(url, headers=headers, json=json_data)
+                else:
+                    resp = await client.get(url, headers=headers)
+                
+                if resp.status_code >= 400:
+                    print(f"[PILOT ERROR] Wix API {resp.status_code}: {resp.text}")
+                    resp.raise_for_status()
+                    
+                return resp.json()
             except Exception as e:
-                print(f"[PILOT ERROR] Fallo llamada Wix Settings: {e}")
-                return {"status": "error", "message": str(e)}
+                print(f"[PILOT ERROR] Error fatal en {url}: {e}")
+                raise e
+
+    async def adjust_wix_ui(self, site_id: str, changes: str) -> dict:
+        try:
+            data = await self._call_wix_api("management", "PATCH", "settings", {
+                "siteSettings": {"description": f"Pilot Update: {changes[:100]}..."}
+            })
+            return {
+                "status": "success",
+                "change_id": data.get("id", "ok"),
+                "summary": "Ajustes de UI procesados via Site Management API."
+            }
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
 
     async def get_site_versions(self, site_id: str) -> List[dict]:
-        config = self._get_wix_config()
-        headers = self._get_headers(config)
-        site_id = site_id or config.get("wix_site_id")
-        
-        url = f"{self.base_url}/sites/v1/sites/{site_id}/revisions"
-        async with httpx.AsyncClient(timeout=20) as client:
-            try:
-                response = await client.get(url, headers=headers)
-                response.raise_for_status()
-                return response.json().get("revisions", [])
-            except Exception:
-                return [{"id": "rev_latest", "label": "Error al recuperar versiones"}]
+        try:
+            data = await self._call_wix_api("revision", "GET", "")
+            return data.get("revisions", [])
+        except Exception:
+            return [{"id": "rev_latest", "label": "No se pudieron obtener versiones"}]
 
     async def create_site_version(self, site_id: str, label: str) -> dict:
-        config = self._get_wix_config()
-        headers = self._get_headers(config)
-        site_id = site_id or config.get("wix_site_id")
-        
-        if not site_id or site_id == "unknown_site":
-             return {"status": "error", "message": "Falta site_id para crear versión."}
-
-        print(f"[PILOT] Creando Snapshot REAL en Wix: {label}")
-        url = f"{self.base_url}/sites/v1/sites/{site_id}/revisions"
-        
-        async with httpx.AsyncClient(timeout=30) as client:
-            try:
-                # API de Revisions de Wix para crear un 'Save' manual
-                response = await client.post(url, headers=headers, json={
-                    "revision": {
-                        "label": label
-                    }
-                })
-                response.raise_for_status()
-                return {"status": "success", "version_id": response.json().get("revision", {}).get("id")}
-            except Exception as e:
-                print(f"[PILOT ERROR] Fallo crear revisión Wix: {e}")
-                return {"status": "error", "message": str(e)}
+        try:
+            print(f"[PILOT] Creando Snapshot OFICIAL en Wix: {label}")
+            data = await self._call_wix_api("revision", "POST", "", {
+                "revision": {"label": label}
+            })
+            return {"status": "success", "version_id": data.get("revision", {}).get("id")}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
 
     async def update_site_draft(self, site_id: str, changes: dict) -> dict:
-        config = self._get_wix_config()
-        headers = self._get_headers(config)
-        site_id = site_id or config.get("wix_site_id")
-        
-        if not site_id or site_id == "unknown_site":
-             return {"status": "error", "message": "Falta site_id para actualizar borrador."}
-
-        print(f"[PILOT] Publicando actualización REAL al BORRADOR de Wix Site {site_id}")
-        
-        # Simulamos la inyección del plan en los metadatos de la revisión
-        # En un producto final, aquí usaríamos el endpoint de Velo / Blocks
-        url = f"{self.base_url}/sites/v1/sites/{site_id}/revisions"
-        
-        async with httpx.AsyncClient(timeout=60) as client:
-            try:
-                # Creamos una revisión que represente el 'Commit' del plan de la IA
-                plan_summary = ", ".join(changes.get("steps", []))[:200]
-                response = await client.post(url, headers=headers, json={
-                    "revision": {
-                        "label": f"Pilot Update: {plan_summary}",
-                        "metaData": {"plan": json.dumps(changes)}
-                    }
-                })
-                response.raise_for_status()
-                
-                return {
-                    "status": "success",
-                    "mode": "live_draft",
-                    "preview_url": f"https://editor.wix.com/html/editor/web/renderer/edit/{site_id}",
-                    "summary": "Los cambios arquitectónicos han sido inyectados en el historial de Wix como una nueva revisión."
+        try:
+            print(f"[PILOT] Publicando actualización OFICIAL al BORRADOR de Wix Site")
+            plan_summary = ", ".join(changes.get("steps", []))[:200]
+            data = await self._call_wix_api("revision", "POST", "", {
+                "revision": {
+                    "label": f"Pilot Commit: {plan_summary}",
+                    "metaData": {"plan": json.dumps(changes)}
                 }
-            except Exception as e:
-                 print(f"[PILOT ERROR] Fallo update draft Wix: {e}")
-                 return {"status": "error", "message": str(e)}
+            })
+            return {
+                "status": "success",
+                "mode": "live_draft",
+                "preview_url": f"https://editor.wix.com/html/editor/web/renderer/edit/{site_id}",
+                "summary": "Los cambios arquitectónicos han sido inyectados oficialmente en el historial de Wix."
+            }
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
