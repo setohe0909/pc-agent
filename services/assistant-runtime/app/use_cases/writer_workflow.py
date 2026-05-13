@@ -36,8 +36,7 @@ class WriterWorkflow:
             "Tu tono es creativo, profesional y persuasivo.\n"
             f"{memory_context}"
         )
-        full_prompt = f"{system_instructions}\n\nUsuario: {prompt}"
-        response = await self.llm.chat(full_prompt)
+        response = await self.llm.chat(full_prompt, system_instruction=system_instructions)
         return {"status": "success", "message": response}
 
     async def _create_blog(self, prompt: str, language: str) -> dict:

@@ -79,9 +79,8 @@ class CoderWebGraph:
         if not state.get("images"):
             return {}
         
-        print("[CODER-WEB GRAPH][VISION] Analizando mockup/referencia visual...")
-        prompt = "Analiza este mockup o referencia para un ecommerce. Describe el layout, colores, tipografía y elementos clave de UI/UX que Pilot debe implementar."
-        vision_analysis = await self.llm.chat(prompt, images=state["images"])
+        sys_instr = "Eres Pilot, un experto en diseño UI/UX y arquitectura de e-commerce. Tu tarea es analizar visualmente mockups."
+        vision_analysis = await self.llm.chat(prompt, images=state["images"], system_instruction=sys_instr)
         return {"context": f"ANÁLISIS DE MOCKUP:\n{vision_analysis}\n\n"}
 
     async def _analyze_references_node(self, state: CoderWebState) -> dict:
@@ -92,9 +91,8 @@ class CoderWebGraph:
             return {}
         
         print(f"[CODER-WEB GRAPH][REFERENCES] Detectadas {len(urls)} URLs de referencia.")
-        # Aquí simularíamos un scraping. Por ahora le pedimos al LLM que analice las intenciones basadas en los links
-        prompt = f"El usuario ha proporcionado estos links como referencia de diseño: {', '.join(urls)}. Basado en el nombre de los dominios y la descripción del usuario, infiere estilos y patrones UX."
-        analysis = await self.llm.chat(prompt)
+        sys_instr = "Eres Pilot, experto en análisis de la competencia y UX Research."
+        analysis = await self.llm.chat(prompt, system_instruction=sys_instr)
         return {"context": state.get("context", "") + f"ANÁLISIS DE REFERENCIAS EXTERNAS:\n{analysis}\n\n"}
 
     async def _retrieve_context_node(self, state: CoderWebState) -> dict:
@@ -136,11 +134,8 @@ class CoderWebGraph:
     async def _plan_review_node(self, state: CoderWebState) -> dict:
         print("[CODER-WEB GRAPH][REVIEW] Validando plan de Pilot...")
         plan_str = json.dumps(state["plan"])
-        prompt = (
-            f"Como experto arquitecto, revisa este plan de Pilot para un proyecto {state['project_type']}:\n{plan_str}\n\n"
-            f"Asegúrate de que el stack {state['stack']} se use correctamente. Sugiere mejoras si faltan componentes críticos de e-commerce."
-        )
-        review = await self.llm.chat(prompt, context={"project_context": state["context"]})
+        sys_instr = "Eres el Arquitecto Pilot. Revisa y optimiza planes de desarrollo web."
+        review = await self.llm.chat(prompt, context={"project_context": state["context"]}, system_instruction=sys_instr)
         # Inyectamos la revisión en el plan para la ejecución
         updated_plan = {**state["plan"], "review_notes": review}
         return {"plan": updated_plan}

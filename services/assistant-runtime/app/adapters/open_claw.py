@@ -72,7 +72,7 @@ class OpenClawLLMAdapter(LLMPort):
                     raise e
         raise last_error
 
-    async def chat(self, prompt: str, context: dict | None = None, images: list[bytes] | None = None) -> str:
+    async def chat(self, prompt: str, context: dict | None = None, images: list[bytes] | None = None, system_instruction: str | None = None) -> str:
         provider, model = self._get_provider_info(policy="cheap")
         
         if provider == "gemini":
@@ -80,11 +80,13 @@ class OpenClawLLMAdapter(LLMPort):
             if context:
                 full_prompt = f"Contexto:\n{json.dumps(context)}\n\nPregunta: {prompt}"
             
-            return await self._generate_with_fallback(full_prompt, images=images)
+            return await self._generate_with_fallback(full_prompt, images=images, system_instruction=system_instruction)
         else:
             # Fallback a litellm para otros proveedores
             litellm_model = f"{provider}/{model}" if provider != "openai" else f"openai/{model}"
             messages = [{"role": "user", "content": prompt}]
+            if system_instruction:
+                messages.insert(0, {"role": "system", "content": system_instruction})
             if context:
                 messages.insert(0, {"role": "system", "content": f"Contexto: {json.dumps(context)}"})
             

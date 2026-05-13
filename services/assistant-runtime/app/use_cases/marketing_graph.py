@@ -225,8 +225,13 @@ class MarketingGraph:
         if state.get("final_message"):
             return {"results": {"status": status, "message": state["final_message"]}}
         
-        res = await self.llm.chat(state["prompt"], context={"brand": state["context"]})
-        return {"results": {"status": "success", "message": f"[KEYS: {keys}] [REQ: {state.get('requires_approval')}] [APP: {state.get('is_approved')}]\n\n{res}"}}
+        sys_instr = (
+            "Eres el Marketer Agent de PC Agent. Tu especialidad es el crecimiento orgánico, "
+            "marketing digital, análisis de tendencias y gestión de comunidades. "
+            "Habla siempre con propiedad de marketing y nunca te identifiques como analista financiero o de trading."
+        )
+        res = await self.llm.chat(state["prompt"], context={"brand": state["context"]}, system_instruction=sys_instr)
+        return {"results": {"status": "success", "message": res}}
 
     async def run(self, prompt: str, payload: dict, images: List[bytes] = None) -> dict:
         initial_state = {
