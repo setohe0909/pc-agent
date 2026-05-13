@@ -127,7 +127,7 @@ class CoderWebGraph:
                 "project_type": data.get("project_type", "repo"),
                 "plan": data.get("plan", {"steps": ["Inicializar"], "architecture": "Standard"}),
                 "stack": data.get("stack", state["stack"]),
-                "payload": {**state["payload"], "site_id": data.get("site_id")}
+                "payload": {**state["payload"], "site_id": state["payload"].get("site_id") or data.get("site_id")}
             }
         except Exception as e:
             print(f"[CODER-WEB ERROR] Fallo análisis: {e}")

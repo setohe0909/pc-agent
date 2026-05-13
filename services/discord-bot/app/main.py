@@ -709,7 +709,9 @@ async def main() -> None:
                     "prompt": raw_query,
                     "source": {"platform": "discord", "channel_id": str(message.channel.id), "user_id": str(message.author.id)},
                     "images": images_b64,
-                    "payload": {}
+                    "payload": {
+                        "site_id": _get_env("WIX_SITE_ID")
+                    }
                 }
 
                 result = await _send_assistant_request(payload)

@@ -49,6 +49,10 @@ class OpenClawLLMAdapter(LLMPort):
             "models/gemini-2.5-pro",
             "models/gemini-3-flash-preview",
             "models/gemini-3-pro-preview",
+            "models/gemini-3.1-flash-lite",
+            "models/gemini-3.1-pro-preview",
+            "models/gemini-1.5-flash",
+            "models/gemini-1.5-pro",
             "models/gemini-flash-latest",
             "models/gemini-pro-latest"
         ]
