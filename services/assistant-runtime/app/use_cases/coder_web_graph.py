@@ -194,6 +194,14 @@ class CoderWebGraph:
         if res.get("preview_url"):
             res_info += f"\n🌐 **Link de Previsualización:** {res.get('preview_url')}"
 
+        steps = state['plan'].get('steps', [])
+        formatted_steps = []
+        for s in steps:
+            if isinstance(s, dict):
+                formatted_steps.append(s.get("description") or s.get("name") or str(s))
+            else:
+                formatted_steps.append(str(s))
+
         msg = (
             f"✅ **Pilot ha completado la tarea con éxito**\n\n"
             f"🛠️ **Tipo de Proyecto:** {state['project_type'].upper()}\n"
