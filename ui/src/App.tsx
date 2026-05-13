@@ -14,8 +14,8 @@ import { WikiView } from "@/components/views/WikiView";
 import { MarketerView } from "@/components/views/MarketerView";
 import { WriterView } from "@/components/views/WriterView";
 import { PictureView } from "@/components/views/PictureView";
-import { LeadsView } from "@/components/views/LeadsView";
-import { Users } from "lucide-react";
+import { CoderWebView } from "@/components/views/CoderWebView";
+import { Users, Code } from "lucide-react";
 
 export default function App() {
   const [data, setData] = useState<any>(null);
@@ -71,6 +71,7 @@ export default function App() {
       case "leads": return <LeadsView />;
       case "writer": return <WriterView data={data} adminToken={adminToken} onSave={handleSaveConfig} />;
       case "picture": return <PictureView data={data} adminToken={adminToken} onSave={handleSaveConfig} />;
+      case "coder": return <CoderWebView data={data} adminToken={adminToken} onSave={handleSaveConfig} />;
       case "wiki": return <WikiView />;
       default: return null;
     }
@@ -113,6 +114,9 @@ export default function App() {
               </TabsTrigger>
               <TabsTrigger value="picture" className="justify-start px-4 py-2 data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
                 <Camera className="w-4 h-4 mr-2" /> Imágenes
+              </TabsTrigger>
+              <TabsTrigger value="coder" className="justify-start px-4 py-2 data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
+                <Code className="w-4 h-4 mr-2" /> Coder Web
               </TabsTrigger>
               <div className="my-2 border-t border-border"></div>
               <TabsTrigger value="architecture" className="justify-start px-4 py-2 data-[state=active]:bg-primary/10 data-[state=active]:text-primary">

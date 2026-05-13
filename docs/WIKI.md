@@ -40,18 +40,32 @@ El agente de imágenes utiliza **DALL-E 3** y memoria proactiva para generar con
 - `!picture memory`: Muestra un resumen de los estilos y preferencias guardadas.
 - `!picture memory --clean`: Limpia la memoria operativa de imágenes.
 
-## 4. Inteligencia Proactiva
+## 4. Desarrollo Web (!coder-web)
+
+El sub-agente de desarrollo web permite automatizar la creación y ajuste de plataformas e-commerce.
+
+### Capacidades
+- **E-commerce Repo**: Crea repositorios completos con **React, TypeScript, Tailwind y Supabase**.
+- **Wix Automator**: Ajusta interfaces en Wix mediante su API, permitiendo versionado y cambios rápidos.
+- **Pilot Engine**: Usa el motor Pilot para orquestar la generación de código siguiendo patrones de arquitectura limpia.
+
+### Comandos
+- `!coder-web <desc>`: Inicia un proyecto web en un hilo dedicado.
+- `!coder-web memory`: Muestra contextos de proyectos previos.
+- `!coder-web memory --clean`: Borra la memoria operativa de desarrollo.
+
+## 5. Inteligencia Proactiva
 
 El sistema aprende mientras duermes:
 *   **Consolidación Diaria**: Cada medianoche (UTC), el `ingestion-worker` toma todas las memorias del día y genera un resumen ejecutivo.
 *   **Ejecución Manual**: Puedes forzar este proceso con `!run consolidation`.
 
-## 4. Observabilidad
+## 6. Observabilidad
 
 Para desarrolladores y administradores:
 *   **Langfuse**: Rastrea cada llamada al LLM. Útil para depurar por qué el agente tomó una decisión.
 *   **Control API**: `http://localhost:8000/status` para ver la salud del sistema.
 
-## 5. Mejores Prácticas
+## 7. Mejores Prácticas
 *   **Contexto**: Cuanto más uses el sistema, mejor te conocerá gracias a la consolidación de memoria.
 *   **Seguridad**: Nunca desactives las compuertas de aprobación para acciones que involucren APIs externas de escritura.

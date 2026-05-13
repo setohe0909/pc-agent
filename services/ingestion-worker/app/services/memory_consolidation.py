@@ -12,7 +12,7 @@ class MemoryConsolidationService:
         api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
         if api_key:
             genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel("models/gemini-2.0-flash-lite")
+        self.model = genai.GenerativeModel("models/gemini-2.0-flash") # Usamos 2.0 Flash para mejor razonamiento
 
     async def run_consolidation(self):
         print("[MEMORY] Iniciando consolidación de memoria diaria...")
@@ -46,21 +46,38 @@ class MemoryConsolidationService:
                     if cat not in grouped: grouped[cat] = []
                     grouped[cat].append(m.get("summary", ""))
 
-                # 3. Consolidar cada categoría con LLM
+                # 3. Consolidar cada categoría con LLM recursivo
                 consolidated_summaries = []
                 for cat, texts in grouped.items():
                     print(f"[MEMORY] Consolidando categoría: {cat} ({len(texts)} items)")
+                    
+                    # --- NUEVO: Obtener la última consolidación previa para recursividad ---
+                    prev_consolidation = ""
+                    prev_url = f"{self.supabase_url}/rest/v1/mentis_memory?category=eq.consolidated_{cat}&order=created_at.desc&limit=1"
+                    prev_resp = await client.get(prev_url, headers=headers)
+                    if prev_resp.status_code == 200:
+                        prev_data = prev_resp.json()
+                        if prev_data:
+                            prev_consolidation = prev_data[0].get("summary", "")
+                            print(f"[MEMORY] Memoria previa encontrada para {cat}. Evolucionando...")
                     
                     # Batching: Máximo 50 memorias por llamada al LLM
                     batch_size = 50
                     for i in range(0, len(texts), batch_size):
                         batch = texts[i:i + batch_size]
                         full_text = "\n---\n".join(batch)
+                        
                         prompt = (
-                            f"A continuación tienes una lista de eventos/aprendizajes registrados hoy para la categoría '{cat}' (Parte {i//batch_size + 1}). "
-                            f"Resume los puntos más importantes de manera concisa y genera 'Aprendizajes Permanentes' "
-                            f"que sirvan para el futuro del agente.\n\n"
-                            f"MEMORIAS:\n{full_text}"
+                            f"Actúa como el núcleo de memoria evolutiva de un Agente IA (PC Agent).\n"
+                            f"Tu objetivo es ACTUALIZAR la 'Memoria de Largo Plazo' con los nuevos eventos de hoy.\n\n"
+                            f"### MEMORIA ACTUAL (Lo que ya sabías):\n{prev_consolidation if prev_consolidation else 'Memoria vacía. Iniciando aprendizaje.'}\n\n"
+                            f"### NUEVOS EVENTOS DE HOY ({cat}):\n{full_text}\n\n"
+                            f"### INSTRUCCIONES:\n"
+                            f"1. Integra los nuevos eventos en la memoria existente.\n"
+                            f"2. Elimina redundancias pero conserva aprendizajes clave.\n"
+                            f"3. Si hay cambios en preferencias del usuario o hitos del proyecto, dales prioridad.\n"
+                            f"4. Mantén un tono ejecutivo, técnico y evolutivo.\n"
+                            f"Genera el nuevo estado consolidado de esta memoria:"
                         )
                         
                         response = await self.model.generate_content_async(prompt)
@@ -70,9 +87,10 @@ class MemoryConsolidationService:
                             "category": f"consolidated_{cat}",
                             "summary": summary,
                             "metadata": {
-                                "type": "daily_consolidation", 
+                                "type": "long_term_consolidation", 
                                 "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-                                "batch": i//batch_size + 1
+                                "batch": i//batch_size + 1,
+                                "recursive": True
                             }
                         })
 

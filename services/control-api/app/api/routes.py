@@ -227,8 +227,9 @@ async def get_today_intelligence(context: str | None = None):
 
     async with httpx.AsyncClient() as client:
         try:
-            # Consultamos registros de hoy usando el rango de created_at y el filtro de categoria
-            query_url = f"{url}/rest/v1/mentis_memory?created_at=gte.{today}T00:00:00Z{category_filter}&order=created_at.desc"
+            # Ya no filtramos por fecha diaria. Buscamos los registros más recientes (LTM)
+            # para que el agente siempre tenga contexto evolutivo.
+            query_url = f"{url}/rest/v1/mentis_memory?{category_filter[1:]}&order=created_at.desc&limit=50"
             response = await client.get(query_url, headers=headers)
             if response.status_code != 200:
                 return {"memory": [], "detail": f"Error de Supabase: {response.text}"}

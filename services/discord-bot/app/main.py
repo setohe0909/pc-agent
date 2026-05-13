@@ -172,8 +172,8 @@ async def main() -> None:
             return
 
         content = message.content.strip()
-        command_list = ("!ask ", "!research ", "!approve_trade ", "!status", "!memory", "!run ", "!claw ", "!marketer ", "!marketer-status", "!writer ", "!picture ", "!help")
-        if not content.startswith(command_list) and not content == "!picture":
+        command_list = ("!ask ", "!research ", "!approve_trade ", "!status", "!memory", "!run ", "!claw ", "!marketer ", "!marketer-status", "!writer ", "!picture ", "!coder-web ", "!help")
+        if not content.startswith(command_list) and not content == "!picture" and not content == "!coder-web":
             return
 
         # --- COMANDO HELP ---
@@ -211,6 +211,11 @@ async def main() -> None:
             embed.add_field(
                 name="⚖️ Decisiones", 
                 value="`!approve_trade <id>`: Aprobar una operación sugerida.", 
+                inline=False
+            )
+            embed.add_field(
+                name="💻 Coder Web Sub-Agent", 
+                value="`!coder-web <descripción>`: Crear/ajustar e-commerce (Wix o Repo).\n`!coder-web memory`: Ver aprendizajes del desarrollador web.\n`!coder-web memory --clean`: Borrar memoria del día.", 
                 inline=False
             )
             embed.set_footer(text="PC Agent v0.5.0 - Autonomía y Análisis")
@@ -613,6 +618,73 @@ async def main() -> None:
                 await message.reply("❌ Necesito permiso para 'Crear hilos públicos'.")
             except Exception as e:
                 await message.reply(f"❌ Error en Picture Agent: {e}")
+            return
+        
+        if content.startswith("!coder-web"):
+            raw_query = content.removeprefix("!coder-web").strip()
+            
+            # Gestión de Memoria
+            if "memory --clean" in raw_query:
+                embed = discord.Embed(
+                    title="⚠️ Confirmación de Borrado (Coder-Web)",
+                    description="¿Estás seguro de que deseas borrar la **memoria de desarrollo web**? Esta acción no se puede deshacer.",
+                    color=discord.Color.red()
+                )
+                await message.reply(embed=embed, view=ConfirmationView("coder-web", message.author))
+                return
+
+            if raw_query == "memory":
+                try:
+                    base_url = _get_env("CONTROL_API_URL", "http://control-api:8000").rstrip("/")
+                    async with httpx.AsyncClient(timeout=10) as client_http:
+                        resp = await client_http.get(f"{base_url}/intelligence/memory/today?context=coder-web")
+                    
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        memory_list = data.get("memory", [])
+                        if not memory_list:
+                            await message.reply("📭 No hay memoria de desarrollo web guardada hoy.")
+                        else:
+                            report = "### 💻 Memoria de Coder Web Agent\n"
+                            for item in memory_list:
+                                report += f"- {item['summary']}\n"
+                            await message.reply(report)
+                    else:
+                        await message.reply(f"❌ Error al obtener memoria: HTTP {resp.status_code}")
+                except Exception as e:
+                    await message.reply(f"❌ Error: {e}")
+                return
+
+            if not raw_query:
+                await message.reply("💻 Por favor, añade una descripción para el proyecto web. Ejemplo: `!coder-web crea un ecommerce de zapatos en Wix`.")
+                return
+
+            # Crear Hilo para el proyecto
+            try:
+                thread = await message.create_thread(name=f"💻 Proyecto: {raw_query[:30]}...")
+                await thread.send("⏳ **Coder Web Agent** está analizando la arquitectura y preparando el stack...")
+
+                payload = {
+                    "action_type": "coder-web",
+                    "prompt": raw_query,
+                    "source": {"platform": "discord", "channel_id": str(message.channel.id), "user_id": str(message.author.id)},
+                    "payload": {}
+                }
+
+                result = await _send_assistant_request(payload)
+                msg = result.get("message", "No hubo respuesta.")
+                
+                if len(msg) > 1900:
+                    chunks = [msg[i:i+1900] for i in range(0, len(msg), 1900)]
+                    for chunk in chunks:
+                        await thread.send(chunk)
+                else:
+                    await thread.send(msg)
+
+            except discord.Forbidden:
+                await message.reply("❌ Necesito permiso para 'Crear hilos públicos'.")
+            except Exception as e:
+                await message.reply(f"❌ Error en Coder Web Agent: {e}")
             return
 
         action_type = "chat"
