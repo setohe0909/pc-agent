@@ -1,5 +1,5 @@
 import type { FormEvent } from "react";
-import { Code, Globe, Save, Cpu, Database, Github, Layout, Terminal, Zap, Shield } from "lucide-react";
+import { Code, Globe, Save, Cpu, Database, Layout, Terminal, Zap, Shield } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -71,7 +71,7 @@ export function CoderWebView({ data, onSave }: { data: any, adminToken: string, 
         <Card>
           <CardHeader>
             <CardTitle className="text-md flex items-center gap-2">
-              <Github className="w-5 h-5 text-slate-900 dark:text-white" />
+              <Code className="w-5 h-5 text-slate-900 dark:text-white" />
               GitHub Repository Control
             </CardTitle>
             <CardDescription>Configuración para el despliegue de proyectos React/TS.</CardDescription>

@@ -14,6 +14,7 @@ import { WikiView } from "@/components/views/WikiView";
 import { MarketerView } from "@/components/views/MarketerView";
 import { WriterView } from "@/components/views/WriterView";
 import { PictureView } from "@/components/views/PictureView";
+import { LeadsView } from "@/components/views/LeadsView";
 import { CoderWebView } from "@/components/views/CoderWebView";
 import { Users, Code } from "lucide-react";
 
