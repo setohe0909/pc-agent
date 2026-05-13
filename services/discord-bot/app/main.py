@@ -180,15 +180,40 @@ async def main() -> None:
         if content == "!help":
             embed = discord.Embed(
                 title="🤖 PC Agent v0.5.0 - Guía de Operaciones", 
-                description="Sistema de agentes autónomos con flujos de estados (LangGraph) y memoria proactiva.",
+                description="Aquí tienes todo lo que puedo hacer por ti:",
                 color=discord.Color.blue()
             )
-            embed.add_field(name="🧠 Inteligencia & Memoria", value="`!memory`: Ver tendencias del día.\n`!memory --clean`: Borrar memoria general.\n`!run consolidation`: Forzar consolidación de memoria diaria.", inline=False)
-            embed.add_field(name="📣 Marketing (LangGraph)", value="`!marketer`: Centro de Control interactivo (Botones).\n`!marketer memory`: Ver aprendizajes consolidados.", inline=False)
-            embed.add_field(name="🎨 Imagenes (!picture)", value="`!picture <petición>`: Generar imágenes usando DALL-E 3 con memoria proactiva.\n`!picture memory`: Ver estilos recordados.\n`!picture memory --clean`: Limpiar memoria de imágenes.", inline=False)
-            embed.add_field(name="✍️ Redactor (Writer)", value="`!writer blog <tema>`: Crear blog y guardar en Obsidian.\n`!writer <mensaje>`: Chat con el redactor creativo.", inline=False)
-            embed.add_field(name="📊 Research & Trading", value="`!research <tema>`: Investigación profunda.\n`!status`: Estado de salud de los microservicios.\n`!approve_trade <id>`: Evaluar propuesta de inversión.", inline=False)
-            embed.set_footer(text="Usa los botones en los mensajes para una experiencia mejorada.")
+            embed.add_field(
+                name="🤖 Inteligencia Proactiva", 
+                value="`!memory`: Ver qué he aprendido hoy.\n`!run trends`: Forzar búsqueda de tendencias.", 
+                inline=False
+            )
+            embed.add_field(
+                name="📣 Marketing Sub-Agent", 
+                value="`!marketer-status`: Estado del marketer.\n`!marketer memory`: Ver aprendizajes del marketer.\n`!marketer respond`: Responder comentarios.\n`!marketer qualify`: Detectar leads calientes.\n`!marketer magnet`: Lead Magnets (DM).\n`!marketer trends`: Buscar tendencias virales.\n`!marketer sentiment`: Análisis de sentimiento/crisis.\n`!marketer collab <marca>`: Buscar colaboraciones.\n`!marketer funnel <tema>`: Diseñar embudo de ventas.\n`!marketer plan <tema>`: Planear campaña.\n`!marketer research <competidor>`: Sondeo de competencia.", 
+                inline=False
+            )
+            embed.add_field(
+                name="✍️ Writer Sub-Agent", 
+                value="`!writer blog <es/en> <tema>`: Crear blog y guardar en Obsidian.\n`!writer story <es/en> <tema>`: Crear storytelling y guardar en Obsidian.\n`!writer <mensaje>`: Chat con el redactor.", 
+                inline=False
+            )
+            embed.add_field(
+                name="🧠 Asistente Open Claw", 
+                value="`!claw <pregunta>`: Abre un hilo de análisis profundo usando mi memoria diaria.", 
+                inline=False
+            )
+            embed.add_field(
+                name="📊 Trading & Research", 
+                value="`!ask <duda>`: Pregunta rápida.\n`!research <tema>`: Investigación profunda.\n`!status`: Estado del sistema.", 
+                inline=False
+            )
+            embed.add_field(
+                name="⚖️ Decisiones", 
+                value="`!approve_trade <id>`: Aprobar una operación sugerida.", 
+                inline=False
+            )
+            embed.set_footer(text="PC Agent v0.5.0 - Autonomía y Análisis")
             await message.reply(embed=embed)
             return
 

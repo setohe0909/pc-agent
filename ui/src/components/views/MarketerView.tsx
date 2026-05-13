@@ -1,5 +1,5 @@
 import type { FormEvent } from "react";
-import { Camera, Music, Megaphone, Save, Sparkles, TrendingUp, Search } from "lucide-react";
+import { Camera, Music, Megaphone, Save, Sparkles, TrendingUp, Search, ShieldCheck, Brain, Activity } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -93,6 +93,36 @@ export function MarketerView({ data, onSave }: { data: any, adminToken: string, 
                 placeholder="@username" 
                 defaultValue={currentRuntime.tiktok_user_id}
               />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="md:col-span-2 border-pink-500/30 bg-pink-500/5">
+          <CardHeader>
+            <CardTitle className="text-md flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-pink-500" />
+              LangGraph v0.5.0 Intelligence
+            </CardTitle>
+            <CardDescription>Flujos de estados autónomos con análisis crítico y visión.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="space-y-1">
+              <p className="text-sm font-bold flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4" /> Critic Node
+              </p>
+              <p className="text-[10px] text-muted-foreground">Revisión automática de planes por un Agente Director Creativo.</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-bold flex items-center gap-2">
+                <Brain className="w-4 h-4" /> Voice Refiner
+              </p>
+              <p className="text-[10px] text-muted-foreground">Ajuste de tono empático y profesional basado en identidad de marca.</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-bold flex items-center gap-2">
+                <Activity className="w-4 h-4" /> Lead Auto-Pilot
+              </p>
+              <p className="text-[10px] text-muted-foreground">Persistencia automática de prospectos calificados en Supabase.</p>
             </div>
           </CardContent>
         </Card>

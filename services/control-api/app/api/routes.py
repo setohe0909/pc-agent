@@ -274,6 +274,26 @@ async def clear_today_intelligence(context: str | None = None):
             raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/marketing/leads")
+async def get_marketing_leads():
+    url = settings.effective("supabase_url")
+    key = settings.effective("supabase_service_role_key") or settings.effective("supabase_publishable_key")
+    headers = {
+        "apikey": key,
+        "Authorization": f"Bearer {key}",
+    }
+    
+    async with httpx.AsyncClient() as client:
+        try:
+            query_url = f"{url}/rest/v1/marketing_leads?order=created_at.desc"
+            response = await client.get(query_url, headers=headers)
+            if response.status_code != 200:
+                return {"leads": [], "detail": f"Error de Supabase: {response.text}"}
+            return {"leads": response.json()}
+        except Exception as e:
+            return {"leads": [], "detail": str(e)}
+
+
 def _supabase_knowledge_base() -> SupabaseVectorKnowledgeBase:
     return SupabaseVectorKnowledgeBase(
         url=settings.effective("supabase_url"),

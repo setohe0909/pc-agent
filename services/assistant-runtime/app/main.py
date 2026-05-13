@@ -101,7 +101,16 @@ async def assistant_request(request: AssistantRequest) -> dict:
         elif request.action_type == ActionType.marketing:
             print(f"[DEBUG] Entrando a MarketingGraph con prompt: {request.prompt}")
             import base64
-            image_data = [base64.b64decode(img) for img in request.images]
+            
+            # Validación de tamaño (Límite 5MB por imagen)
+            MAX_IMG_SIZE = 5 * 1024 * 1024
+            image_data = []
+            for img_b64 in request.images:
+                # Estimación rápida de tamaño de base64 (3/4 del string)
+                if (len(img_b64) * 3 / 4) > MAX_IMG_SIZE:
+                    return {"status": "error", "message": "Una de las imágenes excede el límite de 5MB."}
+                image_data.append(base64.b64decode(img_b64))
+            
             result = await marketing_workflow.run(prompt=request.prompt, payload=request.payload, images=image_data)
         elif request.action_type == ActionType.writer:
             print(f"[DEBUG] Entrando a WriterWorkflow con prompt: {request.prompt}")

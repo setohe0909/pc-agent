@@ -1,15 +1,15 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, Globe, LayoutGrid, Megaphone, PenTool, Files } from "lucide-react";
+import { Activity, Globe, Megaphone, PenTool, Brain, ShieldCheck } from "lucide-react";
 
 export function WikiView() {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">1. Arranque</CardTitle>
+          <CardTitle className="text-lg">1. Arranque v0.5.0</CardTitle>
         </CardHeader>
         <CardContent>
-          <CardDescription className="mb-4">Levanta los servicios base con Docker y abre la consola en localhost:8080.</CardDescription>
+          <CardDescription className="mb-4">Levanta el ecosistema de agentes autónomos con Docker Compose.</CardDescription>
           <code className="bg-secondary text-secondary-foreground text-xs p-2 rounded block break-words font-mono">
             docker compose up --build
           </code>
@@ -93,19 +93,19 @@ export function WikiView() {
               <Card className="bg-muted/30 border-primary/20">
                 <CardHeader>
                   <CardTitle className="text-sm flex items-center gap-2 text-primary">
-                    <LayoutGrid className="h-4 w-4" /> Trading Pro (Dual Agent)
+                    <ShieldCheck className="h-4 w-4" /> Trading Live (Demo)
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="text-xs space-y-2">
                   <p><strong>!approve_trade [instrucción]</strong></p>
-                  <p className="text-muted-foreground">Inicia el flujo de ejecución real en Kalshi.</p>
+                  <p className="text-muted-foreground">Inicia el flujo de ejecución en Kalshi Live (Modo Demo).</p>
                   <div className="bg-background/50 p-2 rounded mt-2 font-mono text-[10px]">
-                    Ej: !approve_trade Compra 5 contratos YES en el mercado de tasas de la FED
+                    Límite de seguridad: $10.00 USD por operación.
                   </div>
                   <ul className="list-disc pl-4 mt-2 text-muted-foreground">
-                    <li>Pasa por validación de balance.</li>
-                    <li>Requiere aprobación del Agente Crítico.</li>
-                    <li>Genera Embed visual en Discord.</li>
+                    <li>Validación de balance en tiempo real.</li>
+                    <li>Requiere aprobación dual (Humano + Crítico).</li>
+                    <li>Registro de auditoría en Supabase.</li>
                   </ul>
                 </CardContent>
               </Card>
@@ -113,32 +113,19 @@ export function WikiView() {
               <Card className="bg-muted/30 border-pink-500/20">
                 <CardHeader>
                   <CardTitle className="text-sm flex items-center gap-2 text-pink-500">
-                    <Megaphone className="h-4 w-4" /> Marketing Sub-Agent
+                    <Megaphone className="h-4 w-4" /> Marketing (LangGraph + Vision)
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="text-xs space-y-2">
-                  <p><strong>!marketer memory</strong></p>
-                  <p className="text-muted-foreground">Muestra los aprendizajes y hallazgos recientes del sub-agente.</p>
-                  <p><strong>!marketer respond</strong></p>
-                  <p className="text-muted-foreground">Responde comentarios en Instagram con un tono empático.</p>
+                  <p><strong>!marketer [petición con imagen]</strong></p>
+                  <p className="text-muted-foreground">Analiza imágenes con <strong>Gemini Vision</strong> y planifica campañas autónomas.</p>
                   <p><strong>!marketer qualify</strong></p>
-                  <p className="text-muted-foreground">Analiza interacciones para detectar leads de alta intención (Hot Leads).</p>
-                  <p><strong>!marketer magnet</strong></p>
-                  <p className="text-muted-foreground">Envía recursos (guías, catálogos) automáticamente por DM basado en palabras clave.</p>
-                  <p><strong>!marketer funnel [tema]</strong></p>
-                  <p className="text-muted-foreground">Diseña una estrategia de embudo de ventas (TOFU, MOFU, BOFU).</p>
-                  <p><strong>!marketer trends</strong></p>
-                  <p className="text-muted-foreground">Detecta tendencias virales en TikTok/IG y sugiere contenido adaptado.</p>
-                  <p><strong>!marketer sentiment</strong></p>
-                  <p className="text-muted-foreground">Analiza el tono de la comunidad y alerta sobre posibles crisis de reputación.</p>
-                  <p><strong>!marketer collab [marca]</strong></p>
-                  <p className="text-muted-foreground">Identifica micro-influencers y marcas para colaboraciones estratégicas.</p>
+                  <p className="text-muted-foreground"><strong>Lead Auto-Pilot:</strong> Detecta y guarda leads automáticamente en el CRM.</p>
                   <p><strong>!marketer plan [tema]</strong></p>
-                  <p className="text-muted-foreground">Planifica campañas basadas en tendencias e insights de diseño.</p>
-                  <p><strong>!marketer research [competidor]</strong></p>
-                  <p className="text-muted-foreground">Analiza la competencia y propone estrategias de superación.</p>
-                  <p><strong>!marketer-status</strong></p>
-                  <p className="text-muted-foreground">Verifica conexión con Instagram Business y TikTok API.</p>
+                  <p className="text-muted-foreground">Flujo con <strong>Agente Crítico</strong> y refinamiento de voz de marca.</p>
+                  <div className="bg-pink-500/10 p-2 rounded text-[10px] text-pink-400">
+                    Nodos: Intent → Vision → Critic → Voice → Execution
+                  </div>
                 </CardContent>
               </Card>
 
@@ -161,16 +148,16 @@ export function WikiView() {
               <Card className="bg-muted/30 border-amber-500/20">
                 <CardHeader>
                   <CardTitle className="text-sm flex items-center gap-2 text-amber-500">
-                    <Camera className="h-4 w-4" /> Picture Sub-Agent (DALL-E 3)
+                    <Brain className="h-4 w-4" /> Inteligencia Proactiva
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="text-xs space-y-2">
-                  <p><strong>!picture [descripción]</strong></p>
-                  <p className="text-muted-foreground">Genera una imagen usando memoria proactiva y hilos de conversación.</p>
-                  <p><strong>!picture memory</strong></p>
-                  <p className="text-muted-foreground">Ver estilos y preferencias visuales consolidadas.</p>
-                  <p><strong>!picture memory --clean</strong></p>
-                  <p className="text-muted-foreground">Limpia la memoria operativa de imágenes.</p>
+                  <p><strong>!memory</strong></p>
+                  <p className="text-muted-foreground">Ver tendencias y memorias operativas del día.</p>
+                  <p><strong>!run consolidation</strong></p>
+                  <p className="text-muted-foreground">Fuerza la <strong>Consolidación Diaria</strong> de aprendizajes.</p>
+                  <p><strong>!memory --clean</strong></p>
+                  <p className="text-muted-foreground">Limpia la memoria operativa (MentisDB).</p>
                 </CardContent>
               </Card>
             </div>
@@ -204,12 +191,12 @@ export function WikiView() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">5. Supabase</CardTitle>
+          <CardTitle className="text-lg">5. Supabase & CRM</CardTitle>
         </CardHeader>
         <CardContent>
-          <CardDescription className="mb-4">La publishable key permite lectura pública. La escritura requiere service role.</CardDescription>
+          <CardDescription className="mb-4">Almacenamiento vectorial y base de datos de leads calificados por la IA.</CardDescription>
           <code className="bg-secondary text-secondary-foreground text-xs p-2 rounded block break-words font-mono">
-            knowledge_sources · knowledge_documents
+            knowledge · mentis_memory · marketing_leads
           </code>
         </CardContent>
       </Card>

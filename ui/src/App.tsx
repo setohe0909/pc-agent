@@ -14,6 +14,8 @@ import { WikiView } from "@/components/views/WikiView";
 import { MarketerView } from "@/components/views/MarketerView";
 import { WriterView } from "@/components/views/WriterView";
 import { PictureView } from "@/components/views/PictureView";
+import { LeadsView } from "@/components/views/LeadsView";
+import { Users } from "lucide-react";
 
 export default function App() {
   const [data, setData] = useState<any>(null);
@@ -66,6 +68,7 @@ export default function App() {
       case "config": return <ConfigView data={data} adminToken={adminToken} onSave={handleSaveConfig} />;
       case "architecture": return <ArchitectureView />;
       case "marketing": return <MarketerView data={data} adminToken={adminToken} onSave={handleSaveConfig} />;
+      case "leads": return <LeadsView />;
       case "writer": return <WriterView data={data} adminToken={adminToken} onSave={handleSaveConfig} />;
       case "picture": return <PictureView data={data} adminToken={adminToken} onSave={handleSaveConfig} />;
       case "wiki": return <WikiView />;
@@ -81,7 +84,7 @@ export default function App() {
             <TerminalSquare className="w-6 h-6" />
             PC Agent
           </h1>
-          <p className="text-xs text-muted-foreground mt-1">Control Panel v2.0</p>
+          <p className="text-xs text-muted-foreground mt-1">Control Panel v2.3.0</p>
         </div>
 
         <div className="p-4 flex-1 overflow-y-auto">
@@ -101,6 +104,9 @@ export default function App() {
               </TabsTrigger>
               <TabsTrigger value="marketing" className="justify-start px-4 py-2 data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
                 <Megaphone className="w-4 h-4 mr-2" /> Marketing
+              </TabsTrigger>
+              <TabsTrigger value="leads" className="justify-start px-4 py-2 data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
+                <Users className="w-4 h-4 mr-2" /> Leads (CRM)
               </TabsTrigger>
               <TabsTrigger value="writer" className="justify-start px-4 py-2 data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
                 <PenTool className="w-4 h-4 mr-2" /> Redactor

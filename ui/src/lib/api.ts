@@ -45,3 +45,7 @@ export async function triggerIngestionRun(target: string, adminToken: string) {
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   return response.json();
 }
+
+export async function getLeads() {
+  return getJson("/marketing/leads");
+}
