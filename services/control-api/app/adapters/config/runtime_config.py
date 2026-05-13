@@ -23,6 +23,9 @@ PUBLIC_KEYS = {
     "discord_status_channel_id",
     "discord_approver_user_ids",
     "default_llm_provider",
+    "coder_web_stack",
+    "coder_web_autonomy",
+    "coder_web_perf",
 }
 
 SECRET_KEYS = {
@@ -40,6 +43,10 @@ SECRET_KEYS = {
     "marketing_brand_type",
     "marketing_tone",
     "marketing_poll_frequency",
+    "wix_api_key",
+    "wix_site_id",
+    "github_token",
+    "github_org",
 }
 
 
@@ -75,6 +82,13 @@ class RuntimeConfigUpdate(BaseModel):
     marketing_brand_type: str | None = Field(default=None, max_length=80)
     marketing_tone: str | None = Field(default=None, max_length=80)
     marketing_poll_frequency: str | None = Field(default=None, max_length=80)
+    wix_api_key: str | None = Field(default=None, max_length=4096)
+    wix_site_id: str | None = Field(default=None, max_length=4096)
+    github_token: str | None = Field(default=None, max_length=4096)
+    github_org: str | None = Field(default=None, max_length=4096)
+    coder_web_stack: str | None = Field(default=None, max_length=80)
+    coder_web_autonomy: str | None = Field(default=None, max_length=80)
+    coder_web_perf: str | None = Field(default=None, max_length=80)
 
     @field_validator("open_claw_base_url", "mentis_base_url", "langfuse_host", "supabase_url", "ollama_base_url")
     @classmethod

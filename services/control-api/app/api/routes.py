@@ -115,7 +115,12 @@ async def config() -> dict:
             "kalshi_configured": bool(
                 (runtime.get("kalshi_username") or settings.kalshi_username) and 
                 (runtime.get("kalshi_password") or settings.kalshi_password)
-            )
+            ),
+            "coder_web": {
+                "has_wix_auth": bool(runtime.get("wix_api_key")),
+                "has_github_auth": bool(runtime.get("github_token")),
+                "stack": runtime.get("coder_web_stack", "react-ts")
+            }
         },
     }
 
