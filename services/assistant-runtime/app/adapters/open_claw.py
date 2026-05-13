@@ -40,7 +40,7 @@ class OpenClawLLMAdapter(LLMPort):
         
         return "openai", "gpt-4o-mini"
 
-    async def _generate_with_fallback(self, prompt: str, system_instruction: str | None = None, response_mime_type: str = "text/plain") -> str:
+    async def _generate_with_fallback(self, prompt: str, system_instruction: str | None = None, response_mime_type: str = "text/plain", **kwargs) -> str:
         model_candidates = ["models/gemini-flash-latest", "models/gemini-pro-latest", "models/gemini-2.0-flash-lite"]
         api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
         genai.configure(api_key=api_key)
@@ -55,7 +55,11 @@ class OpenClawLLMAdapter(LLMPort):
                 content = [prompt]
                 if "images" in kwargs and kwargs["images"]:
                     for img_bytes in kwargs["images"]:
-                        content.append({"mime_type": "image/jpeg", "data": img_bytes})
+                        # Convertir bytes a formato PIL o usar el diccionario de Gemini
+                        content.append({
+                            "mime_type": "image/jpeg",
+                            "data": img_bytes
+                        })
                 
                 response = await model.generate_content_async(content, generation_config=gen_config)
                 return response.text

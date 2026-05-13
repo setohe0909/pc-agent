@@ -93,7 +93,7 @@ async def assistant_request(request: AssistantRequest) -> dict:
     memory_port = MentisMemoryAdapter()
     workflow = TradingWorkflow(trading_port=trading_port, llm_port=llm_port, memory_port=memory_port)
     marketing_workflow = MarketingGraph(llm=llm_port, memory=memory_port, marketing=SocialMediaStubAdapter())
-    writer_workflow = WriterWorkflow(llm_port=llm_port, memory=memory_port)
+    writer_workflow = WriterWorkflow(llm_port=llm_port, memory_port=memory_port)
     from app.use_cases.picture_graph import PictureGraph
     from app.use_cases.coder_web_graph import CoderWebGraph
     picture_workflow = PictureGraph(llm=llm_port, memory=memory_port)

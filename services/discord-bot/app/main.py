@@ -168,13 +168,38 @@ async def main() -> None:
 
     @client.event
     async def on_message(message) -> None:
-        if message.author == client.user or not _is_requests_channel(message.channel.id):
+        if message.author == client.user:
+            return
+            
+        is_thread = isinstance(message.channel, discord.Thread)
+        # Solo procesamos si es el canal correcto o si es un hilo de este bot
+        if not is_thread and not _is_requests_channel(message.channel.id):
+            return
+        
+        # Si es un hilo, verificamos que sea nuestro o que nos mencionen
+        if is_thread and message.channel.owner_id != client.user.id:
             return
 
         content = message.content.strip()
         command_list = ("!ask ", "!research ", "!approve_trade ", "!status", "!memory", "!run ", "!claw ", "!marketer ", "!marketer-status", "!writer ", "!picture ", "!coder-web ", "!help")
-        if not content.startswith(command_list) and not content == "!picture" and not content == "!coder-web":
+        
+        # Si NO es un comando Y NO estamos en un hilo nuestro, ignorar
+        if not content.startswith(command_list) and not content in ("!picture", "!coder-web") and not is_thread:
             return
+
+        # Si estamos en un hilo pero no hay comando, inyectar el comando basado en el nombre del hilo
+        if is_thread and not content.startswith(command_list):
+            thread_name = message.channel.name.lower()
+            if "marketer" in thread_name:
+                content = f"!marketer {content}"
+            elif "writer" in thread_name:
+                content = f"!writer {content}"
+            elif "pilot" in thread_name or "coder" in thread_name:
+                content = f"!coder-web {content}"
+            elif "claw" in thread_name:
+                content = f"!claw {content}"
+            else:
+                content = f"!ask {content}"
 
         # --- COMANDO HELP ---
         if content == "!help":
@@ -659,9 +684,15 @@ async def main() -> None:
                 await message.reply("💻 Por favor, añade una descripción para el proyecto web. Ejemplo: `!coder-web crea un ecommerce de zapatos en Wix`.")
                 return
 
-            # Crear Hilo para el proyecto
+            # Manejo de Hilos (Evitar error 50024)
+            is_thread = isinstance(message.channel, discord.Thread)
+            
             try:
-                thread = await message.create_thread(name=f"💻 Proyecto: {raw_query[:30]}...")
+                if is_thread:
+                    thread = message.channel
+                else:
+                    thread = await message.create_thread(name=f"💻 Proyecto: {raw_query[:30]}...")
+                
                 await thread.send("⏳ **Coder Web Agent** (Pilot) está analizando la arquitectura y preparando el stack...")
 
                 # Capturar imágenes adjuntas (Mockups/Referencias)
