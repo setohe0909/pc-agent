@@ -200,55 +200,83 @@ class OpenClawLLMAdapter(LLMPort):
             for tool in tools
         ]
 
+    def _is_schema_key_error(self, exc: Exception) -> bool:
+        if not isinstance(exc, KeyError):
+            return False
+        schema_types = {"object", "string", "array", "boolean", "number", "integer"}
+        return str(exc).strip("'\"") in schema_types
+
 
     async def get_tools_response(self, prompt: str, tools: list[dict], system_instruction: str | None = None) -> dict:
         provider, model = self._get_provider_info(policy="smart")
         
         if provider == "gemini":
-            api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
-            genai.configure(api_key=api_key)
-            
-            # Convertir esquemas de herramientas a formato Gemini
-            
-            model_instance = genai.GenerativeModel(
-                model_name=model, 
-                system_instruction=system_instruction,
-                tools=self._to_gemini_tools(tools)
-            )
-            
-            chat = model_instance.start_chat()
-            response = await chat.send_message_async(prompt)
-            
-            # Extraer llamadas a funciones
-            fc = response.candidates[0].content.parts[0].function_call
-            if fc:
-                return {
-                    "tool_name": fc.name,
-                    "arguments": dict(fc.args)
-                }
-            return {"message": response.text}
+            try:
+                api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+                genai.configure(api_key=api_key)
+                
+                # Convertir esquemas de herramientas a formato Gemini
+                
+                model_instance = genai.GenerativeModel(
+                    model_name=model, 
+                    system_instruction=system_instruction,
+                    tools=self._to_gemini_tools(tools)
+                )
+                
+                chat = model_instance.start_chat()
+                response = await chat.send_message_async(prompt)
+                
+                # Extraer llamadas a funciones
+                fc = response.candidates[0].content.parts[0].function_call
+                if fc:
+                    return {
+                        "tool_name": fc.name,
+                        "arguments": dict(fc.args)
+                    }
+                return {"message": response.text}
+            except Exception as exc:
+                if self._is_schema_key_error(exc):
+                    raise RuntimeError(
+                        "La detección de herramientas con Gemini falló por un schema JSON incompatible "
+                        f"({exc!r}). Esto suele pasar cuando Gemini recibe tipos como 'object'/'string' "
+                        "sin traducir a su formato interno. Revisa que assistant-runtime esté corriendo "
+                        "con la versión actualizada y reinicia el servicio si sigue usando una imagen anterior."
+                    ) from exc
+                raise RuntimeError(
+                    f"Falló la detección de intención con Gemini usando el modelo {model}: {exc}"
+                ) from exc
         else:
             # Fallback a LiteLLM (que soporta tool calling para OpenAI/Anthropic)
-            litellm_model = f"{provider}/{model}"
-            messages = [{"role": "user", "content": prompt}]
-            if system_instruction:
-                messages.insert(0, {"role": "system", "content": system_instruction})
+            try:
+                litellm_model = f"{provider}/{model}"
+                messages = [{"role": "user", "content": prompt}]
+                if system_instruction:
+                    messages.insert(0, {"role": "system", "content": system_instruction})
+                    
+                response = await acompletion(
+                    model=litellm_model,
+                    messages=messages,
+                    tools=self._to_openai_tools(tools),
+                    tool_choice="auto"
+                )
                 
-            response = await acompletion(
-                model=litellm_model,
-                messages=messages,
-                tools=self._to_openai_tools(tools),
-                tool_choice="auto"
-            )
-            
-            message = response.choices[0].message
-            if message.tool_calls:
-                tc = message.tool_calls[0]
-                return {
-                    "tool_name": tc.function.name,
-                    "arguments": json.loads(tc.function.arguments)
-                }
-            return {"message": message.content}
+                message = response.choices[0].message
+                if message.tool_calls:
+                    tc = message.tool_calls[0]
+                    return {
+                        "tool_name": tc.function.name,
+                        "arguments": json.loads(tc.function.arguments)
+                    }
+                return {"message": message.content}
+            except Exception as exc:
+                if self._is_schema_key_error(exc):
+                    raise RuntimeError(
+                        "La detección de herramientas falló por un schema JSON incompatible "
+                        f"({exc!r}). El adapter esperaba convertir los tools al formato de LiteLLM/OpenAI."
+                    ) from exc
+                raise RuntimeError(
+                    f"Falló la detección de intención con {provider} usando el modelo {model}: {exc}"
+                ) from exc
 
     async def generate_image(self, prompt: str) -> str:
         from litellm import aimage_generation

@@ -6,6 +6,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from app.adapters.open_claw import OpenClawLLMAdapter
+from app.main import ActionType, AssistantRequest, Source, _format_internal_error
 from app.use_cases.marketing_graph import MarketingGraph
 
 
@@ -148,6 +149,21 @@ class MarketingGraphRegressionTests(unittest.TestCase):
                     self.assertNotIn("no disponible", result["message"].lower())
 
         asyncio.run(scenario())
+
+    def test_internal_key_errors_are_reported_with_context(self):
+        request = AssistantRequest(
+            action_type=ActionType.marketing,
+            prompt="crea una estrategia",
+            source=Source(platform="discord", user_id="123"),
+            payload={"sub_command": "chat"},
+        )
+
+        result = _format_internal_error(KeyError("object"), request, "ejecutando marketer:chat")
+
+        self.assertEqual(result["status"], "error")
+        self.assertIn("subcomando `chat`", result["message"])
+        self.assertIn("schema de herramientas", result["hint"])
+        self.assertIn("object", result["error_detail"])
 
 
 if __name__ == "__main__":

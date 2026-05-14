@@ -73,6 +73,49 @@ class AssistantRequest(BaseModel):
     payload: dict = Field(default_factory=dict)
 
 
+def _format_internal_error(exc: Exception, request: AssistantRequest, stage: str) -> dict:
+    raw_detail = str(exc) or repr(exc)
+    error_type = type(exc).__name__
+    sub_command = request.payload.get("sub_command", "chat") if isinstance(request.payload, dict) else "chat"
+    hint = "Revisa los logs del assistant-runtime para el traceback completo."
+
+    if isinstance(exc, KeyError):
+        missing = str(exc).strip("'\"")
+        raw_detail = f"Clave o valor esperado no encontrado: {missing}"
+        if missing in {"object", "string", "array", "boolean", "number", "integer"}:
+            hint = (
+                "Parece un problema de schema de herramientas del LLM. "
+                "Asegúrate de reiniciar/reconstruir assistant-runtime para cargar el adapter actualizado."
+            )
+        else:
+            hint = f"El flujo intentó leer '{missing}' en una respuesta o payload que no lo tenía."
+    elif "schema JSON incompatible" in raw_detail or "detección de herramientas" in raw_detail:
+        hint = "El problema está en la detección de intención/tools del LLM, antes de ejecutar la acción."
+    elif "429" in raw_detail or "quota" in raw_detail.lower():
+        hint = "El proveedor LLM devolvió límite de cuota/rate limit. Cambia proveedor, revisa cuota o reintenta más tarde."
+    elif "nodename nor servname" in raw_detail or "Name or service not known" in raw_detail:
+        hint = "El servicio no pudo resolver/conectar a una dependencia externa desde el entorno actual."
+    elif "ZERNIO" in raw_detail.upper() or "zernio" in raw_detail.lower():
+        hint = "El problema parece venir de la integración Zernio o su respuesta."
+
+    message = (
+        f"No pude completar `{request.action_type.value}`"
+        f" con subcomando `{sub_command}` durante `{stage}`.\n"
+        f"Tipo: `{error_type}`\n"
+        f"Detalle: {raw_detail}\n"
+        f"Pista: {hint}"
+    )
+
+    return {
+        "status": "error",
+        "message": message,
+        "error_type": error_type,
+        "error_stage": stage,
+        "error_detail": raw_detail,
+        "hint": hint,
+    }
+
+
 @app.get("/health")
 async def health() -> dict:
     return {"status": "ok", "service": "assistant-runtime"}
@@ -80,6 +123,7 @@ async def health() -> dict:
 
 @app.post("/assistant/request")
 async def assistant_request(request: AssistantRequest) -> dict:
+    stage = "validando permisos"
     gate = _discord_gate(request)
     if not gate["allowed"]:
         return {
@@ -105,8 +149,10 @@ async def assistant_request(request: AssistantRequest) -> dict:
 
     try:
         if request.action_type in {ActionType.trade_decision, ActionType.open_position}:
+            stage = "ejecutando flujo de trading"
             result = await workflow.execute_trade_decision(prompt=request.prompt, user_id=request.source.user_id)
         elif request.action_type == ActionType.marketing:
+            stage = "preparando flujo de marketing"
             print(f"[DEBUG] Entrando a MarketingGraph con prompt: {request.prompt}")
             import base64
             
@@ -119,21 +165,26 @@ async def assistant_request(request: AssistantRequest) -> dict:
                     return {"status": "error", "message": "Una de las imágenes excede el límite de 5MB."}
                 image_data.append(base64.b64decode(img_b64))
             
+            stage = f"ejecutando marketer:{request.payload.get('sub_command', 'chat')}"
             result = await marketing_workflow.run(prompt=request.prompt, payload=request.payload, images=image_data)
         elif request.action_type == ActionType.writer:
+            stage = "ejecutando writer"
             print(f"[DEBUG] Entrando a WriterWorkflow con prompt: {request.prompt}")
             result = await writer_workflow.execute_writer_action(prompt=request.prompt, payload=request.payload)
         elif request.action_type == ActionType.picture:
+            stage = "ejecutando picture"
             print(f"[DEBUG] Entrando a PictureGraph con prompt: {request.prompt}")
             import base64
             image_data = [base64.b64decode(img) for img in request.images]
             result = await picture_workflow.run(prompt=request.prompt, payload=request.payload, images=image_data)
         elif request.action_type == ActionType.coder_web:
+            stage = "ejecutando coder-web"
             print(f"[DEBUG] Entrando a CoderWebGraph con prompt: {request.prompt}")
             import base64
             image_data = [base64.b64decode(img) for img in request.images]
             result = await coder_web_workflow.run(prompt=request.prompt, payload=request.payload, images=image_data)
         else:
+            stage = "ejecutando chat"
             result_text = await workflow.execute_chat(prompt=request.prompt, user_id=request.source.user_id)
             result = {"status": "success", "message": result_text}
 
@@ -157,11 +208,9 @@ async def assistant_request(request: AssistantRequest) -> dict:
         import traceback
         error_trace = traceback.format_exc()
         print(f"[CRITICAL ERROR] {exc}\n{error_trace}")
-        return {
-            "status": "error",
-            "message": f"Error interno en el servidor: {str(exc)}",
-            "debug_trace": error_trace
-        }
+        response = _format_internal_error(exc, request, stage)
+        response["debug_trace"] = error_trace
+        return response
 
 
 def _discord_gate(request: AssistantRequest) -> dict:

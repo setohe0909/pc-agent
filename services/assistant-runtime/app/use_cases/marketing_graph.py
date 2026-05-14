@@ -339,7 +339,19 @@ class MarketingGraph:
             
             return {"tool_results": result}
         except Exception as e:
-            return {"errors": [str(e)]}
+            detail = str(e) or repr(e)
+            return {
+                "tool_results": {
+                    "status": "error",
+                    "message": (
+                        f"No pude ejecutar la herramienta `{tool_name}`.\n"
+                        f"Tipo: `{type(e).__name__}`\n"
+                        f"Detalle: {detail}"
+                    ),
+                    "error_type": type(e).__name__,
+                    "error_detail": detail,
+                }
+            }
 
     async def _finalize_node(self, state: MarketingState) -> dict:
         if state.get("errors"):
