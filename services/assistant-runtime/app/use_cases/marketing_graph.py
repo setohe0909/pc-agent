@@ -5,6 +5,8 @@ from app.domain.ports.llm import LLMPort
 from app.domain.ports.memory import MemoryPort
 from app.domain.ports.marketing import MarketingPort
 import json
+import re
+import unicodedata
 
 class MarketingState(TypedDict):
     """Estado avanzado del flujo de marketing v0.4.0."""
@@ -78,6 +80,24 @@ class MarketingGraph:
                 }
             }
         ]
+
+    def _direct_action_from_prompt(self, prompt: str) -> Optional[dict]:
+        normalized = unicodedata.normalize("NFKD", prompt.casefold())
+        normalized = "".join(ch for ch in normalized if not unicodedata.combining(ch))
+        normalized = re.sub(r"\s+", " ", normalized).strip()
+
+        if any(word in normalized for word in ("dashboard", "tablero", "metricas", "analytics")):
+            return {"tool_name": "generate_dashboard", "arguments": {}}
+
+        if "reporte" in normalized or "informe" in normalized:
+            report_type = "general"
+            for candidate in ("diario", "semanal", "mensual", "crecimiento", "engagement"):
+                if candidate in normalized:
+                    report_type = candidate
+                    break
+            return {"tool_name": "generate_report", "arguments": {"report_type": report_type}}
+
+        return None
 
 
     def _build_graph(self):
@@ -167,6 +187,14 @@ class MarketingGraph:
             return {
                 "suggested_action": {"tool_name": tool_name, "arguments": {"topic": state["prompt"]}},
                 "requires_approval": tool_name == "plan_campaign"
+            }
+
+        direct_action = self._direct_action_from_prompt(state["prompt"])
+        if direct_action:
+            print(f"[GRAPH][INTENT] Acción directa detectada: {direct_action['tool_name']}")
+            return {
+                "suggested_action": direct_action,
+                "requires_approval": False
             }
 
         tools = self._get_marketing_tools()

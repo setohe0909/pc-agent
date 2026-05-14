@@ -163,6 +163,43 @@ class OpenClawLLMAdapter(LLMPort):
         response = await acompletion(model=litellm_model, messages=messages, response_format={"type": "json_object"})
         return json.loads(response.choices[0].message.content)
 
+    def _to_gemini_schema(self, schema):
+        if isinstance(schema, list):
+            return [self._to_gemini_schema(item) for item in schema]
+        if not isinstance(schema, dict):
+            return schema
+
+        converted = {}
+        for key, value in schema.items():
+            if key == "type" and isinstance(value, str):
+                converted[key] = value.upper()
+            else:
+                converted[key] = self._to_gemini_schema(value)
+        return converted
+
+    def _to_gemini_tools(self, tools: list[dict]) -> list[dict]:
+        return [
+            {
+                "name": tool["name"],
+                "description": tool.get("description", ""),
+                "parameters": self._to_gemini_schema(tool.get("parameters", {"type": "object", "properties": {}})),
+            }
+            for tool in tools
+        ]
+
+    def _to_openai_tools(self, tools: list[dict]) -> list[dict]:
+        return [
+            {
+                "type": "function",
+                "function": {
+                    "name": tool["name"],
+                    "description": tool.get("description", ""),
+                    "parameters": tool.get("parameters", {"type": "object", "properties": {}}),
+                },
+            }
+            for tool in tools
+        ]
+
 
     async def get_tools_response(self, prompt: str, tools: list[dict], system_instruction: str | None = None) -> dict:
         provider, model = self._get_provider_info(policy="smart")
@@ -176,7 +213,7 @@ class OpenClawLLMAdapter(LLMPort):
             model_instance = genai.GenerativeModel(
                 model_name=model, 
                 system_instruction=system_instruction,
-                tools=tools
+                tools=self._to_gemini_tools(tools)
             )
             
             chat = model_instance.start_chat()
@@ -200,7 +237,7 @@ class OpenClawLLMAdapter(LLMPort):
             response = await acompletion(
                 model=litellm_model,
                 messages=messages,
-                tools=tools,
+                tools=self._to_openai_tools(tools),
                 tool_choice="auto"
             )
             
@@ -273,4 +310,3 @@ class OpenClawLLMAdapter(LLMPort):
                 print(f"[OPEN CLAW ERROR] Falló backup DALL-E 3: {str(e)}", file=sys.stderr)
             
         raise Exception("No se pudo generar la imagen. Gemini Imagen falló y el backup de DALL-E 3 también (o no está configurado).")
-
