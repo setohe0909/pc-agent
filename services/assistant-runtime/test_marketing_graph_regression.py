@@ -11,6 +11,9 @@ from app.use_cases.marketing_graph import MarketingGraph
 
 class FakeLLM:
     async def chat(self, *args, **kwargs):
+        prompt = args[0] if args else ""
+        if "Clasifica el sentimiento" in prompt:
+            return "POSITIVE"
         return "respuesta generica"
 
     async def analyze_trade(self, *args, **kwargs):
@@ -37,20 +40,29 @@ class FakeMemory:
 class FakeMarketing:
     def __init__(self):
         self.dashboard_calls = 0
+        self.replies = []
+        self.dms = []
+        self.saved_leads = []
 
     async def get_comments(self, platform: str, post_id: str):
-        return []
+        return [
+            {"id": "c1", "user": "user1", "text": "Me encanta este diseño!"},
+            {"id": "c2", "user": "user2", "text": "INFO por favor"},
+        ]
 
     async def reply_to_comment(self, platform: str, comment_id: str, text: str):
+        self.replies.append((platform, comment_id, text))
         return True
 
     async def send_dm(self, platform: str, user_id: str, text: str):
+        self.dms.append((platform, user_id, text))
         return True
 
     async def get_competitor_data(self, platform: str, competitor_handle: str):
-        return {}
+        return {"handle": competitor_handle, "recent_posts": [{"text": "post", "engagement": "high"}]}
 
     async def save_lead(self, lead_data: dict):
+        self.saved_leads.append(lead_data)
         return True
 
     async def get_dashboard(self):
@@ -107,6 +119,35 @@ class MarketingGraphRegressionTests(unittest.TestCase):
             "STRING",
         )
         self.assertEqual(tools[0]["parameters"]["type"], "object")
+
+    def test_existing_marketer_subcommands_still_execute(self):
+        async def scenario():
+            commands = [
+                "respond",
+                "research",
+                "status",
+                "qualify",
+                "magnet",
+                "funnel",
+                "trends",
+                "sentiment",
+                "collab",
+                "memory",
+                "report",
+            ]
+
+            for command in commands:
+                with self.subTest(command=command):
+                    graph = MarketingGraph(llm=FakeLLM(), memory=FakeMemory(), marketing=FakeMarketing())
+                    result = await graph.run(
+                        prompt="marca minimalista",
+                        payload={"sub_command": command},
+                    )
+
+                    self.assertEqual(result["status"], "success")
+                    self.assertNotIn("no disponible", result["message"].lower())
+
+        asyncio.run(scenario())
 
 
 if __name__ == "__main__":
