@@ -229,14 +229,27 @@ class ZernioAdapter(MarketingPort):
             if isinstance(raw, dict) and raw.get("success"):
                 tt_insights = raw.get("metrics", {})
 
-        # Top content
+        # Top content (all platforms)
         analytics_raw = await self._z_get(
             "/analytics",
-            {"sortBy": "engagement", "order": "desc", "limit": "5"},
+            {"sortBy": "engagement", "order": "desc", "limit": "20"},
         )
         posts_list = []
         if isinstance(analytics_raw, dict):
             posts_list = analytics_raw.get("posts", [])
+
+        # Also fetch TikTok-specific top content
+        if tt_id:
+            tt_analytics_raw = await self._z_get(
+                "/analytics",
+                {"sortBy": "engagement", "order": "desc", "limit": "10", "platform": "tiktok"},
+            )
+            if isinstance(tt_analytics_raw, dict):
+                tt_posts = tt_analytics_raw.get("posts", [])
+                existing_ids = {p.get("_id") for p in posts_list if p.get("_id")}
+                for tp in tt_posts:
+                    if tp.get("_id") not in existing_ids:
+                        posts_list.append(tp)
 
         # Follower stats
         follower_raw = await self._z_get("/accounts/follower-stats")
@@ -288,18 +301,31 @@ class ZernioAdapter(MarketingPort):
         if total_reach > 0:
             total_engagement = round((total_interactions / total_reach) * 100, 1)
 
+        def _extract(container: dict, *keys) -> str | int | float:
+            for key in keys:
+                val = container.get(key)
+                if val is None:
+                    continue
+                if isinstance(val, dict):
+                    v = val.get("total")
+                    if v is not None:
+                        return v
+                if isinstance(val, (int, float, str)):
+                    return val
+            return "N/D"
+
         # IG insights
         ig_metrics = {}
         if ig_insights:
             ig_metrics = {
-                "reach": ig_insights.get("reach", {}).get("total", 0),
-                "views": ig_insights.get("views", {}).get("total", 0),
-                "accounts_engaged": ig_insights.get("accounts_engaged", {}).get("total", 0),
-                "total_interactions": ig_insights.get("total_interactions", {}).get("total", 0),
-                "impressions": ig_insights.get("impressions", {}).get("total", "N/D"),
-                "profile_visits": ig_insights.get("profile_visits", {}).get("total", "N/D"),
-                "website_clicks": ig_insights.get("website_clicks", {}).get("total", "N/D"),
-                "follower_growth": ig_insights.get("follower_growth", {}).get("total", "N/D"),
+                "reach": _extract(ig_insights, "reach"),
+                "views": _extract(ig_insights, "views"),
+                "accounts_engaged": _extract(ig_insights, "accounts_engaged"),
+                "total_interactions": _extract(ig_insights, "total_interactions"),
+                "impressions": _extract(ig_insights, "impressions", "impression", "total_impressions"),
+                "profile_visits": _extract(ig_insights, "profile_visits", "profile_views", "profileVisits"),
+                "website_clicks": _extract(ig_insights, "website_clicks", "websiteClicks"),
+                "follower_growth": _extract(ig_insights, "follower_growth", "followerGrowth"),
             }
 
         ig_engagement_rate = "N/D"
@@ -311,25 +337,29 @@ class ZernioAdapter(MarketingPort):
         tt_metrics = {}
         if tt_insights:
             tt_metrics = {
-                "follower_count": tt_insights.get("follower_count", {}).get("total", 0),
-                "likes_count": tt_insights.get("likes_count", {}).get("total", 0),
-                "video_count": tt_insights.get("video_count", {}).get("total", 0),
-                "views": tt_insights.get("views", {}).get("total", "N/D"),
-                "shares": tt_insights.get("shares", {}).get("total", "N/D"),
-                "profile_visits": tt_insights.get("profile_visits", {}).get("total", "N/D"),
-                "completion_rate": tt_insights.get("completion_rate", {}).get("total", "N/D"),
-                "follower_growth": tt_insights.get("follower_growth", {}).get("total", "N/D"),
+                "follower_count": _extract(tt_insights, "follower_count", "followerCount"),
+                "likes_count": _extract(tt_insights, "likes_count", "likesCount"),
+                "video_count": _extract(tt_insights, "video_count", "videoCount"),
+                "views": _extract(tt_insights, "views", "total_views", "viewCount"),
+                "shares": _extract(tt_insights, "shares", "shareCount"),
+                "profile_visits": _extract(tt_insights, "profile_visits", "profile_views", "profileVisits"),
+                "completion_rate": _extract(tt_insights, "completion_rate", "completionRate", "video_views_rate"),
+                "follower_growth": _extract(tt_insights, "follower_growth", "followerGrowth"),
             }
 
-        tt_engagement_rate = "N/D"
+        # Agregar métricas TT desde todos los posts TikTok en el listado
+        tt_total_views = 0
+        tt_total_likes = 0
+        tt_total_shares = 0
+        tt_total_comments = 0
+        tt_posts_count = 0
 
-        # Top content por platform
         ig_top = None
         tt_top = None
         for p in posts_list:
             plat = p.get("platform", "")
+            a = p.get("analytics", {})
             if plat == "instagram" and ig_top is None:
-                a = p.get("analytics", {})
                 ig_top = {
                     "title": p.get("content", "")[:60],
                     "format": p.get("mediaType", "post"),
@@ -342,18 +372,29 @@ class ZernioAdapter(MarketingPort):
                     "shares": a.get("shares", 0),
                     "url": p.get("platformPostUrl", ""),
                 }
-            if plat == "tiktok" and tt_top is None:
-                a = p.get("analytics", {})
-                tt_top = {
-                    "title": p.get("content", "")[:60],
-                    "format": p.get("mediaType", "video"),
-                    "views": a.get("views", 0),
-                    "likes": a.get("likes", 0),
-                    "comments": a.get("comments", 0),
-                    "shares": a.get("shares", 0),
-                    "engagement_rate": f"{a.get('engagementRate', 0)}%",
-                    "url": p.get("platformPostUrl", ""),
-                }
+            if plat == "tiktok":
+                tt_posts_count += 1
+                tt_total_views += a.get("views", 0) or 0
+                tt_total_likes += a.get("likes", 0) or 0
+                tt_total_shares += a.get("shares", 0) or 0
+                tt_total_comments += a.get("comments", 0) or 0
+                if tt_top is None:
+                    tt_top = {
+                        "title": p.get("content", "")[:60],
+                        "format": p.get("mediaType", "video"),
+                        "views": a.get("views", 0),
+                        "likes": a.get("likes", 0),
+                        "comments": a.get("comments", 0),
+                        "shares": a.get("shares", 0),
+                        "engagement_rate": f"{a.get('engagementRate', 0)}%",
+                        "url": p.get("platformPostUrl", ""),
+                    }
+
+        # Calcular engagement rate TT desde posts reales
+        tt_engagement_rate = "N/D"
+        if tt_total_views > 0:
+            er = round(((tt_total_likes + tt_total_comments + tt_total_shares) / tt_total_views) * 100, 2)
+            tt_engagement_rate = f"{er}%"
 
         # Alertas basadas en datos
         alerts = self._build_alerts(daily_data, ig_insights, platform_map)
@@ -378,18 +419,52 @@ class ZernioAdapter(MarketingPort):
         # Audiencia
         audience = self._build_audience(demographics, platform_map)
 
+        # Preferir métricas TT agregadas desde posts reales cuando insights no las tiene
+        tt_views_final = tt_metrics.get("views", "N/D")
+        if tt_views_final == "N/D" and tt_total_views > 0:
+            tt_views_final = str(tt_total_views)
+        tt_shares_final = tt_metrics.get("shares", "N/D")
+        if tt_shares_final == "N/D" and tt_total_shares > 0:
+            tt_shares_final = str(tt_total_shares)
+
         # Follower growth from follower-stats endpoint
         ig_follower_growth = "N/D"
         tt_follower_growth = "N/D"
         for acc in follower_accounts:
             plat = acc.get("platform", "")
-            growth = acc.get("followerGrowth")
+            growth = acc.get("followerGrowth") or acc.get("growth") or acc.get("follower_growth")
             if growth is not None:
-                growth_str = f"+{growth}" if growth >= 0 else str(growth)
+                try:
+                    g = int(growth)
+                    growth_str = f"+{g}" if g >= 0 else str(g)
+                except (ValueError, TypeError):
+                    growth_str = str(growth)
                 if plat == "instagram":
                     ig_follower_growth = growth_str
                 elif plat == "tiktok":
                     tt_follower_growth = growth_str
+
+        # Fallback: compute follower growth from daily_data follower counts
+        if ig_follower_growth == "N/D" or tt_follower_growth == "N/D":
+            first_followers = {}
+            last_followers = {}
+            for day in daily_data:
+                for fkey in ("followers", "followerCount", "followersCount"):
+                    fval = day.get(fkey)
+                    if isinstance(fval, dict):
+                        for plat_key, count in fval.items():
+                            plat = plat_key.replace("_followers", "").replace("Followers", "").lower()
+                            if plat not in first_followers:
+                                first_followers[plat] = count
+                            last_followers[plat] = count
+            if ig_follower_growth == "N/D" and "instagram" in last_followers and "instagram" in first_followers:
+                diff = int(last_followers["instagram"]) - int(first_followers["instagram"])
+                if diff != 0:
+                    ig_follower_growth = f"+{diff}" if diff > 0 else str(diff)
+            if tt_follower_growth == "N/D" and "tiktok" in last_followers and "tiktok" in first_followers:
+                diff = int(last_followers["tiktok"]) - int(first_followers["tiktok"])
+                if diff != 0:
+                    tt_follower_growth = f"+{diff}" if diff > 0 else str(diff)
 
         return {
             "status": "success",
@@ -427,10 +502,10 @@ class ZernioAdapter(MarketingPort):
                     "followers": platform_map.get("tiktok", {}).get("followers", 0),
                     "external_posts": platform_map.get("tiktok", {}).get("posts", 0),
                     "follower_count": tt_metrics.get("follower_count", "N/D"),
-                    "likes_count": tt_metrics.get("likes_count", "N/D"),
-                    "video_count": tt_metrics.get("video_count", "N/D"),
-                    "views": tt_metrics.get("views", "N/D"),
-                    "shares": tt_metrics.get("shares", "N/D"),
+                    "likes_count": str(tt_total_likes) if tt_total_likes > 0 else tt_metrics.get("likes_count", "N/D"),
+                    "video_count": str(tt_posts_count) if tt_posts_count > 0 else tt_metrics.get("video_count", "N/D"),
+                    "views": tt_views_final,
+                    "shares": tt_shares_final,
                     "profile_visits": tt_metrics.get("profile_visits", "N/D"),
                     "completion_rate": tt_metrics.get("completion_rate", "N/D"),
                     "engagement_rate": tt_engagement_rate,
