@@ -416,17 +416,22 @@ class MarketingAutomationService:
             "content": caption,
             "media_urls": media_urls,
         }
-        if scheduled_for:
+        if payload.get("draft"):
+            post_data["draft"] = True
+            ok = await self.marketing.publish_post(post_data)
+        elif scheduled_for:
             post_data["scheduled_for"] = scheduled_for
             ok = await self.marketing.schedule_post(post_data)
         else:
             ok = await self.marketing.publish_post(post_data)
         if ok:
+            verb = "guardado como draft" if payload.get("draft") else ("programado" if scheduled_for else "publicado")
             return {
                 "status": "success",
-                "message": f"Post {'programado' if scheduled_for else 'publicado'} en {platform}.\n\n{caption}",
+                "message": f"Post {verb} en {platform}.\n\n{caption}",
             }
-        return {"status": "error", "message": f"No se pudo {'programar' if scheduled_for else 'publicar'} el post en {platform}."}
+        verb = "guardar como draft" if payload.get("draft") else ("programar" if scheduled_for else "publicar")
+        return {"status": "error", "message": f"No se pudo {verb} el post en {platform}."}
 
     async def _enhance_description(self, content: str) -> str:
         prompt = (

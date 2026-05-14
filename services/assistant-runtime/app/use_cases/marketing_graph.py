@@ -114,7 +114,7 @@ class MarketingGraph:
             (("mejores horarios", "best hours", "horarios"), "get_best_hours"),
             (("campana", "campanas", "campaign"), "create_campaign"),
             (("posts", "post ", "publicaciones"), "generate_post_queue"),
-            (("publish", "publicar", "postear"), "publish_post"),
+            (("publish", "publicar", "postear", "draft", "borrador"), "publish_post"),
         ]
         for keywords, tool_name in direct_patterns:
             if any(keyword in normalized for keyword in keywords):
@@ -259,7 +259,11 @@ class MarketingGraph:
             }
 
         tools = self._get_marketing_tools()
-        decision = await self.llm.get_tools_response(state["prompt"], tools, "Eres un Marketer estratega.")
+        sys_instr = "Eres un Marketer estratega."
+        ctx = state.get("context", "").strip()
+        if ctx:
+            sys_instr += f"\n\nContexto de la conversación reciente:\n{ctx[:1500]}"
+        decision = await self.llm.get_tools_response(state["prompt"], tools, sys_instr)
         
         if "tool_name" in decision:
             return {"suggested_action": decision, "requires_approval": decision["tool_name"] == "plan_campaign"}
@@ -354,10 +358,20 @@ class MarketingGraph:
                 payload = state.get("payload", {})
                 inner = payload.get("payload", {})
                 platform = action.get("arguments", {}).get("platform") or inner.get("platform") or payload.get("platform", "instagram")
-                scheduled_for = action.get("arguments", {}).get("scheduled_for") or inner.get("scheduled_for") or payload.get("scheduled_for")
+                scheduled_for = inner.get("scheduled_for") or payload.get("scheduled_for")
                 import base64
                 media = [base64.b64encode(img).decode("utf-8") for img in (state.get("images") or [])]
                 result = await self.automation.publish_post(content, media=media, platform=platform, scheduled_for=scheduled_for, payload=inner)
+                if result.get("status") == "requires_approval" and result.get("suggestion"):
+                    await self.memory.save_interaction("marketer", {
+                        "role": "assistant",
+                        "content": f"Se generó sugerencia de post para {platform}: {result['suggestion']['caption'][:200]}"
+                    })
+                elif result.get("status") == "success":
+                    await self.memory.save_interaction("marketer", {
+                        "role": "assistant",
+                        "content": f"Post {'publicado' if not inner.get('draft') else 'guardado como draft'} en {platform}: {result.get('message', '')[:200]}"
+                    })
             elif "qualify" in tool_name:
                 result = await self._qualify_leads(state.get("payload", {}))
             elif "trends" in tool_name:

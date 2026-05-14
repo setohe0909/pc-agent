@@ -877,6 +877,15 @@ class ZernioAdapter(MarketingPort):
                 return True
         return False
 
+    def _build_media_items(self, post: dict) -> list[dict] | None:
+        urls = post.get("media_urls") or post.get("mediaUrls")
+        if not urls:
+            return None
+        return [{"url": u, "type": "image"} for u in urls]
+
+    def _format_scheduled_for(self, raw: str) -> str:
+        return raw.replace(" ", "T") if "T" not in raw else raw
+
     async def schedule_post(self, post: dict) -> bool:
         print(f"[ZERNIO] Programando post via Zernio API")
         platform = post.get("platform", "instagram")
@@ -888,11 +897,13 @@ class ZernioAdapter(MarketingPort):
             "platforms": [
                 {"platform": platform, "accountId": account_id}
             ],
+            "timezone": post.get("timezone", "America/Argentina/Buenos_Aires"),
         }
         if post.get("scheduled_for"):
-            zernio_payload["scheduledFor"] = post["scheduled_for"]
-        if post.get("media_urls"):
-            zernio_payload["mediaUrls"] = post["media_urls"]
+            zernio_payload["scheduledFor"] = self._format_scheduled_for(post["scheduled_for"])
+        media_items = self._build_media_items(post)
+        if media_items:
+            zernio_payload["mediaItems"] = media_items
 
         return await self._z_post("/posts", zernio_payload)
 
@@ -908,7 +919,10 @@ class ZernioAdapter(MarketingPort):
                 {"platform": platform, "accountId": account_id}
             ],
         }
-        if post.get("media_urls"):
-            zernio_payload["mediaUrls"] = post["media_urls"]
+        if not post.get("draft"):
+            zernio_payload["publishNow"] = True
+        media_items = self._build_media_items(post)
+        if media_items:
+            zernio_payload["mediaItems"] = media_items
 
         return await self._z_post("/posts", zernio_payload)

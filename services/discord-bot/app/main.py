@@ -791,11 +791,15 @@ async def main() -> None:
                             ),
                             color=discord.Color.purple()
                         )
-                        embed.set_footer(text="¿Publicar con esta sugerencia o escribir tu propio texto?")
+                        embed.set_footer(text="Publica ahora, guarda como draft, o escribe tu propio texto.")
 
                         approval_payload = {
                             **payload,
                             "payload": {**payload["payload"], "is_approved": True, "suggestion": suggestion},
+                        }
+                        draft_payload = {
+                            **payload,
+                            "payload": {**payload["payload"], "is_approved": True, "suggestion": suggestion, "draft": True},
                         }
 
                         class PostRejectModal(discord.ui.Modal, title="Tu descripción personalizada"):
@@ -827,9 +831,10 @@ async def main() -> None:
                                 await self.thread.send(res.get("message", "Post publicado."))
 
                         class PostApprovalView(View):
-                            def __init__(self, pld, author, thread):
+                            def __init__(self, pld, draft_pld, author, thread):
                                 super().__init__(timeout=120)
                                 self.pld = pld
+                                self.draft_pld = draft_pld
                                 self.author = author
                                 self.thread = thread
 
@@ -845,11 +850,23 @@ async def main() -> None:
                                 await itn.message.edit(content="✅ Publicado exitosamente.")
                                 await _send_long(self.thread, res.get("message", "Post publicado."))
 
+                            @discord.ui.button(label="📋 Subir como Draft", style=discord.ButtonStyle.blurple)
+                            async def draft(self, itn, btn):
+                                approvers = _approvers()
+                                if approvers and str(itn.user.id) not in approvers:
+                                    if str(itn.user.id) != str(self.author.id):
+                                        await itn.response.send_message("No estás autorizado como aprobador.", ephemeral=True)
+                                        return
+                                await itn.response.edit_message(content="⏳ Guardando como draft...", view=None)
+                                res = await _send_assistant_request(self.draft_pld)
+                                await itn.message.edit(content="✅ Draft guardado.")
+                                await _send_long(self.thread, res.get("message", "Post guardado como draft."))
+
                             @discord.ui.button(label="❌ Rechazar", style=discord.ButtonStyle.red)
                             async def reject(self, itn, btn):
                                 await itn.response.send_modal(PostRejectModal(self.pld, self.thread, self.author))
 
-                        await thread.send(embed=embed, view=PostApprovalView(approval_payload, message.author, thread))
+                        await thread.send(embed=embed, view=PostApprovalView(approval_payload, draft_payload, message.author, thread))
                     else:
                         embed = discord.Embed(
                             title="⚖️ Aprobación de Marketing Requerida",
