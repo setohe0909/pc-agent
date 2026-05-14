@@ -307,6 +307,29 @@ class MarketingGraphRegressionTests(unittest.TestCase):
 
         asyncio.run(scenario())
 
+    def test_publish_post_uses_payload_media_urls(self):
+        async def scenario():
+            marketing = FakeMarketing()
+            graph = MarketingGraph(llm=FakeLLM(), memory=FakeMemory(), marketing=marketing)
+
+            result = await graph.run(
+                prompt="Texto base del post",
+                payload={
+                    "sub_command": "publish",
+                    "is_approved": True,
+                    "platform": "instagram",
+                    "media_urls": ["https://cdn.example.com/post.png"],
+                    "account_id": "acc_123",
+                },
+                images=[b"local image bytes"],
+            )
+
+            self.assertEqual(result["status"], "success")
+            self.assertEqual(marketing.published_posts[0]["media_urls"], ["https://cdn.example.com/post.png"])
+            self.assertEqual(marketing.published_posts[0]["account_id"], "acc_123")
+
+        asyncio.run(scenario())
+
     def test_internal_key_errors_are_reported_with_context(self):
         request = AssistantRequest(
             action_type=ActionType.marketing,

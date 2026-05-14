@@ -184,7 +184,7 @@ class MarketingAutomationTests(unittest.TestCase):
 
         asyncio.run(scenario())
 
-    def test_approved_posts_only_schedule_when_writes_enabled(self):
+    def test_approved_post_queue_saves_zernio_drafts_when_writes_enabled(self):
         async def scenario():
             marketing = FakeMarketing()
             service = MarketingAutomationService(FakeLLM(), marketing, FakeMemory())
@@ -192,11 +192,15 @@ class MarketingAutomationTests(unittest.TestCase):
             result = await service.generate_post_queue("lanzar nueva colección", {"autonomy_level": "assisted", "is_approved": True})
             self.assertEqual(result["status"], "success")
             self.assertEqual(marketing.scheduled_posts, [])
+            self.assertEqual(marketing.published_posts, [])
 
             os.environ["MARKETER_ALLOW_WRITES"] = "true"
             result = await service.generate_post_queue("lanzar nueva colección", {"autonomy_level": "assisted", "is_approved": True})
             self.assertEqual(result["status"], "success")
-            self.assertGreater(len(marketing.scheduled_posts), 0)
+            self.assertEqual(marketing.scheduled_posts, [])
+            self.assertTrue(marketing.published_posts)
+            self.assertTrue(all(post.get("draft") for post in marketing.published_posts))
+            self.assertIn("drafts en Zernio", result["message"])
 
         asyncio.run(scenario())
 

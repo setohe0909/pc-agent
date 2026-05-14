@@ -357,11 +357,11 @@ class MarketingGraph:
                 content = action.get("arguments", {}).get("content") or state["prompt"]
                 payload = state.get("payload", {})
                 inner = payload.get("payload", {})
-                platform = action.get("arguments", {}).get("platform") or inner.get("platform") or payload.get("platform", "instagram")
-                scheduled_for = inner.get("scheduled_for") or payload.get("scheduled_for")
-                import base64
-                media = [base64.b64encode(img).decode("utf-8") for img in (state.get("images") or [])]
-                result = await self.automation.publish_post(content, media=media, platform=platform, scheduled_for=scheduled_for, payload=inner)
+                effective_payload = {**payload, **inner}
+                platform = action.get("arguments", {}).get("platform") or effective_payload.get("platform", "instagram")
+                scheduled_for = effective_payload.get("scheduled_for")
+                media_urls = effective_payload.get("media_urls") or []
+                result = await self.automation.publish_post(content, media_urls=media_urls, platform=platform, scheduled_for=scheduled_for, payload=effective_payload)
                 if result.get("status") == "requires_approval" and result.get("suggestion"):
                     await self.memory.save_interaction("marketer", {
                         "role": "assistant",
@@ -370,7 +370,7 @@ class MarketingGraph:
                 elif result.get("status") == "success":
                     await self.memory.save_interaction("marketer", {
                         "role": "assistant",
-                        "content": f"Post {'publicado' if not inner.get('draft') else 'guardado como draft'} en {platform}: {result.get('message', '')[:200]}"
+                        "content": f"Post {'publicado' if not effective_payload.get('draft') else 'guardado como draft'} en {platform}: {result.get('message', '')[:200]}"
                     })
             elif "qualify" in tool_name:
                 result = await self._qualify_leads(state.get("payload", {}))

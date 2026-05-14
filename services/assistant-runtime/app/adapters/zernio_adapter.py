@@ -127,17 +127,25 @@ class ZernioAdapter(MarketingPort):
             self._accounts_cache = []
         return self._accounts_cache
 
+    async def _get_accounts_for_platform(self, platform: str) -> list[dict]:
+        return [
+            acc for acc in await self._fetch_accounts()
+            if acc.get("platform") == platform and acc.get("isActive", True)
+        ]
+
     async def _get_account_id(self, platform: str) -> str | None:
-        for acc in await self._fetch_accounts():
-            if acc.get("platform") == platform:
-                return acc.get("_id")
+        accounts = await self._get_accounts_for_platform(platform)
+        if len(accounts) == 1:
+            return accounts[0].get("_id")
+        if len(accounts) > 1:
+            print(f"[ZERNIO] Hay varias cuentas {platform}; especifica account_id.")
         return None
 
-    async def _get_account_ids(self) -> dict[str, str]:
-        result = {}
-        for acc in await self._fetch_accounts():
-            result[acc.get("platform")] = acc.get("_id")
-        return result
+    async def _resolve_account_id(self, platform: str, post: dict) -> str | None:
+        explicit = post.get("account_id") or post.get("accountId")
+        if explicit:
+            return explicit
+        return await self._get_account_id(platform)
 
     # ------------------------------------------------------------------
     # MarketingPort implementation
@@ -878,22 +886,44 @@ class ZernioAdapter(MarketingPort):
         return False
 
     def _build_media_items(self, post: dict) -> list[dict] | None:
+        existing = post.get("mediaItems")
+        if existing:
+            return existing
         urls = post.get("media_urls") or post.get("mediaUrls")
         if not urls:
             return None
-        return [{"url": u, "type": "image"} for u in urls]
+        items = []
+        for url in urls:
+            if not isinstance(url, str) or not url.startswith(("http://", "https://")):
+                print("[ZERNIO] Ignorando media no compatible: Zernio requiere URLs públicas en mediaItems.")
+                continue
+            media_type = "video" if url.lower().split("?")[0].endswith((".mp4", ".mov", ".webm")) else "image"
+            items.append({"url": url, "type": media_type})
+        return items or None
 
     def _format_scheduled_for(self, raw: str) -> str:
         return raw.replace(" ", "T") if "T" not in raw else raw
 
+    def _post_content(self, post: dict) -> str:
+        if post.get("content"):
+            return post["content"]
+        pieces = [
+            post.get("hook", ""),
+            post.get("caption", ""),
+            post.get("cta", ""),
+            " ".join(post.get("hashtags", [])),
+        ]
+        return "\n\n".join(piece for piece in pieces if piece).strip()
+
     async def schedule_post(self, post: dict) -> bool:
         print(f"[ZERNIO] Programando post via Zernio API")
         platform = post.get("platform", "instagram")
-        account_ids = await self._get_account_ids()
-        account_id = account_ids.get(platform)
+        account_id = await self._resolve_account_id(platform, post)
+        if not account_id:
+            return False
 
         zernio_payload = {
-            "content": post.get("content", post.get("title", "")),
+            "content": self._post_content(post),
             "platforms": [
                 {"platform": platform, "accountId": account_id}
             ],
@@ -910,16 +940,18 @@ class ZernioAdapter(MarketingPort):
     async def publish_post(self, post: dict) -> bool:
         print(f"[ZERNIO] Publicando post via Zernio API")
         platform = post.get("platform", "instagram")
-        account_ids = await self._get_account_ids()
-        account_id = account_ids.get(platform)
+        account_id = await self._resolve_account_id(platform, post)
+        if not account_id and not post.get("draft"):
+            return False
 
         zernio_payload = {
-            "content": post.get("content", post.get("title", "")),
-            "platforms": [
-                {"platform": platform, "accountId": account_id}
-            ],
+            "content": self._post_content(post),
         }
-        if not post.get("draft"):
+        if account_id:
+            zernio_payload["platforms"] = [{"platform": platform, "accountId": account_id}]
+        if post.get("draft"):
+            zernio_payload["isDraft"] = True
+        else:
             zernio_payload["publishNow"] = True
         media_items = self._build_media_items(post)
         if media_items:

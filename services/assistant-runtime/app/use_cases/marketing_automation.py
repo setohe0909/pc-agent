@@ -83,8 +83,8 @@ class MarketingAutomationService:
             allowed, reason = policy.can_execute_write(approved=True)
             if allowed:
                 for post in posts:
-                    await self.marketing.schedule_post(post.to_dict())
-                status_note = "Posts aprobados y enviados a programación vía Zernio."
+                    await self.marketing.publish_post({**post.to_dict(), "draft": True})
+                status_note = "Posts aprobados y guardados como drafts en Zernio. Para programar se necesita scheduledFor ISO o una cola Zernio."
             else:
                 status_note = f"Posts aprobados como borradores. No se programaron: {reason}"
             await self.marketing.save_automation_run({
@@ -375,7 +375,7 @@ class MarketingAutomationService:
             return "Por definir"
         return values[min(index, len(values) - 1)]
 
-    async def publish_post(self, content: str, media: list[str] | None = None,
+    async def publish_post(self, content: str, media_urls: list[str] | None = None,
                            platform: str = "instagram",
                            scheduled_for: str | None = None,
                            payload: dict | None = None) -> dict:
@@ -407,15 +407,14 @@ class MarketingAutomationService:
             hashtags = await self._generate_hashtags(content)
             caption = f"{content}\n\n{' '.join(hashtags)}"
 
-        media_urls = []
-        if media:
-            for b64_data in media:
-                media_urls.append(f"data:image/png;base64,{b64_data}")
         post_data = {
             "platform": platform,
             "content": caption,
-            "media_urls": media_urls,
+            "media_urls": media_urls or payload.get("media_urls") or payload.get("mediaUrls") or [],
         }
+        account_id = payload.get("account_id") or payload.get("accountId")
+        if account_id:
+            post_data["account_id"] = account_id
         if payload.get("draft"):
             post_data["draft"] = True
             ok = await self.marketing.publish_post(post_data)

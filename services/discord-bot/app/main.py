@@ -656,12 +656,16 @@ async def main() -> None:
 
             # Capturar imágenes/video adjuntos
             images_b64 = []
+            media_urls = []
             if message.attachments:
                 import base64
                 for att in message.attachments:
                     if any(att.filename.lower().endswith(ext) for ext in [".png", ".jpg", ".jpeg", ".webp"]):
                         img_data = await att.read()
                         images_b64.append(base64.b64encode(img_data).decode("utf-8"))
+                        media_urls.append(att.url)
+                    elif any(att.filename.lower().endswith(ext) for ext in [".mp4", ".mov", ".webm"]):
+                        media_urls.append(att.url)
 
             extra = {}
             if raw_query.startswith("post "):
@@ -672,6 +676,10 @@ async def main() -> None:
                 if plat_match:
                     extra["platform"] = plat_match.group(1).lower()
                     rest = rest.replace(plat_match.group(0), "")
+                account_match = _re.search(r'--account\s+(\S+)', rest)
+                if account_match:
+                    extra["account_id"] = account_match.group(1)
+                    rest = rest.replace(account_match.group(0), "")
                 sched_match = _re.search(r'--schedule\s+"([^"]+)"', rest)
                 if sched_match:
                     extra["scheduled_for"] = sched_match.group(1)
@@ -772,7 +780,7 @@ async def main() -> None:
                 "prompt": prompt,
                 "source": {"platform": "discord", "channel_id": str(thread.id), "user_id": str(message.author.id)},
                 "images": images_b64,
-                "payload": {"sub_command": sub_command, "autonomy_level": "assisted", "is_approved": is_approved_marketing, **extra}
+                "payload": {"sub_command": sub_command, "autonomy_level": "assisted", "is_approved": is_approved_marketing, "media_urls": media_urls, **extra}
             }
             
             await thread.send(f"📣 **Marketer Agent procesando `{sub_command}`...**")
