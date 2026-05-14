@@ -178,9 +178,11 @@ class MarketingGraph:
 
     async def _initialize_node(self, state: MarketingState) -> dict:
         print("[GRAPH] v0.4.0 - Iniciando...")
+        outer = state.get("payload", {})
+        inner = outer.get("payload", {})
         return {
-            "sub_command": state.get("payload", {}).get("sub_command", "chat"),
-            "is_approved": state.get("payload", {}).get("is_approved", False),
+            "sub_command": inner.get("sub_command") or outer.get("sub_command", "chat"),
+            "is_approved": inner.get("is_approved", False) or outer.get("is_approved", False),
             "errors": []
         }
 
@@ -341,18 +343,21 @@ class MarketingGraph:
                 result = await self._get_best_hours()
             elif tool_name == "create_campaign":
                 topic = action.get("arguments", {}).get("topic") or state["prompt"]
-                result = await self.automation.plan_campaign(topic, payload=state.get("payload", {}), context=state.get("context", ""))
+                outer = state.get("payload", {})
+                result = await self.automation.plan_campaign(topic, payload=outer.get("payload", outer), context=state.get("context", ""))
             elif tool_name == "generate_post_queue":
                 topic = action.get("arguments", {}).get("topic") or state["prompt"]
-                result = await self.automation.generate_post_queue(topic, payload=state.get("payload", {}), context=state.get("context", ""))
+                outer = state.get("payload", {})
+                result = await self.automation.generate_post_queue(topic, payload=outer.get("payload", outer), context=state.get("context", ""))
             elif tool_name == "publish_post":
                 content = action.get("arguments", {}).get("content") or state["prompt"]
                 payload = state.get("payload", {})
-                platform = action.get("arguments", {}).get("platform") or payload.get("platform", "instagram")
-                scheduled_for = action.get("arguments", {}).get("scheduled_for") or payload.get("scheduled_for")
+                inner = payload.get("payload", {})
+                platform = action.get("arguments", {}).get("platform") or inner.get("platform") or payload.get("platform", "instagram")
+                scheduled_for = action.get("arguments", {}).get("scheduled_for") or inner.get("scheduled_for") or payload.get("scheduled_for")
                 import base64
                 media = [base64.b64encode(img).decode("utf-8") for img in (state.get("images") or [])]
-                result = await self.automation.publish_post(content, media=media, platform=platform, scheduled_for=scheduled_for, payload=payload)
+                result = await self.automation.publish_post(content, media=media, platform=platform, scheduled_for=scheduled_for, payload=inner)
             elif "qualify" in tool_name:
                 result = await self._qualify_leads(state.get("payload", {}))
             elif "trends" in tool_name:
@@ -412,16 +417,17 @@ class MarketingGraph:
         return {"results": {"status": "success", "message": res}}
 
     async def run(self, prompt: str, payload: dict, images: List[bytes] = None) -> dict:
+        inner_payload = payload.get("payload", {})
         initial_state = {
             "prompt": prompt,
             "images": images,
             "payload": payload,
-            "sub_command": payload.get("sub_command", "chat"),
+            "sub_command": inner_payload.get("sub_command") or payload.get("sub_command", "chat"),
             "context": "",
             "suggested_action": payload.get("suggested_action"),
             "tool_results": None,
             "requires_approval": False,
-            "is_approved": payload.get("is_approved", False),
+            "is_approved": inner_payload.get("is_approved", False) or payload.get("is_approved", False),
             "is_criticized": False,
             "critic_feedback": None,
             "refined_message": None,
