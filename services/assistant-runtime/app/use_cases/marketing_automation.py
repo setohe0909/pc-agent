@@ -377,9 +377,36 @@ class MarketingAutomationService:
 
     async def publish_post(self, content: str, media: list[str] | None = None,
                            platform: str = "instagram",
-                           scheduled_for: str | None = None) -> dict:
-        hashtags = await self._generate_hashtags(content)
-        caption = f"{content}\n\n{' '.join(hashtags)}"
+                           scheduled_for: str | None = None,
+                           payload: dict | None = None) -> dict:
+        payload = payload or {}
+
+        if not payload.get("is_approved"):
+            enhanced_desc = await self._enhance_description(content)
+            hashtags = await self._generate_hashtags(enhanced_desc)
+            caption = f"{enhanced_desc}\n\n{' '.join(hashtags)}"
+            return {
+                "status": "requires_approval",
+                "requires_approval": True,
+                "message": (
+                    f"📝 **Sugerencia de publicación para {platform}:**\n\n"
+                    f"{enhanced_desc}\n\n"
+                    f"**Hashtags:** {' '.join(hashtags)}"
+                ),
+                "suggestion": {
+                    "enhanced_description": enhanced_desc,
+                    "hashtags": hashtags,
+                    "caption": caption,
+                },
+            }
+
+        suggestion = payload.get("suggestion")
+        if suggestion:
+            caption = suggestion.get("caption", content)
+        else:
+            hashtags = await self._generate_hashtags(content)
+            caption = f"{content}\n\n{' '.join(hashtags)}"
+
         media_urls = []
         if media:
             for b64_data in media:
@@ -400,6 +427,20 @@ class MarketingAutomationService:
                 "message": f"Post {'programado' if scheduled_for else 'publicado'} en {platform}.\n\n{caption}",
             }
         return {"status": "error", "message": f"No se pudo {'programar' if scheduled_for else 'publicar'} el post en {platform}."}
+
+    async def _enhance_description(self, content: str) -> str:
+        prompt = (
+            "Eres un copywriter experto en marketing para Instagram y TikTok en español. "
+            "Mejora la siguiente descripción para un post, haciéndola más atractiva, "
+            "con llamada a la acción y emojis relevantes. "
+            "Devuelve SOLO el texto mejorado, sin explicaciones ni hashtags.\n\n"
+            f"Descripción original: {content}"
+        )
+        try:
+            enhanced = await self.llm.chat(prompt)
+            return enhanced.strip()
+        except Exception:
+            return content
 
     async def _generate_hashtags(self, content: str) -> list[str]:
         prompt = (

@@ -781,36 +781,107 @@ async def main() -> None:
                 msg = result.get("message", "No hubo respuesta.")
                 
                 if result.get("status") == "requires_approval":
-                    embed = discord.Embed(
-                        title="⚖️ Aprobación de Marketing Requerida",
-                        description=msg,
-                        color=discord.Color.orange()
-                    )
-                    approval_payload = payload.copy()
-                    approval_payload["payload"]["is_approved"] = True
-                    
-                    class MarketingApprovalView(View):
-                        def __init__(self, pld, author):
-                            super().__init__(timeout=120)
-                            self.pld = pld
-                            self.author = author
-                        @discord.ui.button(label="✅ Aprobar Ejecución", style=discord.ButtonStyle.green)
-                        async def approve(self, itn, btn):
-                            approvers = _approvers()
-                            if approvers and str(itn.user.id) not in approvers:
-                                if str(itn.user.id) != str(self.author.id):
-                                    await itn.response.send_message("No estás autorizado como aprobador.", ephemeral=True)
-                                    return
-                            
-                            await itn.response.edit_message(content="⏳ Ejecutando acción aprobada...", view=None)
-                            res = await _send_assistant_request(self.pld)
-                            await itn.message.edit(content="✅ Acción aprobada. Resultado enviado debajo.")
-                            await _send_long(thread, res.get("message", "Acción completada."))
-                        @discord.ui.button(label="❌ Denegar", style=discord.ButtonStyle.red)
-                        async def deny(self, itn, btn):
-                            await itn.response.edit_message(content="🚫 Acción denegada.", embed=None, view=None)
+                    if sub_command == "publish" and result.get("suggestion"):
+                        suggestion = result["suggestion"]
+                        embed = discord.Embed(
+                            title="📝 Vista Previa del Post",
+                            description=(
+                                f"{suggestion['enhanced_description']}\n\n"
+                                f"**Hashtags:** {' '.join(suggestion['hashtags'])}"
+                            ),
+                            color=discord.Color.purple()
+                        )
+                        embed.set_footer(text="¿Publicar con esta sugerencia o escribir tu propio texto?")
 
-                    await thread.send(embed=embed, view=MarketingApprovalView(approval_payload, message.author))
+                        approval_payload = {
+                            **payload,
+                            "payload": {**payload["payload"], "is_approved": True, "suggestion": suggestion},
+                        }
+
+                        class PostRejectModal(discord.ui.Modal, title="Tu descripción personalizada"):
+                            custom_text = discord.ui.TextInput(
+                                label="Descripción del post",
+                                style=discord.TextStyle.paragraph,
+                                placeholder="Escribe tu propia descripción para el post...",
+                                required=True,
+                                max_length=2000,
+                            )
+
+                            def __init__(self, pld, thread, author):
+                                super().__init__()
+                                self.pld = pld
+                                self.thread = thread
+                                self.author = author
+
+                            async def on_submit(self, interaction: discord.Interaction):
+                                publish_pld = {
+                                    **self.pld,
+                                    "prompt": self.custom_text.value,
+                                    "payload": {**self.pld["payload"], "is_approved": True},
+                                }
+                                publish_pld["payload"].pop("suggestion", None)
+                                await interaction.response.edit_message(
+                                    content="⏳ Publicando con tu texto personalizado...", view=None, embed=None
+                                )
+                                res = await _send_assistant_request(publish_pld)
+                                await self.thread.send(res.get("message", "Post publicado."))
+
+                        class PostApprovalView(View):
+                            def __init__(self, pld, author, thread):
+                                super().__init__(timeout=120)
+                                self.pld = pld
+                                self.author = author
+                                self.thread = thread
+
+                            @discord.ui.button(label="✅ Aceptar", style=discord.ButtonStyle.green)
+                            async def accept(self, itn, btn):
+                                approvers = _approvers()
+                                if approvers and str(itn.user.id) not in approvers:
+                                    if str(itn.user.id) != str(self.author.id):
+                                        await itn.response.send_message("No estás autorizado como aprobador.", ephemeral=True)
+                                        return
+                                await itn.response.edit_message(content="⏳ Publicando con la sugerencia...", view=None)
+                                res = await _send_assistant_request(self.pld)
+                                await itn.message.edit(content="✅ Publicado exitosamente.")
+                                await _send_long(self.thread, res.get("message", "Post publicado."))
+
+                            @discord.ui.button(label="❌ Rechazar", style=discord.ButtonStyle.red)
+                            async def reject(self, itn, btn):
+                                await itn.response.send_modal(PostRejectModal(self.pld, self.thread, self.author))
+
+                        await thread.send(embed=embed, view=PostApprovalView(approval_payload, message.author, thread))
+                    else:
+                        embed = discord.Embed(
+                            title="⚖️ Aprobación de Marketing Requerida",
+                            description=msg,
+                            color=discord.Color.orange()
+                        )
+                        approval_payload = {
+                            **payload,
+                            "payload": {**payload["payload"], "is_approved": True},
+                        }
+
+                        class MarketingApprovalView(View):
+                            def __init__(self, pld, author):
+                                super().__init__(timeout=120)
+                                self.pld = pld
+                                self.author = author
+                            @discord.ui.button(label="✅ Aprobar Ejecución", style=discord.ButtonStyle.green)
+                            async def approve(self, itn, btn):
+                                approvers = _approvers()
+                                if approvers and str(itn.user.id) not in approvers:
+                                    if str(itn.user.id) != str(self.author.id):
+                                        await itn.response.send_message("No estás autorizado como aprobador.", ephemeral=True)
+                                        return
+                                await itn.response.edit_message(content="⏳ Ejecutando acción aprobada...", view=None)
+                                res = await _send_assistant_request(self.pld)
+                                await itn.message.edit(content="✅ Acción aprobada. Resultado enviado debajo.")
+                                await _send_long(thread, res.get("message", "Acción completada."))
+                            @discord.ui.button(label="❌ Denegar", style=discord.ButtonStyle.red)
+                            async def deny(self, itn, btn):
+                                await itn.response.edit_message(content="🚫 Acción denegada.", embed=None, view=None)
+
+                        await thread.send(embed=embed, view=MarketingApprovalView(approval_payload, message.author))
                     return
 
                 await _send_long(thread, msg)

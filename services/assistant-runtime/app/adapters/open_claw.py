@@ -30,7 +30,7 @@ class OpenClawLLMAdapter(LLMPort):
         provider = runtime_config.get("default_llm_provider") or os.getenv("DEFAULT_LLM_PROVIDER", "openai")
         
         if provider == "gemini":
-            model = "models/gemini-1.5-flash" if policy == "cheap" else "models/gemini-1.5-pro"
+            model = "models/gemini-2.0-flash-lite" if policy == "cheap" else "models/gemini-2.0-flash"
             return "gemini", model
         elif provider == "ollama":
             return "ollama", "llama3:latest"
@@ -43,10 +43,9 @@ class OpenClawLLMAdapter(LLMPort):
     async def _generate_with_fallback(self, prompt: str, system_instruction: str | None = None, response_mime_type: str = "text/plain", **kwargs) -> str:
         # Enfocamos en los modelos más estables y probables de tener cuota
         model_candidates = [
-            "models/gemini-1.5-flash",
-            "models/gemini-1.5-pro",
+            "models/gemini-2.0-flash-lite",
             "models/gemini-2.0-flash",
-            "models/gemini-2.0-flash-lite"
+            "models/gemini-2.5-flash",
         ]
         api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
         genai.configure(api_key=api_key)
@@ -216,9 +215,9 @@ class OpenClawLLMAdapter(LLMPort):
 
             model_candidates = [
                 model,
-                "models/gemini-1.5-flash",
                 "models/gemini-2.0-flash",
-                "models/gemini-1.5-pro",
+                "models/gemini-2.0-flash-lite",
+                "models/gemini-2.5-flash",
             ]
 
             last_exc = None

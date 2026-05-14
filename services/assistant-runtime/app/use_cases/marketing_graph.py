@@ -206,7 +206,7 @@ class MarketingGraph:
             "dashboard", "report", "status", "magnet", "funnel", "collab", "memory",
             "top-content", "audience", "alerts", "comments", "negative-comments",
             "reply-drafts", "leads", "content-plan", "repurpose", "best-hours",
-            "competitors", "campaign", "posts"
+            "competitors", "campaign", "posts", "publish"
         ]
         if state["sub_command"] in forced_cmds:
             tool_name = state["sub_command"]
@@ -352,7 +352,7 @@ class MarketingGraph:
                 scheduled_for = action.get("arguments", {}).get("scheduled_for") or payload.get("scheduled_for")
                 import base64
                 media = [base64.b64encode(img).decode("utf-8") for img in (state.get("images") or [])]
-                result = await self.automation.publish_post(content, media=media, platform=platform, scheduled_for=scheduled_for)
+                result = await self.automation.publish_post(content, media=media, platform=platform, scheduled_for=scheduled_for, payload=payload)
             elif "qualify" in tool_name:
                 result = await self._qualify_leads(state.get("payload", {}))
             elif "trends" in tool_name:

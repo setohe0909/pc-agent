@@ -58,11 +58,15 @@ class ZernioAdapter(MarketingPort):
 
     async def _z_post(self, path: str, data: dict) -> bool:
         if not self.api_key:
+            print("[ZERNIO] ZERNIO_API_KEY no configurada")
             return False
         url = f"{self.base_url}{path}"
         try:
             async with httpx.AsyncClient(timeout=15) as client:
                 resp = await client.post(url, headers=self._z_headers(), json=data)
+                if resp.status_code not in (200, 201, 204):
+                    body = resp.text[:500]
+                    print(f"[ZERNIO][HTTP {resp.status_code}] POST {path}: {body}")
                 return resp.status_code in (200, 201, 204)
         except Exception as e:
             print(f"[ZERNIO][ERROR] POST {path}: {e}")
