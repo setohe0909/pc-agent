@@ -42,6 +42,30 @@ def _approvers() -> set[str]:
     return {value.strip() for value in _get_env("DISCORD_APPROVER_USER_IDS", "").split(",") if value.strip()}
 
 
+def _extract_post_suggestion(message: str) -> dict | None:
+    if "Sugerencia de publicación" not in message or "Hashtags:" not in message:
+        return None
+
+    normalized = message.replace("\r\n", "\n")
+    body = re.split(r"Sugerencia de publicación para [^:\n]+:\s*", normalized, maxsplit=1)
+    if len(body) != 2:
+        return None
+
+    description, hashtags_text = body[1].split("Hashtags:", 1)
+    description = re.sub(r"^[\s*📝]+", "", description).strip()
+    description = re.sub(r"\*+\s*$", "", description).strip()
+    hashtags = re.findall(r"#\w+", hashtags_text)
+    if not description:
+        return None
+
+    caption = f"{description}\n\n{' '.join(hashtags)}".strip()
+    return {
+        "enhanced_description": description,
+        "hashtags": hashtags,
+        "caption": caption,
+    }
+
+
 async def main() -> None:
     token = None
     while not token:
@@ -789,8 +813,8 @@ async def main() -> None:
                 msg = result.get("message", "No hubo respuesta.")
                 
                 if result.get("status") == "requires_approval":
-                    if result.get("suggestion"):
-                        suggestion = result["suggestion"]
+                    suggestion = result.get("suggestion") or _extract_post_suggestion(msg)
+                    if suggestion:
                         embed = discord.Embed(
                             title="📝 Vista Previa del Post",
                             description=(

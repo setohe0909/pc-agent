@@ -115,6 +115,24 @@ def _format_internal_error(exc: Exception, request: AssistantRequest, stage: str
     }
 
 
+def _assistant_response(result: dict, request: AssistantRequest) -> dict:
+    return {
+        "status": result.get("status", "accepted"),
+        "provider": os.getenv("DEFAULT_LLM_PROVIDER", "openai"),
+        "message": result.get("message") or "El asistente no pudo generar una respuesta de texto.",
+        "order": result.get("order"),
+        "critic_note": result.get("critic_note"),
+        "warnings": result.get("warnings", []),
+        "dashboard": result.get("dashboard"),
+        "campaign": result.get("campaign"),
+        "posts": result.get("posts"),
+        "actions": result.get("actions", []),
+        "suggestion": result.get("suggestion"),
+        "requires_approval": result.get("requires_approval", result.get("status") == "requires_approval"),
+        "input": request.model_dump(),
+    }
+
+
 @app.get("/health")
 async def health() -> dict:
     return {"status": "ok", "service": "assistant-runtime"}
@@ -194,20 +212,7 @@ async def assistant_request(request: AssistantRequest) -> dict:
         # DEBUG: Ver que esta devolviendo el workflow
         print(f"[DEBUG] Workflow result: {result}")
 
-        return {
-            "status": result.get("status", "accepted"),
-            "provider": os.getenv("DEFAULT_LLM_PROVIDER", "openai"),
-            "message": result.get("message") or "El asistente no pudo generar una respuesta de texto.",
-            "order": result.get("order"),
-            "critic_note": result.get("critic_note"),
-            "warnings": result.get("warnings", []),
-            "dashboard": result.get("dashboard"),
-            "campaign": result.get("campaign"),
-            "posts": result.get("posts"),
-            "actions": result.get("actions", []),
-            "requires_approval": result.get("requires_approval", result.get("status") == "requires_approval"),
-            "input": request.model_dump(),
-        }
+        return _assistant_response(result, request)
     except Exception as exc:
         import traceback
         error_trace = traceback.format_exc()

@@ -6,7 +6,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from app.adapters.open_claw import OpenClawLLMAdapter
-from app.main import ActionType, AssistantRequest, Source, _format_internal_error
+from app.main import ActionType, AssistantRequest, Source, _assistant_response, _format_internal_error
 from app.use_cases.marketing_graph import MarketingGraph
 
 
@@ -344,6 +344,31 @@ class MarketingGraphRegressionTests(unittest.TestCase):
         self.assertIn("subcomando `chat`", result["message"])
         self.assertIn("schema de herramientas", result["hint"])
         self.assertIn("object", result["error_detail"])
+
+    def test_assistant_response_preserves_post_suggestion_for_discord_approval(self):
+        request = AssistantRequest(
+            action_type=ActionType.marketing,
+            prompt="nuevo andes",
+            source=Source(platform="discord", user_id="123"),
+            payload={"sub_command": "publish"},
+        )
+        suggestion = {
+            "enhanced_description": "Descripción aprobada",
+            "hashtags": ["#Andes", "#Aventura"],
+            "caption": "Descripción aprobada\n\n#Andes #Aventura",
+        }
+
+        response = _assistant_response(
+            {
+                "status": "requires_approval",
+                "message": "preview",
+                "suggestion": suggestion,
+            },
+            request,
+        )
+
+        self.assertEqual(response["suggestion"], suggestion)
+        self.assertTrue(response["requires_approval"])
 
 
 if __name__ == "__main__":
