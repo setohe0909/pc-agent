@@ -30,8 +30,7 @@ class OpenClawLLMAdapter(LLMPort):
         provider = runtime_config.get("default_llm_provider") or os.getenv("DEFAULT_LLM_PROVIDER", "openai")
         
         if provider == "gemini":
-            # Usamos los alias 'latest' que el escaneo confirmo como disponibles
-            model = "models/gemini-flash-latest" if policy == "cheap" else "models/gemini-pro-latest"
+            model = "models/gemini-1.5-flash" if policy == "cheap" else "models/gemini-1.5-pro"
             return "gemini", model
         elif provider == "ollama":
             return "ollama", "llama3:latest"
@@ -211,40 +210,55 @@ class OpenClawLLMAdapter(LLMPort):
         provider, model = self._get_provider_info(policy="smart")
         
         if provider == "gemini":
-            try:
-                api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
-                genai.configure(api_key=api_key)
-                
-                # Convertir esquemas de herramientas a formato Gemini
-                
-                model_instance = genai.GenerativeModel(
-                    model_name=model, 
-                    system_instruction=system_instruction,
-                    tools=self._to_gemini_tools(tools)
-                )
-                
-                chat = model_instance.start_chat()
-                response = await chat.send_message_async(prompt)
-                
-                # Extraer llamadas a funciones
-                fc = response.candidates[0].content.parts[0].function_call
-                if fc:
-                    return {
-                        "tool_name": fc.name,
-                        "arguments": dict(fc.args)
-                    }
-                return {"message": response.text}
-            except Exception as exc:
-                if self._is_schema_key_error(exc):
+            api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+            genai.configure(api_key=api_key)
+            gemini_tools = self._to_gemini_tools(tools)
+
+            model_candidates = [
+                model,
+                "models/gemini-1.5-flash",
+                "models/gemini-2.0-flash",
+                "models/gemini-1.5-pro",
+            ]
+
+            last_exc = None
+            for candidate in model_candidates:
+                try:
+                    model_instance = genai.GenerativeModel(
+                        model_name=candidate,
+                        system_instruction=system_instruction,
+                        tools=gemini_tools,
+                    )
+                    chat = model_instance.start_chat()
+                    response = await chat.send_message_async(prompt)
+                    fc = response.candidates[0].content.parts[0].function_call
+                    if fc:
+                        return {
+                            "tool_name": fc.name,
+                            "arguments": dict(fc.args),
+                        }
+                    return {"message": response.text}
+                except Exception as exc:
+                    last_exc = exc
+                    err_str = str(exc)
+                    if "429" in err_str or "quota" in err_str.lower() or "Quota" in err_str:
+                        print(f"[OPEN CLAW WARNING] Cuota excedida en {candidate}, probando siguiente...", file=sys.stderr)
+                        continue
+                    if self._is_schema_key_error(exc):
+                        raise RuntimeError(
+                            "La detección de herramientas con Gemini falló por un schema JSON incompatible "
+                            f"({exc!r}). Esto suele pasar cuando Gemini recibe tipos como 'object'/'string' "
+                            "sin traducir a su formato interno. Revisa que assistant-runtime esté corriendo "
+                            "con la versión actualizada y reinicia el servicio si sigue usando una imagen anterior."
+                        ) from exc
                     raise RuntimeError(
-                        "La detección de herramientas con Gemini falló por un schema JSON incompatible "
-                        f"({exc!r}). Esto suele pasar cuando Gemini recibe tipos como 'object'/'string' "
-                        "sin traducir a su formato interno. Revisa que assistant-runtime esté corriendo "
-                        "con la versión actualizada y reinicia el servicio si sigue usando una imagen anterior."
+                        f"Falló la detección de intención con Gemini usando el modelo {candidate}: {exc}"
                     ) from exc
-                raise RuntimeError(
-                    f"Falló la detección de intención con Gemini usando el modelo {model}: {exc}"
-                ) from exc
+
+            raise RuntimeError(
+                "⚠️ Todos los modelos de Gemini han agotado su cuota (429). "
+                "Configura una OPENAI_API_KEY en .env o intenta más tarde."
+            ) from last_exc
         else:
             # Fallback a LiteLLM (que soporta tool calling para OpenAI/Anthropic)
             try:

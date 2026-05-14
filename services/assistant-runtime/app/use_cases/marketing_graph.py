@@ -67,7 +67,8 @@ class MarketingGraph:
                         "topic": {"type": "string", "description": "Tema de la campaña"},
                         "goal": {"type": "string", "description": "Objetivo (ventas, awareness)"}
                     },
-                "required": ["topic"]
+                    "required": ["topic"]
+                },
             },
             {
                 "name": "publish_post",
