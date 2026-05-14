@@ -64,7 +64,7 @@ class IngestionScheduleRequest(BaseModel):
 
 
 class TriggerIngestionRequest(BaseModel):
-    target: str = Field(pattern="^(markets|trends|mentis|all)$")
+    target: str = Field(pattern="^(markets|trends|mentis|consolidation|all)$")
 
 
 @router.get("/health")

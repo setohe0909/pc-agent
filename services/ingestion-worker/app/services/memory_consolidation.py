@@ -8,7 +8,7 @@ import os
 class MemoryConsolidationService:
     def __init__(self):
         self.supabase_url = settings.supabase_url
-        self.supabase_key = settings.supabase_service_role_key
+        self.supabase_key = settings.supabase_service_role_key or settings.supabase_publishable_key
         api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
         if api_key:
             genai.configure(api_key=api_key)
