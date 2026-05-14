@@ -1,4 +1,8 @@
-# PC Agent
+<p align="center">
+  <img src="docs/assets/pc-agent-logo.png" alt="PC Agent logo" width="260" />
+</p>
+
+<h1 align="center">PC Agent</h1>
 
 [![Version](https://img.shields.io/badge/version-0.5.0-blue.svg)](VERSION)
 [![Python](https://img.shields.io/badge/python-3.10+-3776AB.svg)](services/assistant-runtime/requirements.txt)
