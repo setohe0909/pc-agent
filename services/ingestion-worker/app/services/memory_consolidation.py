@@ -12,14 +12,19 @@ class MemoryConsolidationService:
         api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
         if api_key:
             genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel("models/gemini-2.0-flash") # Usamos 2.0 Flash para mejor razonamiento
+        self.models_to_try = [] # Se poblará dinámicamente
+        self.model = None
 
     async def run_consolidation(self):
         print("[MEMORY] Iniciando consolidación de memoria diaria...")
         
         # 1. Obtener memorias de las últimas 24 horas
-        yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
+        yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
         
+        if not self.supabase_key:
+            print("[MEMORY ERROR] No hay API Key de Supabase configurada.")
+            return
+
         headers = {
             "apikey": self.supabase_key,
             "Authorization": f"Bearer {self.supabase_key}",
@@ -80,19 +85,19 @@ class MemoryConsolidationService:
                             f"Genera el nuevo estado consolidado de esta memoria:"
                         )
                         
-                        response = await self.model.generate_content_async(prompt)
-                        summary = response.text
+                        summary = await self._generate_with_fallback(prompt)
                         
-                        consolidated_summaries.append({
-                            "category": f"consolidated_{cat}",
-                            "summary": summary,
-                            "metadata": {
-                                "type": "long_term_consolidation", 
-                                "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-                                "batch": i//batch_size + 1,
-                                "recursive": True
-                            }
-                        })
+                        if summary:
+                            consolidated_summaries.append({
+                                "category": f"consolidated_{cat}",
+                                "summary": summary,
+                                "metadata": {
+                                    "type": "long_term_consolidation", 
+                                    "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                                    "batch": i//batch_size + 1,
+                                    "recursive": True
+                                }
+                            })
 
                 # 4. Guardar los resúmenes consolidados en Supabase (usando la misma tabla por ahora con un flag de consolidado)
                 # O podríamos guardarlos en una tabla de 'knowledge' dedicada
@@ -109,6 +114,47 @@ class MemoryConsolidationService:
                 
             except Exception as e:
                 print(f"[MEMORY CRITICAL ERROR] {e}")
+
+    async def _generate_with_fallback(self, prompt: str) -> str | None:
+        """Intenta generar contenido probando todos los modelos de Gemini disponibles"""
+        # 1. Poblar lista de modelos si está vacía
+        if not self.models_to_try:
+            try:
+                print("[MEMORY] Consultando modelos Gemini disponibles...")
+                all_models = genai.list_models()
+                # Filtrar solo modelos que soporten generateContent y tengan nombre corto usable
+                self.models_to_try = [
+                    m.name.replace("models/", "") 
+                    for m in all_models 
+                    if 'generateContent' in m.supported_generation_methods
+                ]
+                # Ordenar para priorizar Flash (opcional)
+                self.models_to_try.sort(key=lambda x: ("flash" not in x.lower(), x))
+                print(f"[MEMORY] Modelos detectados: {', '.join(self.models_to_try)}")
+            except Exception as e:
+                print(f"[MEMORY ERROR] Error listando modelos: {e}")
+                return None
+
+        # 2. Iterar por cada modelo hasta que uno funcione
+        for model_name in self.models_to_try:
+            try:
+                print(f"[MEMORY] Intentando con: {model_name}")
+                model = genai.GenerativeModel(model_name)
+                response = await model.generate_content_async(prompt)
+                if response and response.text:
+                    return response.text
+            except Exception as e:
+                # Solo logueamos el error si no es un 404/429 común
+                msg = str(e)
+                if "429" in msg:
+                    print(f"[MEMORY FALLBACK] Quota excedida para {model_name}")
+                elif "404" in msg:
+                    print(f"[MEMORY FALLBACK] Modelo {model_name} no disponible")
+                else:
+                    print(f"[MEMORY FALLBACK] Error con {model_name}: {msg[:50]}...")
+                continue
+            
+        return None
 
     async def notify_discord(self, message: str):
         if not settings.discord_notifications_channel_id: return
