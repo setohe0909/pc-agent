@@ -327,8 +327,8 @@ class MarketingGraph:
                 result = {"status": "success", "message": f"🚀 **Campaña Iniciada**: {state.get('refined_message', 'Procesada.')}"}
             elif "dashboard" in tool_name:
                 data = await self.marketing.get_dashboard()
-                msg = f"## 📊 Dashboard Zernio\n\n```json\n{json.dumps(data.get('metrics', {}), indent=2)}\n```\n\nEstado: Conectado vía Zernio."
-                result = {"status": "success", "message": msg}
+                msg = self._format_dashboard(data)
+                result = {"status": "success", "message": msg, "dashboard": data}
             elif "report" in tool_name:
                 report_type = action.get("arguments", {}).get("report_type", "general")
                 data = await self.marketing.generate_report(report_type)
@@ -397,6 +397,64 @@ class MarketingGraph:
         return final_state.get("results")
 
     # --- Business Logic ---
+    def _format_dashboard(self, data: dict) -> str:
+        metrics = data.get("metrics", {})
+        platforms = data.get("platforms", {})
+        instagram = platforms.get("instagram", {})
+        tiktok = platforms.get("tiktok", {})
+        audience = data.get("audience", {})
+        recommendations = data.get("recommendations", [])
+        accounts = data.get("accounts", {})
+
+        def value(source: dict, key: str, default: str = "N/D") -> str:
+            raw = source.get(key, default)
+            return str(raw)
+
+        def content_line(platform_data: dict) -> str:
+            top_content = platform_data.get("top_content", {})
+            if not top_content:
+                return "N/D"
+            title = top_content.get("title", "Contenido destacado")
+            metric = top_content.get("views") or top_content.get("reach") or "N/D"
+            engagement = top_content.get("engagement_rate", "N/D")
+            return f"{title} ({metric}, ER {engagement})"
+
+        recommendation_lines = "\n".join(f"- {item}" for item in recommendations[:3]) or "- Sin recomendaciones disponibles."
+        location_text = ", ".join(audience.get("top_locations", [])) or "N/D"
+        window_text = ", ".join(audience.get("best_posting_windows", [])) or "N/D"
+
+        return (
+            f"## 📊 Dashboard Zernio\n"
+            f"**Periodo:** {data.get('period', 'Últimos 30 días')}\n"
+            f"**Cuentas:** Instagram {accounts.get('instagram', 'conectado')} · TikTok {accounts.get('tiktok', 'conectado')}\n\n"
+            f"### Resumen ejecutivo\n"
+            f"- Alcance total: **{value(metrics, 'total_reach')}**\n"
+            f"- Impresiones totales: **{value(metrics, 'total_impressions')}**\n"
+            f"- Engagement total: **{value(metrics, 'total_engagement_rate')}**\n"
+            f"- Crecimiento de seguidores: **{value(metrics, 'followers_growth')}**\n"
+            f"- Leads detectados: **{value(metrics, 'leads_detected')}**\n"
+            f"- Sentimiento: **{value(metrics, 'sentiment_score')}**\n\n"
+            f"### Instagram\n"
+            f"- Crecimiento: **{value(instagram, 'followers_growth')}**\n"
+            f"- Alcance: **{value(instagram, 'reach')}** · Impresiones: **{value(instagram, 'impressions')}**\n"
+            f"- Engagement: **{value(instagram, 'engagement_rate')}**\n"
+            f"- Visitas al perfil: **{value(instagram, 'profile_visits')}** · Clicks web: **{value(instagram, 'website_clicks')}**\n"
+            f"- Top content: **{content_line(instagram)}**\n\n"
+            f"### TikTok\n"
+            f"- Crecimiento: **{value(tiktok, 'followers_growth')}**\n"
+            f"- Views: **{value(tiktok, 'views')}** · Completion rate: **{value(tiktok, 'completion_rate')}**\n"
+            f"- Engagement: **{value(tiktok, 'engagement_rate')}** · Shares: **{value(tiktok, 'shares')}**\n"
+            f"- Visitas al perfil: **{value(tiktok, 'profile_visits')}**\n"
+            f"- Top content: **{content_line(tiktok)}**\n\n"
+            f"### Audiencia\n"
+            f"- Ubicaciones top: **{location_text}**\n"
+            f"- Edad principal: **{audience.get('top_age_range', 'N/D')}**\n"
+            f"- Mejores horarios: **{window_text}**\n\n"
+            f"### Próximas acciones sugeridas\n"
+            f"{recommendation_lines}\n\n"
+            f"Estado: Conectado vía Zernio."
+        )
+
     async def _respond_to_comments(self) -> dict:
         comments = await self.marketing.get_comments("instagram", "latest_post")
         responses = []

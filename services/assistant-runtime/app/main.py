@@ -202,6 +202,7 @@ async def assistant_request(request: AssistantRequest) -> dict:
             "order": result.get("order"),
             "critic_note": result.get("critic_note"),
             "warnings": result.get("warnings", []),
+            "dashboard": result.get("dashboard"),
             "input": request.model_dump(),
         }
     except Exception as exc:

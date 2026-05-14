@@ -28,3 +28,23 @@ class MarketingPort(ABC):
     @abstractmethod
     async def generate_report(self, report_type: str) -> dict:
         pass
+
+    @abstractmethod
+    async def get_top_content(self, platform: str | None = None, limit: int = 5) -> list[dict]:
+        pass
+
+    @abstractmethod
+    async def get_audience_insights(self) -> dict:
+        pass
+
+    @abstractmethod
+    async def get_alerts(self) -> list[dict]:
+        pass
+
+    @abstractmethod
+    async def get_leads(self, status: str | None = None) -> list[dict]:
+        pass
+
+    @abstractmethod
+    async def get_best_posting_windows(self) -> dict:
+        pass

@@ -47,12 +47,59 @@ class ZernioAdapter(MarketingPort):
         return {
             "status": "success",
             "source": "Zernio Analytics",
+            "period": "Últimos 30 días",
+            "accounts": {
+                "instagram": "@brand_oficial",
+                "tiktok": "@brand_tok"
+            },
             "metrics": {
-                "instagram_followers_growth": "+12.5%",
-                "engagement_rate": "5.8%",
-                "top_performing_content": "Reel_Zernio_Integration",
+                "total_reach": "184.2K",
+                "total_impressions": "312.7K",
+                "total_engagement_rate": "6.4%",
+                "followers_growth": "+14.1%",
+                "leads_detected": 28,
                 "sentiment_score": "8.9/10"
-            }
+            },
+            "platforms": {
+                "instagram": {
+                    "followers_growth": "+12.5%",
+                    "reach": "96.4K",
+                    "impressions": "171.8K",
+                    "engagement_rate": "5.8%",
+                    "profile_visits": "4.1K",
+                    "website_clicks": 342,
+                    "top_content": {
+                        "title": "Reel_Zernio_Integration",
+                        "format": "Reel",
+                        "reach": "38.2K",
+                        "engagement_rate": "8.1%"
+                    }
+                },
+                "tiktok": {
+                    "followers_growth": "+16.8%",
+                    "views": "142.6K",
+                    "engagement_rate": "7.2%",
+                    "completion_rate": "41%",
+                    "shares": 1180,
+                    "profile_visits": "3.6K",
+                    "top_content": {
+                        "title": "Behind_the_brand_process",
+                        "format": "TikTok video",
+                        "views": "54.9K",
+                        "engagement_rate": "9.4%"
+                    }
+                }
+            },
+            "audience": {
+                "top_locations": ["Bogotá", "Medellín", "Ciudad de México"],
+                "top_age_range": "25-34",
+                "best_posting_windows": ["12:00-14:00", "19:00-21:00"]
+            },
+            "recommendations": [
+                "Duplicar el formato del contenido top en TikTok con una variante educativa.",
+                "Convertir los Reels con más guardados en carruseles de Instagram.",
+                "Activar lead magnet con palabra clave INFO en comentarios de alto engagement."
+            ]
         }
 
     async def generate_report(self, report_type: str) -> dict:

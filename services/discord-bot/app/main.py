@@ -2,6 +2,8 @@ import asyncio
 import os
 import json
 from pathlib import Path
+import re
+import tempfile
 import httpx
 from fastapi import FastAPI, Request
 import uvicorn
@@ -166,6 +168,143 @@ async def main() -> None:
     async def on_ready() -> None:
         print(f"Discord conectado como {client.user}")
 
+    def _is_thread_channel(channel) -> bool:
+        return isinstance(channel, discord.Thread)
+
+    async def _get_or_create_agent_thread(message, agent_name: str, title: str):
+        if _is_thread_channel(message.channel):
+            return message.channel
+
+        clean_title = " ".join(title.split()).strip() or "conversación"
+        if len(clean_title) > 48:
+            clean_title = clean_title[:48].rstrip() + "..."
+        return await message.create_thread(name=f"{agent_name}: {clean_title}")
+
+    async def _send_long(destination, text: str, prefix: str | None = None):
+        text = text or "No hubo respuesta."
+        if prefix:
+            text = f"{prefix}\n\n{text}"
+
+        if len(text) <= 1900:
+            await destination.send(text)
+            return
+
+        chunks = [text[i:i+1900] for i in range(0, len(text), 1900)]
+        for index, chunk in enumerate(chunks, start=1):
+            header = f"**Parte {index}/{len(chunks)}**\n" if len(chunks) > 1 else ""
+            await destination.send(f"{header}{chunk}")
+
+    def _metric_number(value) -> float:
+        if value is None:
+            return 0.0
+        text = str(value).strip().upper().replace(",", "")
+        match = re.search(r"-?\d+(?:\.\d+)?", text)
+        if not match:
+            return 0.0
+        number = float(match.group(0))
+        if "K" in text:
+            return number * 1000
+        if "M" in text:
+            return number * 1000000
+        return number
+
+    def _render_dashboard_chart(dashboard: dict) -> str | None:
+        try:
+            os.environ.setdefault("MPLCONFIGDIR", "/tmp/matplotlib")
+            import matplotlib
+            matplotlib.use("Agg")
+            import matplotlib.pyplot as plt
+        except Exception as exc:
+            print(f"[DASHBOARD CHART] matplotlib no disponible: {exc}")
+            return None
+
+        platforms = dashboard.get("platforms", {})
+        instagram = platforms.get("instagram", {})
+        tiktok = platforms.get("tiktok", {})
+        metrics = dashboard.get("metrics", {})
+
+        labels = ["Alcance / Views", "Engagement %", "Crecimiento %", "Visitas perfil"]
+        instagram_values = [
+            _metric_number(instagram.get("reach")),
+            _metric_number(instagram.get("engagement_rate")),
+            _metric_number(instagram.get("followers_growth")),
+            _metric_number(instagram.get("profile_visits")),
+        ]
+        tiktok_values = [
+            _metric_number(tiktok.get("views")),
+            _metric_number(tiktok.get("engagement_rate")),
+            _metric_number(tiktok.get("followers_growth")),
+            _metric_number(tiktok.get("profile_visits")),
+        ]
+
+        fig = plt.figure(figsize=(13, 7.2), facecolor="#f8fafc")
+        grid = fig.add_gridspec(2, 4, height_ratios=[1, 3], hspace=0.45, wspace=0.35)
+
+        fig.suptitle("Dashboard Zernio | Instagram + TikTok", fontsize=20, fontweight="bold", color="#111827", y=0.96)
+        fig.text(0.5, 0.915, dashboard.get("period", "Últimos 30 días"), ha="center", fontsize=11, color="#4b5563")
+
+        kpis = [
+            ("Alcance total", metrics.get("total_reach", "N/D")),
+            ("Impresiones", metrics.get("total_impressions", "N/D")),
+            ("Engagement", metrics.get("total_engagement_rate", "N/D")),
+            ("Leads", metrics.get("leads_detected", "N/D")),
+        ]
+
+        for index, (label, value) in enumerate(kpis):
+            ax = fig.add_subplot(grid[0, index])
+            ax.set_facecolor("#ffffff")
+            for spine in ax.spines.values():
+                spine.set_edgecolor("#e5e7eb")
+            ax.set_xticks([])
+            ax.set_yticks([])
+            ax.text(0.06, 0.65, str(value), fontsize=20, fontweight="bold", color="#111827", transform=ax.transAxes)
+            ax.text(0.06, 0.28, label, fontsize=10, color="#6b7280", transform=ax.transAxes)
+
+        ax = fig.add_subplot(grid[1, :3])
+        x = range(len(labels))
+        width = 0.36
+        ax.bar([i - width / 2 for i in x], instagram_values, width, label="Instagram", color="#e1306c")
+        ax.bar([i + width / 2 for i in x], tiktok_values, width, label="TikTok", color="#00a6a6")
+        ax.set_xticks(list(x))
+        ax.set_xticklabels(labels, rotation=8, ha="right")
+        ax.set_title("Comparativa por canal", fontsize=14, fontweight="bold", color="#111827")
+        ax.grid(axis="y", alpha=0.22)
+        ax.legend(frameon=False)
+        ax.set_facecolor("#ffffff")
+        for spine in ax.spines.values():
+            spine.set_edgecolor("#e5e7eb")
+
+        ax_notes = fig.add_subplot(grid[1, 3])
+        ax_notes.set_facecolor("#ffffff")
+        for spine in ax_notes.spines.values():
+            spine.set_edgecolor("#e5e7eb")
+        ax_notes.set_xticks([])
+        ax_notes.set_yticks([])
+        ax_notes.set_title("Acciones sugeridas", fontsize=13, fontweight="bold", color="#111827", loc="left")
+        notes = dashboard.get("recommendations", [])[:3]
+        note_text = "\n\n".join(f"{idx}. {note}" for idx, note in enumerate(notes, start=1)) or "Sin recomendaciones disponibles."
+        ax_notes.text(0.03, 0.92, note_text, va="top", fontsize=10, color="#374151", wrap=True, transform=ax_notes.transAxes)
+
+        output = tempfile.NamedTemporaryFile(prefix="zernio-dashboard-", suffix=".png", delete=False)
+        output.close()
+        fig.savefig(output.name, dpi=180, bbox_inches="tight")
+        plt.close(fig)
+        return output.name
+
+    async def _send_dashboard_chart(destination, dashboard: dict | None):
+        if not dashboard:
+            return
+        chart_path = _render_dashboard_chart(dashboard)
+        if not chart_path:
+            return
+        try:
+            await destination.send(file=discord.File(chart_path, filename="zernio-dashboard.png"))
+        finally:
+            try:
+                os.unlink(chart_path)
+            except OSError:
+                pass
+
     @client.event
     async def on_message(message) -> None:
         if message.author == client.user:
@@ -194,6 +333,8 @@ async def main() -> None:
                 content = f"!marketer {content}"
             elif "writer" in thread_name:
                 content = f"!writer {content}"
+            elif "picture" in thread_name or "imagen" in thread_name:
+                content = f"!picture {content}"
             elif "pilot" in thread_name or "coder" in thread_name:
                 content = f"!coder-web {content}"
             elif "claw" in thread_name:
@@ -258,9 +399,8 @@ async def main() -> None:
                 await message.reply("⚠️ Por favor, añade una pregunta después de `!claw`.")
                 return
             
-            # 1. Creamos un hilo para la consulta
             try:
-                thread = await message.create_thread(name=f"Claw: {query[:30]}...")
+                thread = await _get_or_create_agent_thread(message, "Claw", query)
                 await thread.send("🔍 Consultando a Open Claw (Analizando memoria de Mentis)...")
                 
                 # 2. Llamamos al assistant-runtime
@@ -276,14 +416,7 @@ async def main() -> None:
                 answer_data = await _send_assistant_request(payload)
                 answer = answer_data.get("message", "No hubo respuesta.")
                 
-                # 3. Respondemos en el hilo (con soporte para mensajes largos)
-                if len(answer) > 1900:
-                    chunks = [answer[i:i+1900] for i in range(0, len(answer), 1900)]
-                    await thread.send("🤖 **Respuesta de Open Claw (Parte 1):**")
-                    for i, chunk in enumerate(chunks):
-                        await thread.send(f"{chunk}")
-                else:
-                    await thread.send(f"🤖 **Respuesta de Open Claw:**\n\n{answer}")
+                await _send_long(thread, answer, prefix="🤖 **Respuesta de Open Claw:**")
             except discord.Forbidden:
                 await message.reply("❌ No tengo permiso para crear hilos en este canal. Por favor, dales permiso a 'Crear hilos públicos'.")
             except Exception as e:
@@ -389,18 +522,25 @@ async def main() -> None:
 
         if content.startswith("!marketer-status"):
             print(f"[DEBUG] Comando !marketer-status detectado")
+            try:
+                thread = await _get_or_create_agent_thread(message, "Marketer", "estado")
+            except discord.Forbidden:
+                await message.reply("❌ Necesito permiso para 'Crear hilos públicos' para conversar con el Marketer Agent.")
+                return
+
             payload = {
                 "action_type": "marketing",
                 "prompt": "dame tu estado",
-                "source": {"platform": "discord", "channel_id": str(message.channel.id), "user_id": str(message.author.id)},
+                "source": {"platform": "discord", "channel_id": str(thread.id), "user_id": str(message.author.id)},
                 "payload": {"sub_command": "status"}
             }
             print(f"[DEBUG] Enviando solicitud !marketer-status al assistant-runtime")
             try:
+                await thread.send("📣 **Marketer Agent consultando estado...**")
                 result = await _send_assistant_request(payload)
-                await message.reply(result.get("message", "No pude obtener el estado del marketer."))
+                await _send_long(thread, result.get("message", "No pude obtener el estado del marketer."))
             except Exception as e:
-                await message.reply(f"❌ Error al contactar al marketer: {e}")
+                await thread.send(f"❌ Error al contactar al marketer: {e}")
             return
 
         if content.startswith("!marketer "):
@@ -467,15 +607,21 @@ async def main() -> None:
                 sub_command = "memory"
                 prompt = "ver memoria"
 
+            try:
+                thread = await _get_or_create_agent_thread(message, "Marketer", raw_query)
+            except discord.Forbidden:
+                await message.reply("❌ Necesito permiso para 'Crear hilos públicos' para conversar con el Marketer Agent.")
+                return
+
             payload = {
                 "action_type": "marketing",
                 "prompt": prompt,
-                "source": {"platform": "discord", "channel_id": str(message.channel.id), "user_id": str(message.author.id)},
+                "source": {"platform": "discord", "channel_id": str(thread.id), "user_id": str(message.author.id)},
                 "images": images_b64,
                 "payload": {"sub_command": sub_command}
             }
             
-            await message.reply(f"📣 **Marketer Agent procesando `{sub_command}`...**")
+            await thread.send(f"📣 **Marketer Agent procesando `{sub_command}`...**")
             try:
                 result = await _send_assistant_request(payload)
                 msg = result.get("message", "No hubo respuesta.")
@@ -509,18 +655,14 @@ async def main() -> None:
                         async def deny(self, itn, btn):
                             await itn.response.edit_message(content="🚫 Acción denegada.", embed=None, view=None)
 
-                    await message.reply(embed=embed, view=MarketingApprovalView(approval_payload, message.author))
+                    await thread.send(embed=embed, view=MarketingApprovalView(approval_payload, message.author))
                     return
 
-                if len(msg) > 1900:
-                    chunks = [msg[i:i+1900] for i in range(0, len(msg), 1900)]
-                    for chunk in chunks:
-                        await message.reply(chunk)
-                else:
-                    await message.reply(msg)
+                await _send_long(thread, msg)
+                await _send_dashboard_chart(thread, result.get("dashboard"))
 
             except Exception as e:
-                await message.reply(f"❌ Error en Marketer Agent: {e}")
+                await thread.send(f"❌ Error en Marketer Agent: {e}")
             return
 
         if content.startswith("!writer "):
@@ -551,18 +693,21 @@ async def main() -> None:
                 "payload": {"sub_command": sub_command, "language": language}
             }
             
-            await message.reply(f"✍️ **Writer Sub-Agent procesando `{sub_command}` en `{language}`...**")
             try:
+                thread = await _get_or_create_agent_thread(message, "Writer", raw_query)
+                payload["source"]["channel_id"] = str(thread.id)
+                await thread.send(f"✍️ **Writer Sub-Agent procesando `{sub_command}` en `{language}`...**")
                 result = await _send_assistant_request(payload)
                 msg = result.get("message", "No hubo respuesta.")
-                if len(msg) > 1900:
-                    chunks = [msg[i:i+1900] for i in range(0, len(msg), 1900)]
-                    for chunk in chunks:
-                        await message.reply(chunk)
-                else:
-                    await message.reply(msg)
+                await _send_long(thread, msg)
+            except discord.Forbidden:
+                await message.reply("❌ Necesito permiso para 'Crear hilos públicos' para conversar con el Writer Agent.")
             except Exception as e:
-                await message.reply(f"❌ Error en Writer Agent: {e}")
+                destination = message.channel if _is_thread_channel(message.channel) else message
+                if hasattr(destination, "send"):
+                    await destination.send(f"❌ Error en Writer Agent: {e}")
+                else:
+                    await message.reply(f"❌ Error en Writer Agent: {e}")
             return
 
         if content.startswith("!picture"):
@@ -604,9 +749,8 @@ async def main() -> None:
                 await message.reply("🎨 Por favor, añade una descripción para generar la imagen. Ejemplo: `!picture un gato astronauta`.")
                 return
 
-            # Crear Hilo para la generación
             try:
-                thread = await message.create_thread(name=f"🎨 Imagen: {raw_query[:30]}...")
+                thread = await _get_or_create_agent_thread(message, "Picture", raw_query)
                 await thread.send("⏳ **Picture Agent** está procesando tu solicitud con memoria proactiva...")
 
                 # Capturar imágenes adjuntas
@@ -621,7 +765,7 @@ async def main() -> None:
                 payload = {
                     "action_type": "picture",
                     "prompt": raw_query,
-                    "source": {"platform": "discord", "channel_id": str(message.channel.id), "user_id": str(message.author.id)},
+                    "source": {"platform": "discord", "channel_id": str(thread.id), "user_id": str(message.author.id)},
                     "images": images_b64,
                     "payload": {}
                 }
@@ -689,15 +833,8 @@ async def main() -> None:
                 await message.reply("💻 Por favor, añade una descripción para el proyecto web. Ejemplo: `!coder-web crea un ecommerce de zapatos con React`.")
                 return
 
-            # Manejo de Hilos (Evitar error 50024)
-            is_thread = isinstance(message.channel, discord.Thread)
-            
             try:
-                if is_thread:
-                    thread = message.channel
-                else:
-                    thread = await message.create_thread(name=f"💻 Proyecto: {raw_query[:30]}...")
-                
+                thread = await _get_or_create_agent_thread(message, "Coder", raw_query)
                 await thread.send("⏳ **Coder Web Agent** (Pilot) está analizando la arquitectura y preparando el stack...")
 
                 # Capturar imágenes adjuntas (Mockups/Referencias)
@@ -712,7 +849,7 @@ async def main() -> None:
                 payload = {
                     "action_type": "coder-web",
                     "prompt": raw_query,
-                    "source": {"platform": "discord", "channel_id": str(message.channel.id), "user_id": str(message.author.id)},
+                    "source": {"platform": "discord", "channel_id": str(thread.id), "user_id": str(message.author.id)},
                     "images": images_b64,
                     "payload": {}
                 }
@@ -720,12 +857,7 @@ async def main() -> None:
                 result = await _send_assistant_request(payload)
                 msg = result.get("message", "No hubo respuesta.")
                 
-                if len(msg) > 1900:
-                    chunks = [msg[i:i+1900] for i in range(0, len(msg), 1900)]
-                    for chunk in chunks:
-                        await thread.send(chunk)
-                else:
-                    await thread.send(msg)
+                await _send_long(thread, msg)
 
             except discord.Forbidden:
                 await message.reply("❌ Necesito permiso para 'Crear hilos públicos'.")
