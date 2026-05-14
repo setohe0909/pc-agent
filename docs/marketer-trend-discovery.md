@@ -11,8 +11,8 @@ El agente monitorea el ecosistema digital para detectar sonidos, hashtags y form
     - Sugerencias creativas generadas por IA para adaptar esas tendencias a la marca específica.
 
 ## Implementación Técnica
-- **Workflow**: `MarketingWorkflow._monitor_trends()`
-- **Lógica**: Actualmente simula la detección de tendencias y utiliza el LLM para generar ideas de contenido contextualizadas. 
+- **Workflow**: `MarketingGraph._monitor_trends()`
+- **Lógica**: Utiliza el LLM con el contexto real de la marca para identificar tendencias actuales en redes sociales. Los resultados se persisten en Supabase (`mentis_memory` con categoría `marketing_trend`) para referencia futura y están disponibles vía `!marketer memory`.
 - **Integración**: Este módulo está diseñado para ser llamado periódicamente por el `ingestion-worker` para enviar alertas proactivas.
 
 ## Beneficios

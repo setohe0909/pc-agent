@@ -51,6 +51,9 @@ class FakeMarketing:
         self.published_posts = []
         self.processed = set()
 
+    async def get_connected_accounts(self):
+        return {"instagram": "@brand_oficial", "tiktok": "@brand_tok"}
+
     async def get_comments(self, platform: str, post_id: str):
         return [
             {"id": "c1", "user": "user1", "text": "Me encanta este diseño!"},

@@ -222,80 +222,153 @@ async def main() -> None:
             import matplotlib
             matplotlib.use("Agg")
             import matplotlib.pyplot as plt
+            from matplotlib.patches import FancyBboxPatch
         except Exception as exc:
             print(f"[DASHBOARD CHART] matplotlib no disponible: {exc}")
             return None
 
+        accounts = dashboard.get("accounts", {})
         platforms = dashboard.get("platforms", {})
         instagram = platforms.get("instagram", {})
         tiktok = platforms.get("tiktok", {})
         metrics = dashboard.get("metrics", {})
+        audience = dashboard.get("audience", {})
+        best_windows = dashboard.get("best_posting_windows", {})
+        recommendations = dashboard.get("recommendations", [])
 
-        labels = ["Alcance / Views", "Engagement %", "Crecimiento %", "Visitas perfil"]
-        instagram_values = [
-            _metric_number(instagram.get("reach")),
-            _metric_number(instagram.get("engagement_rate")),
-            _metric_number(instagram.get("followers_growth")),
-            _metric_number(instagram.get("profile_visits")),
+        ig_top = instagram.get("top_content") or {}
+        tt_top = tiktok.get("top_content") or {}
+
+        ig_user = str(accounts.get("instagram", "—")).replace("@", "")
+        tt_user = str(accounts.get("tiktok", "—")).replace("@", "")
+
+        fig = plt.figure(figsize=(14, 8), facecolor="#f1f5f9")
+        grid = fig.add_gridspec(3, 6, height_ratios=[0.15, 1, 1.2], hspace=0.4, wspace=0.35)
+
+        fig.suptitle("📊 Dashboard Zernio", fontsize=22, fontweight="bold", color="#0f172a", y=0.975)
+        fig.text(0.5, 0.942, dashboard.get("period", "Últimos 30 días"), ha="center", fontsize=10, color="#64748b")
+
+        # ── KPI cards row ──
+        ig_followers = instagram.get("followers", 0)
+        tt_followers = tiktok.get("followers", 0)
+        total_reach = metrics.get("total_reach", "N/D")
+        total_engagement = metrics.get("total_engagement_rate", "N/D")
+        total_posts = metrics.get("posts_last_30d", "N/D")
+
+        kpi_data = [
+            ("Alcance", str(total_reach)),
+            ("Engagement", str(total_engagement)),
+            ("Posts (30d)", str(total_posts)),
+            ("IG Seguidores", str(ig_followers)),
+            ("TT Seguidores", str(tt_followers)),
         ]
-        tiktok_values = [
-            _metric_number(tiktok.get("views")),
-            _metric_number(tiktok.get("engagement_rate")),
-            _metric_number(tiktok.get("followers_growth")),
-            _metric_number(tiktok.get("profile_visits")),
-        ]
 
-        fig = plt.figure(figsize=(13, 7.2), facecolor="#f8fafc")
-        grid = fig.add_gridspec(2, 4, height_ratios=[1, 3], hspace=0.45, wspace=0.35)
-
-        fig.suptitle("Dashboard Zernio | Instagram + TikTok", fontsize=20, fontweight="bold", color="#111827", y=0.96)
-        fig.text(0.5, 0.915, dashboard.get("period", "Últimos 30 días"), ha="center", fontsize=11, color="#4b5563")
-
-        kpis = [
-            ("Alcance total", metrics.get("total_reach", "N/D")),
-            ("Impresiones", metrics.get("total_impressions", "N/D")),
-            ("Engagement", metrics.get("total_engagement_rate", "N/D")),
-            ("Leads", metrics.get("leads_detected", "N/D")),
-        ]
-
-        for index, (label, value) in enumerate(kpis):
-            ax = fig.add_subplot(grid[0, index])
+        for idx, (label, value) in enumerate(kpi_data):
+            ax = fig.add_subplot(grid[0, idx])
             ax.set_facecolor("#ffffff")
-            for spine in ax.spines.values():
-                spine.set_edgecolor("#e5e7eb")
+            for s in ax.spines.values():
+                s.set_edgecolor("#e2e8f0")
             ax.set_xticks([])
             ax.set_yticks([])
-            ax.text(0.06, 0.65, str(value), fontsize=20, fontweight="bold", color="#111827", transform=ax.transAxes)
-            ax.text(0.06, 0.28, label, fontsize=10, color="#6b7280", transform=ax.transAxes)
+            ax.text(0.08, 0.55, value, fontsize=14, fontweight="bold", color="#0f172a", transform=ax.transAxes)
+            ax.text(0.08, 0.18, label, fontsize=8, color="#64748b", transform=ax.transAxes)
 
-        ax = fig.add_subplot(grid[1, :3])
-        x = range(len(labels))
-        width = 0.36
-        ax.bar([i - width / 2 for i in x], instagram_values, width, label="Instagram", color="#e1306c")
-        ax.bar([i + width / 2 for i in x], tiktok_values, width, label="TikTok", color="#00a6a6")
-        ax.set_xticks(list(x))
-        ax.set_xticklabels(labels, rotation=8, ha="right")
-        ax.set_title("Comparativa por canal", fontsize=14, fontweight="bold", color="#111827")
-        ax.grid(axis="y", alpha=0.22)
-        ax.legend(frameon=False)
-        ax.set_facecolor("#ffffff")
-        for spine in ax.spines.values():
-            spine.set_edgecolor("#e5e7eb")
+        # ── IG Metrics Panel ──
+        ax_ig = fig.add_subplot(grid[1, :3])
+        ax_ig.set_facecolor("#ffffff")
+        for s in ax_ig.spines.values():
+            s.set_edgecolor("#e2e8f0")
+        ax_ig.set_xticks([])
+        ax_ig.set_yticks([])
+        ax_ig.set_title(f"Instagram @{ig_user}", fontsize=13, fontweight="bold", color="#0f172a", loc="left", pad=8)
 
-        ax_notes = fig.add_subplot(grid[1, 3])
-        ax_notes.set_facecolor("#ffffff")
-        for spine in ax_notes.spines.values():
-            spine.set_edgecolor("#e5e7eb")
-        ax_notes.set_xticks([])
-        ax_notes.set_yticks([])
-        ax_notes.set_title("Acciones sugeridas", fontsize=13, fontweight="bold", color="#111827", loc="left")
-        notes = dashboard.get("recommendations", [])[:3]
-        note_text = "\n\n".join(f"{idx}. {note}" for idx, note in enumerate(notes, start=1)) or "Sin recomendaciones disponibles."
-        ax_notes.text(0.03, 0.92, note_text, va="top", fontsize=10, color="#374151", wrap=True, transform=ax_notes.transAxes)
+        ig_metrics_lines = [
+            f"👥 Seguidores: {instagram.get('followers', 'N/D')}",
+            f"📸 Posts: {instagram.get('external_posts', 'N/D')}",
+            f"👁 Alcance (30d): {instagram.get('reach', 'N/D')}",
+            f"▶️ Views (30d): {instagram.get('views', 'N/D')}",
+            f"❤️ Interacciones: {instagram.get('total_interactions', 'N/D')}",
+            f"🔄 Cuentas alcanzadas: {instagram.get('accounts_engaged', 'N/D')}",
+        ]
+        if ig_top.get("title"):
+            ig_metrics_lines.append(f"🏆 Top: {ig_top['title'][:35]}...")
+            ig_metrics_lines.append(f"   ER: {ig_top.get('engagement_rate', 'N/A')} · 👍 {ig_top.get('likes', '?')}")
+        ig_text = "\n".join(ig_metrics_lines)
+        ax_ig.text(0.06, 0.92, ig_text, va="top", fontsize=9, color="#334155",
+                   linespacing=1.6, transform=ax_ig.transAxes,
+                   bbox=dict(facecolor="#fafafa", edgecolor="none", pad=8, boxstyle="round,pad=0.5"))
+
+        # ── TT Metrics Panel ──
+        ax_tt = fig.add_subplot(grid[1, 3:])
+        ax_tt.set_facecolor("#ffffff")
+        for s in ax_tt.spines.values():
+            s.set_edgecolor("#e2e8f0")
+        ax_tt.set_xticks([])
+        ax_tt.set_yticks([])
+        ax_tt.set_title(f"TikTok @{tt_user}", fontsize=13, fontweight="bold", color="#0f172a", loc="left", pad=8)
+
+        tt_metrics_lines = [
+            f"👥 Seguidores: {tiktok.get('followers', 'N/D')}",
+            f"🎬 Videos: {tiktok.get('video_count', tiktok.get('external_posts', 'N/D'))}",
+            f"❤️ Likes totales: {tiktok.get('likes_count', 'N/D')}",
+        ]
+        if tt_top.get("title"):
+            tt_metrics_lines.append(f"🏆 Top: {tt_top['title'][:35]}...")
+            tt_metrics_lines.append(f"   ER: {tt_top.get('engagement_rate', 'N/A')} · 👍 {tt_top.get('likes', '?')}")
+        else:
+            tt_metrics_lines.append("📭 Sin datos de contenido todavía")
+        tt_text = "\n".join(tt_metrics_lines)
+        ax_tt.text(0.06, 0.92, tt_text, va="top", fontsize=9, color="#334155",
+                   linespacing=1.6, transform=ax_tt.transAxes,
+                   bbox=dict(facecolor="#fafafa", edgecolor="none", pad=8, boxstyle="round,pad=0.5"))
+
+        # ── Audience + Horarios Panel ──
+        ax_info = fig.add_subplot(grid[2, :3])
+        ax_info.set_facecolor("#ffffff")
+        for s in ax_info.spines.values():
+            s.set_edgecolor("#e2e8f0")
+        ax_info.set_xticks([])
+        ax_info.set_yticks([])
+        ax_info.set_title("Audiencia y Horarios", fontsize=13, fontweight="bold", color="#0f172a", loc="left", pad=8)
+
+        age_range = audience.get("top_age_range", "N/D")
+        top_locs = audience.get("top_locations", [])
+        loc_text = ", ".join(top_locs[:3]) if top_locs else "N/D"
+        windows_rec = best_windows.get("recommendation", "Acumula datos para obtener recomendaciones.")
+
+        info_lines = [
+            f"📅 Edad principal: {age_range}",
+            f"📍 Ubicaciones: {loc_text}",
+            f"⏰ {windows_rec[:80]}",
+        ]
+        ax_info.text(0.06, 0.92, "\n".join(info_lines), va="top", fontsize=9, color="#334155",
+                     linespacing=1.8, transform=ax_info.transAxes,
+                     bbox=dict(facecolor="#fafafa", edgecolor="none", pad=8, boxstyle="round,pad=0.5"))
+
+        # ── Recommendations Panel ──
+        ax_recs = fig.add_subplot(grid[2, 3:])
+        ax_recs.set_facecolor("#ffffff")
+        for s in ax_recs.spines.values():
+            s.set_edgecolor("#e2e8f0")
+        ax_recs.set_xticks([])
+        ax_recs.set_yticks([])
+        ax_recs.set_title("Acciones Sugeridas", fontsize=13, fontweight="bold", color="#0f172a", loc="left", pad=8)
+
+        if recommendations:
+            rec_text = "\n".join(f"• {r[:90]}" for r in recommendations[:4])
+        else:
+            rec_text = "Sigue publicando para obtener recomendaciones personalizadas."
+        ax_recs.text(0.06, 0.92, rec_text, va="top", fontsize=9, color="#334155",
+                     linespacing=1.6, transform=ax_recs.transAxes,
+                     bbox=dict(facecolor="#f0f9ff", edgecolor="#bae6fd", pad=8, boxstyle="round,pad=0.5"))
+
+        # ── Platfom badges at bottom ──
+        fig.text(0.5, 0.008, f"IG: @{ig_user}  ·  TT: @{tt_user}  ·  Datos vía Zernio API",
+                 ha="center", fontsize=8, color="#94a3b8", style="italic")
 
         output = tempfile.NamedTemporaryFile(prefix="zernio-dashboard-", suffix=".png", delete=False)
         output.close()
-        fig.savefig(output.name, dpi=180, bbox_inches="tight")
+        fig.savefig(output.name, dpi=200, bbox_inches="tight", facecolor=fig.get_facecolor())
         plt.close(fig)
         return output.name
 

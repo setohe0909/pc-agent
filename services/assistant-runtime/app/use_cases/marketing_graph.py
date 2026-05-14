@@ -605,17 +605,22 @@ class MarketingGraph:
         return await self.automation.respond_to_comments(payload)
 
     async def _get_status(self) -> dict:
-        status_report = (
-            "**Estado del Sub-Agente !marketer**\n"
-            "✅ Conexión Zernio: Activa\n"
-            "✅ Analítica: dashboard, report, top-content, audience, alerts, best-hours\n"
-            "✅ Comunidad: comments, negative-comments, reply-drafts, respond, qualify, leads, magnet\n"
-            "✅ Estrategia: campaign, posts, content-plan, repurpose, plan, research, competitors, trends, collab, funnel\n"
-            "✅ Autonomía: modo asistido por defecto; publicaciones, DMs y respuestas requieren aprobación\n"
-            "✅ Visual: dashboard con imagen adjunta en Discord\n"
-            "🧠 Memoria Mentis: disponible si Supabase está configurado"
-        )
-        return {"status": "success", "message": status_report}
+        accounts = await self.marketing.get_connected_accounts()
+        ig = accounts.get("instagram", "no conectada")
+        tt = accounts.get("tiktok", "no conectada")
+        lines = [
+            "**Estado del Sub-Agente !marketer**",
+            f"✅ Cuentas: Instagram **{ig}** · TikTok **{tt}**",
+            "✅ Analítica: dashboard, report, top-content, audience, alerts, best-hours",
+            "✅ Comunidad: comments, negative-comments, reply-drafts, respond, qualify, leads, magnet",
+            "✅ Estrategia: campaign, posts, content-plan, repurpose, plan, research, competitors, trends, collab, funnel",
+            "✅ Autonomía: modo asistido por defecto; publicaciones, DMs y respuestas requieren aprobación",
+            "✅ Visual: dashboard con imagen adjunta en Discord",
+            "🧠 Memoria Mentis: disponible si Supabase está configurado",
+            "",
+            "_Datos obtenidos desde conexiones reales en system_config_",
+        ]
+        return {"status": "success", "message": "\n".join(lines)}
 
     async def _research_competitors(self, competitor: str) -> dict:
         competitor = competitor.strip() or "competidor_generico"
@@ -642,25 +647,28 @@ class MarketingGraph:
         return {"status": "success", "message": f"## 🗺️ Estrategia de Funnel de Ventas\n\n{funnel_strategy}"}
 
     async def _monitor_trends(self) -> dict:
-        trends_detected = [
-            {"name": "Minimalist Lifestyle", "growth": "45%", "platform": "TikTok"},
-            {"name": "Handmade Aesthetics", "growth": "30%", "platform": "Instagram"}
-        ]
+        existing = await self.memory.get_context("marketer")
+        context = existing or "Sin contexto de marca disponible"
+
         trend_prompt = (
-            f"Analiza estas tendencias crecientes:\n{json.dumps(trends_detected)}\n\n"
-            f"Sugiere 2 ideas creativas de contenido que aprovechen estas tendencias."
+            "Eres un estratega de marketing digital. Identifica 2 tendencias reales y actuales "
+            "en redes sociales (TikTok, Instagram) que sean relevantes para marcas y creadores.\n\n"
+            f"Contexto de la marca:\n{context}\n\n"
+            "Para cada tendencia incluye:\n"
+            "- Nombre de la tendencia\n"
+            "- Plataforma principal\n"
+            "- Por qué está creciendo\n"
+            "- Oportunidad de contenido para la marca\n\n"
+            "Responde con datos reales, no inventes métricas exactas."
         )
-        suggestions = await self.llm.chat(trend_prompt)
+        analysis = await self.llm.chat(trend_prompt)
+
         await self.memory.save_memory(
             category="marketing_trend",
-            summary=f"Tendencia detectada: {trends_detected[0]['name']} ({trends_detected[0]['growth']})"
+            summary=f"Análisis de tendencias real: {analysis[:200]}..."
         )
-        report = (
-            "### 🚀 Tendencias Detectadas\n\n"
-            f"- **{trends_detected[0]['name']}** ({trends_detected[0]['growth']} en {trends_detected[0]['platform']})\n"
-            f"- **{trends_detected[1]['name']}** ({trends_detected[1]['growth']} en {trends_detected[1]['platform']})\n\n"
-            f"💡 **Sugerencias de la IA**:\n{suggestions}"
-        )
+
+        report = f"### 🚀 Tendencias Detectadas\n\n{analysis}"
         return {"status": "success", "message": report}
 
     async def _analyze_sentiment(self) -> dict:

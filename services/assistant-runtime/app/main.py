@@ -10,7 +10,6 @@ from pydantic import BaseModel, Field
 from app.adapters.kalshi import KalshiHttpAdapter
 from app.adapters.open_claw import OpenClawLLMAdapter
 from app.adapters.memory import MentisMemoryAdapter
-from app.adapters.marketing import SocialMediaStubAdapter
 from app.adapters.zernio_adapter import ZernioAdapter
 from app.use_cases.trading_workflow import TradingWorkflow
 from app.use_cases.marketing_graph import MarketingGraph
