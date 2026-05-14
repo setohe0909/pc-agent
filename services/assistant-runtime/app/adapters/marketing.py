@@ -51,3 +51,18 @@ class SocialMediaStubAdapter(MarketingPort):
             except Exception as e:
                 print(f"[STUB ERROR] {e}")
                 return False
+
+    async def get_dashboard(self) -> dict:
+        print("[STUB] Obteniendo dashboard de marketing")
+        return {
+            "status": "success",
+            "metrics": {"engagement": "4.2%", "growth": "+15%"}
+        }
+
+    async def generate_report(self, report_type: str) -> dict:
+        print(f"[STUB] Generando reporte: {report_type}")
+        return {
+            "status": "success",
+            "report_type": report_type,
+            "data": "Report data stub"
+        }

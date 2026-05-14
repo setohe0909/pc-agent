@@ -20,3 +20,11 @@ class MarketingPort(ABC):
     @abstractmethod
     async def save_lead(self, lead_data: dict) -> bool:
         pass
+
+    @abstractmethod
+    async def get_dashboard(self) -> dict:
+        pass
+
+    @abstractmethod
+    async def generate_report(self, report_type: str) -> dict:
+        pass

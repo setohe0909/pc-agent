@@ -60,8 +60,25 @@ class MarketingGraph:
                     },
                     "required": ["topic"]
                 }
+            },
+            {
+                "name": "generate_dashboard",
+                "description": "Genera y analiza un dashboard de marketing desde Zernio.",
+                "parameters": {"type": "object", "properties": {}}
+            },
+            {
+                "name": "generate_report",
+                "description": "Genera un informe detallado de marketing desde Zernio.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "report_type": {"type": "string", "description": "Tipo de informe (ej. mensual, semanal, crecimiento)"}
+                    },
+                    "required": ["report_type"]
+                }
             }
         ]
+
 
     def _build_graph(self):
         workflow = StateGraph(MarketingState)
@@ -138,11 +155,13 @@ class MarketingGraph:
     async def _analyze_intent_node(self, state: MarketingState) -> dict:
         print(f"[GRAPH][INTENT] Analizando: {state['prompt']} (Sub: {state['sub_command']})")
         
-        forced_cmds = ["qualify", "trends", "sentiment", "plan"]
+        forced_cmds = ["qualify", "trends", "sentiment", "plan", "dashboard", "report"]
         if state["sub_command"] in forced_cmds:
             tool_name = state["sub_command"]
             if tool_name == "qualify": tool_name = "qualify_leads"
             if tool_name == "plan": tool_name = "plan_campaign"
+            if tool_name == "dashboard": tool_name = "generate_dashboard"
+            if tool_name == "report": tool_name = "generate_report"
             
             print(f"[GRAPH][INTENT] Comando forzado detectado: {tool_name}")
             return {
@@ -206,6 +225,15 @@ class MarketingGraph:
                 result = await self._analyze_sentiment()
             elif "plan" in tool_name:
                 result = {"status": "success", "message": f"🚀 **Campaña Iniciada**: {state.get('refined_message', 'Procesada.')}"}
+            elif "dashboard" in tool_name:
+                data = await self.marketing.get_dashboard()
+                msg = f"## 📊 Dashboard Zernio\n\n```json\n{json.dumps(data.get('metrics', {}), indent=2)}\n```\n\nEstado: Conectado vía Zernio."
+                result = {"status": "success", "message": msg}
+            elif "report" in tool_name:
+                report_type = action.get("arguments", {}).get("report_type", "general")
+                data = await self.marketing.generate_report(report_type)
+                msg = f"## 📈 Informe Zernio ({report_type})\n\n{data.get('summary', '')}\n\nEnlace: {data.get('link', '#')}"
+                result = {"status": "success", "message": msg}
             else:
                 result = {"status": "error", "message": f"Herramienta {tool_name} no disponible."}
             

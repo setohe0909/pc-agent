@@ -11,6 +11,7 @@ from app.adapters.kalshi import KalshiHttpAdapter
 from app.adapters.open_claw import OpenClawLLMAdapter
 from app.adapters.memory import MentisMemoryAdapter
 from app.adapters.marketing import SocialMediaStubAdapter
+from app.adapters.zernio_adapter import ZernioAdapter
 from app.use_cases.trading_workflow import TradingWorkflow
 from app.use_cases.marketing_graph import MarketingGraph
 from app.use_cases.writer_workflow import WriterWorkflow
@@ -92,7 +93,7 @@ async def assistant_request(request: AssistantRequest) -> dict:
     llm_port = OpenClawLLMAdapter()
     memory_port = MentisMemoryAdapter()
     workflow = TradingWorkflow(trading_port=trading_port, llm_port=llm_port, memory_port=memory_port)
-    marketing_workflow = MarketingGraph(llm=llm_port, memory=memory_port, marketing=SocialMediaStubAdapter())
+    marketing_workflow = MarketingGraph(llm=llm_port, memory=memory_port, marketing=ZernioAdapter())
     writer_workflow = WriterWorkflow(llm_port=llm_port, memory_port=memory_port)
     from app.use_cases.picture_graph import PictureGraph
     from app.use_cases.coder_web_graph import CoderWebGraph
