@@ -9,12 +9,7 @@ El **Coder Web Sub-Agent** es un agente autónomo diseñado para la creación y 
    - Configuración automática de autenticación, base de datos y almacenamiento.
    - Integración con **Pilot AI** para el diseño de componentes y layouts.
 
-2. **Ajustes en Wix:**
-   - Acceso vía credenciales API.
-   - Modificación de la UI basada en requerimientos del usuario.
-   - Versionado automático del sitio para evitar pérdida de datos.
-
-3. **Memoria Proactiva (`!coder-web memory`):**
+2. **Memoria Proactiva (`!coder-web memory`):**
    - Almacena contextos de proyectos previos.
    - Recuerda preferencias de diseño y decisiones arquitectónicas.
    - Permite un seguimiento continuo del hilo de desarrollo.
@@ -32,14 +27,13 @@ El **Coder Web Sub-Agent** es un agente autónomo diseñado para la creación y 
 El agente utiliza **LangGraph** para orquestar sus estados:
 - **Initialize:** Configura el entorno y stack.
 - **Retrieve Context:** Inyecta memoria proactiva del contexto `coder-web`.
-- **Analyze:** Decide si la tarea es para un repositorio nuevo o un ajuste en Wix.
-- **Execute Task:** Interactúa con APIs externas (GitHub/Wix) y genera código.
+- **Analyze:** Diseña la arquitectura del repositorio.
+- **Execute Task:** Interactúa con GitHub para crear el repositorio y genera código.
 - **Finalize:** Reporta el estado final y guarda aprendizajes en MentisDB.
 
 ## 🖥️ Panel Administrativo
 
 El portal administrativo permite configurar:
-- **Wix API Keys & Site IDs.**
 - **GitHub Tokens & Organizaciones.**
 - **Stack Tecnológico Preferido.**
 - **Nivel de Autonomía de Pilot AI.**

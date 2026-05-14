@@ -41,35 +41,6 @@ export function CoderWebView({ data, onSave }: { data: any, adminToken: string, 
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-md flex items-center gap-2">
-              <Globe className="w-5 h-5 text-blue-500" />
-              Wix Platform Settings
-            </CardTitle>
-            <CardDescription>Conexión vía API Velo para ajustes automáticos.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Wix API Key</Label>
-              <Input 
-                name="wix_api_key" 
-                type="password" 
-                placeholder={secrets.wix_api_key ? "••••••••••••••••" : "wix_..."}
-              />
-              {secrets.wix_api_key && <p className="text-[10px] text-green-500">✓ API Key guardada en el servidor</p>}
-            </div>
-            <div className="space-y-2">
-              <Label>Wix Site ID</Label>
-              <Input 
-                name="wix_site_id" 
-                placeholder="uuid-..." 
-                defaultValue={currentRuntime.wix_site_id || ""}
-              />
-              {currentRuntime.wix_site_id && <p className="text-[10px] text-blue-500">ID: {currentRuntime.wix_site_id}</p>}
-            </div>
-          </CardContent>
-        </Card>
 
         <Card>
           <CardHeader>
@@ -126,7 +97,7 @@ export function CoderWebView({ data, onSave }: { data: any, adminToken: string, 
               <p className="text-sm font-bold flex items-center gap-2">
                 <Shield className="w-4 h-4" /> Version Control
               </p>
-              <p className="text-[10px] text-muted-foreground">Versionado automático de cambios en Wix y Git.</p>
+              <p className="text-[10px] text-muted-foreground">Versionado automático de cambios en Git.</p>
             </div>
           </CardContent>
         </Card>
@@ -147,7 +118,6 @@ export function CoderWebView({ data, onSave }: { data: any, adminToken: string, 
                 <SelectContent>
                   <SelectItem value="react-ts">React/TS + Tailwind + Supabase</SelectItem>
                   <SelectItem value="nextjs">Next.js + Tailwind + Prisma</SelectItem>
-                  <SelectItem value="wix-velo">Wix Velo (Fullstack)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -196,14 +166,13 @@ export function CoderWebView({ data, onSave }: { data: any, adminToken: string, 
                 </div>
                 <div className="flex items-center gap-2 p-2 rounded bg-background border">
                   <Globe className="w-3 h-3 text-muted-foreground" />
-                  <span>Wix Webhooks: **Activos**</span>
+                  <span>CI/CD Pipelines: **Activos**</span>
                 </div>
               </div>
               
               <div className="p-4 rounded-lg bg-black text-green-400 font-mono text-[10px] space-y-1">
                 <p>{">"} [SYSTEM] Pilot initialized.</p>
                 <p>{">"} [INFO] Monitoring repository ecommerce-3a2f...</p>
-                <p>{">"} [WIX] Snapshot v_pre_update_cafe created.</p>
                 <p>{">"} [STATUS] Awaiting next instruction...</p>
               </div>
             </div>

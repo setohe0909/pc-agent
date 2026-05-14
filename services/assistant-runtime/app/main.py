@@ -97,7 +97,10 @@ async def assistant_request(request: AssistantRequest) -> dict:
     from app.use_cases.picture_graph import PictureGraph
     from app.use_cases.coder_web_graph import CoderWebGraph
     picture_workflow = PictureGraph(llm=llm_port, memory=memory_port)
-    coder_web_workflow = CoderWebGraph(llm=llm_port, memory=memory_port, coder_web=PilotWebAdapter())
+    
+    coder_web_adapter = PilotWebAdapter()
+        
+    coder_web_workflow = CoderWebGraph(llm=llm_port, memory=memory_port, coder_web=coder_web_adapter)
 
     try:
         if request.action_type in {ActionType.trade_decision, ActionType.open_position}:

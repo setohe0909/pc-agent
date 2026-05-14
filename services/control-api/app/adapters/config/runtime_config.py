@@ -26,7 +26,6 @@ PUBLIC_KEYS = {
     "coder_web_stack",
     "coder_web_autonomy",
     "coder_web_perf",
-    "wix_site_id",
     "github_org",
 }
 
@@ -45,7 +44,6 @@ SECRET_KEYS = {
     "marketing_brand_type",
     "marketing_tone",
     "marketing_poll_frequency",
-    "wix_api_key",
     "github_token",
 }
 
@@ -82,8 +80,6 @@ class RuntimeConfigUpdate(BaseModel):
     marketing_brand_type: str | None = Field(default=None, max_length=80)
     marketing_tone: str | None = Field(default=None, max_length=80)
     marketing_poll_frequency: str | None = Field(default=None, max_length=80)
-    wix_api_key: str | None = Field(default=None, max_length=4096)
-    wix_site_id: str | None = Field(default=None, max_length=4096)
     github_token: str | None = Field(default=None, max_length=4096)
     github_org: str | None = Field(default=None, max_length=4096)
     coder_web_stack: str | None = Field(default=None, max_length=80)

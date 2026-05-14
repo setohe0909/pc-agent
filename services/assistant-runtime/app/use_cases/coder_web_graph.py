@@ -10,12 +10,11 @@ class CoderWebState(TypedDict):
     """Estado robusto del flujo de Coder Web Agent v0.2.0."""
     prompt: str
     images: Optional[List[bytes]]
-    project_type: str  # 'repo' or 'wix'
+    project_type: str  # always 'repo' now
     stack: str
     context: str
     plan: Optional[dict]
     task_result: Optional[dict]
-    versioning_status: Optional[dict]
     payload: dict
     errors: List[str]
     warnings: List[str]
@@ -38,7 +37,6 @@ class CoderWebGraph:
         workflow.add_node("retrieve_context", self._retrieve_context_node)
         workflow.add_node("analyze_request", self._analyze_request_node)
         workflow.add_node("plan_review", self._plan_review_node)
-        workflow.add_node("pilot_versioning", self._pilot_versioning_node)
         workflow.add_node("execute_pilot_task", self._execute_pilot_task_node)
         workflow.add_node("finalize", self._finalize_node)
 
@@ -49,27 +47,12 @@ class CoderWebGraph:
         workflow.add_edge("analyze_references", "retrieve_context")
         workflow.add_edge("retrieve_context", "analyze_request")
         workflow.add_edge("analyze_request", "plan_review")
-        
-        # Flujo condicional: Si es Wix, versionamos antes de tocar
-        workflow.add_conditional_edges(
-            "plan_review",
-            self._decide_versioning,
-            {
-                "wix_flow": "pilot_versioning",
-                "repo_flow": "execute_pilot_task"
-            }
-        )
-        
-        workflow.add_edge("pilot_versioning", "execute_pilot_task")
+        workflow.add_edge("plan_review", "execute_pilot_task")
         workflow.add_edge("execute_pilot_task", "finalize")
         workflow.add_edge("finalize", END)
 
         return workflow.compile()
 
-    def _decide_versioning(self, state: CoderWebState):
-        if state.get("project_type") == "wix":
-            return "wix_flow"
-        return "repo_flow"
 
     async def _initialize_node(self, state: CoderWebState) -> dict:
         print("[CODER-WEB GRAPH] v0.6.0 - Iniciando...")
@@ -107,11 +90,10 @@ class CoderWebGraph:
         
         system_instruction = (
             "Eres el Agente Pilot, experto en arquitectura web y automatización de e-commerce. "
-            "Tu objetivo es diseñar una solución técnica. "
+            "Tu objetivo es diseñar una solución técnica DETALLADA. "
             "Stack default para repos: React/TS + Tailwind + Supabase. "
-            "Para Wix: Usa Velo API. "
             "Responde en formato JSON con: "
-            "'project_type' (repo|wix), 'stack', 'plan' (objeto con 'steps' y 'architecture'), 'site_id' (si es wix)."
+            "'project_type' (repo), 'stack', 'plan' (objeto con 'steps', 'architecture')."
         )
         
         try:
@@ -124,33 +106,34 @@ class CoderWebGraph:
             
             data = json.loads(analysis)
             return {
-                "project_type": data.get("project_type", "repo"),
+                "project_type": "repo",
                 "plan": data.get("plan", {"steps": ["Inicializar"], "architecture": "Standard"}),
                 "stack": data.get("stack", state["stack"]),
-                "payload": {**state["payload"], "site_id": state["payload"].get("site_id") or data.get("site_id")}
+                "payload": state["payload"]
             }
         except Exception as e:
             print(f"[CODER-WEB ERROR] Fallo análisis: {e}")
-            return {"project_type": "repo", "plan": {"steps": ["Default Repo Setup"], "architecture": "Basic"}}
+            return {"project_type": "repo", "plan": {"steps": ["Default Repo Setup"], "architecture": "Basic", "velo_code": ""}}
 
     async def _plan_review_node(self, state: CoderWebState) -> dict:
         print("[CODER-WEB GRAPH][REVIEW] Validando plan de Pilot...")
         plan_str = json.dumps(state["plan"])
         prompt = (
-            f"Como experto arquitecto, revisa este plan de Pilot para un proyecto {state['project_type']}:\n{plan_str}\n\n"
-            f"Asegúrate de que el stack {state['stack']} se use correctamente. Sugiere mejoras si faltan componentes críticos de e-commerce."
+            f"Como experto arquitecto, revisa y COMPLETA este plan de Pilot para un proyecto {state['project_type']}:\n{plan_str}\n\n"
+            f"Devuelve el plan actualizado en formato JSON."
         )
-        sys_instr = "Eres el Arquitecto Pilot. Revisa y optimiza planes de desarrollo web."
-        review = await self.llm.chat(prompt, context={"project_context": state["context"]}, system_instruction=sys_instr)
-        # Inyectamos la revisión en el plan para la ejecución
-        updated_plan = {**state["plan"], "review_notes": review}
-        return {"plan": updated_plan}
+        sys_instr = "Eres el Arquitecto Pilot. Revisa, optimiza y escribe código para e-commerce."
+        
+        try:
+            review_json = await self.llm.chat(prompt, context={"project_context": state["context"]}, system_instruction=sys_instr)
+            if "```json" in review_json:
+                review_json = review_json.split("```json")[1].split("```")[0].strip()
+            
+            updated_plan = json.loads(review_json)
+            return {"plan": updated_plan}
+        except:
+            return {"plan": state["plan"]}
 
-    async def _pilot_versioning_node(self, state: CoderWebState) -> dict:
-        site_id = state["payload"].get("site_id", "default_site")
-        print(f"[CODER-WEB GRAPH][VERSIONING] Creando snapshot para Wix Site: {site_id}")
-        version = await self.coder_web.create_site_version(site_id, f"Pre-update: {state['prompt'][:20]}")
-        return {"versioning_status": version}
 
     async def _execute_pilot_task_node(self, state: CoderWebState) -> dict:
         project_type = state["project_type"]
@@ -158,16 +141,11 @@ class CoderWebGraph:
         print(f"[CODER-WEB GRAPH][EXECUTE] Pilot ejecutando {project_type}")
         
         try:
-            if project_type == "repo":
-                res = await self.coder_web.create_repository(
-                    name=f"ecommerce-{os.urandom(2).hex()}",
-                    stack=state["stack"],
-                    description=state["prompt"]
-                )
-            else:
-                site_id = state["payload"].get("site_id", "unknown_site")
-                # Siempre trabajamos en DRAFT por defecto para iteración segura
-                res = await self.coder_web.update_site_draft(site_id, plan)
+            res = await self.coder_web.create_repository(
+                name=f"ecommerce-{os.urandom(2).hex()}",
+                stack=state["stack"],
+                description=state["prompt"]
+            )
             
             await self.memory.save_memory("coder-web", f"Tarea completada ({project_type}): {state['prompt'][:50]}")
             return {"task_result": res}
@@ -184,30 +162,29 @@ class CoderWebGraph:
         res = state.get("task_result")
         if not res:
             return {"results": {"status": "error", "message": "Pilot no pudo generar un resultado válido.", "warnings": warning_list}}
-        v_status = state.get("versioning_status", {})
-        if v_status.get("status") == "success":
-            v_info = f"\n📦 **Versión Wix Guardada:** {v_status.get('version_id')}"
-        else:
-            v_info = f"\n❌ **Fallo Versión Wix:** {v_status.get('message', 'Desconocido')}"
-            
-        res_info = f"🔗 **Resultado:** {res.get('repo_url') or res.get('summary')}"
-        if res.get("preview_url"):
-            res_info += f"\n🌐 **Link de Previsualización:** {res.get('preview_url')}"
-
-        steps = state['plan'].get('steps', [])
+        
+        # Extraer detalles técnicos del plan para mostrarlos al usuario
+        plan = state.get("plan", {})
+        architecture = plan.get("architecture", "Estándar")
+        
+        steps = plan.get('steps', [])
         formatted_steps = []
         for s in steps:
             if isinstance(s, dict):
-                formatted_steps.append(s.get("description") or s.get("name") or str(s))
+                formatted_steps.append(f"• {s.get('description') or s.get('name') or str(s)}")
             else:
-                formatted_steps.append(str(s))
+                formatted_steps.append(f"• {str(s)}")
+        
+        steps_str = "\n".join(formatted_steps)
+
+        res_info = f"🔗 **Repositorio:** {res.get('repo_url')}"
 
         msg = (
             f"✅ **Pilot ha completado la tarea con éxito**\n\n"
-            f"🛠️ **Tipo de Proyecto:** {state['project_type'].upper()}\n"
-            f"📚 **Stack:** {state['stack']}\n"
-            f"📝 **Plan Ejecutado:** {', '.join(formatted_steps)}\n\n"
-            f"{v_info}\n"
+            f"🛠️ **Proyecto:** {state['project_type'].upper()}\n"
+            f"📚 **Stack:** {state['stack']}\n\n"
+            f"📋 **PLAN TÉCNICO:**\n{steps_str}\n\n"
+            f"🏗️ **ARQUITECTURA & DISEÑO:**\n{architecture}\n\n"
             f"{res_info}"
         )
         
@@ -222,7 +199,6 @@ class CoderWebGraph:
             "context": "",
             "plan": None,
             "task_result": None,
-            "versioning_status": None,
             "payload": payload,
             "errors": [],
             "warnings": [],
