@@ -159,7 +159,7 @@ Comandos iniciales:
 !approve_trade decision aprobada para evaluar
 !picture generacion de imagenes con IA y memoria proactiva
 !marketer centro de control de marketing
-!coder-web creacion y ajuste de e-commerce (Wix / React-TS)
+!coder-web creacion y ajuste de e-commerce (Repo React-TS)
 ```
 
 Importante: PC Agent `0.2.0` todavia no ejecuta ordenes reales de Kalshi. La

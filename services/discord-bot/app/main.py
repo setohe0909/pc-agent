@@ -245,7 +245,7 @@ async def main() -> None:
             )
             embed.add_field(
                 name="💻 Coder Web Sub-Agent", 
-                value="`!coder-web <descripción>`: Crear/ajustar e-commerce (Wix o Repo).\n`!coder-web memory`: Ver aprendizajes del desarrollador web.\n`!coder-web memory --clean`: Borrar memoria del día.", 
+                value="`!coder-web <descripción>`: Crear/ajustar e-commerce (Repositorio).\n`!coder-web memory`: Ver aprendizajes del desarrollador web.\n`!coder-web memory --clean`: Borrar memoria del día.", 
                 inline=False
             )
             embed.set_footer(text="PC Agent v0.6.0 - Autonomía y Análisis")
@@ -686,7 +686,7 @@ async def main() -> None:
                 return
 
             if not raw_query:
-                await message.reply("💻 Por favor, añade una descripción para el proyecto web. Ejemplo: `!coder-web crea un ecommerce de zapatos en Wix`.")
+                await message.reply("💻 Por favor, añade una descripción para el proyecto web. Ejemplo: `!coder-web crea un ecommerce de zapatos con React`.")
                 return
 
             # Manejo de Hilos (Evitar error 50024)
@@ -714,9 +714,7 @@ async def main() -> None:
                     "prompt": raw_query,
                     "source": {"platform": "discord", "channel_id": str(message.channel.id), "user_id": str(message.author.id)},
                     "images": images_b64,
-                    "payload": {
-                        "site_id": _get_env("WIX_SITE_ID")
-                    }
+                    "payload": {}
                 }
 
                 result = await _send_assistant_request(payload)

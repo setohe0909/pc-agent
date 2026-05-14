@@ -42,11 +42,10 @@ El agente de imágenes utiliza **DALL-E 3** y memoria proactiva para generar con
 
 ## 4. Desarrollo Web (!coder-web)
 
-El sub-agente de desarrollo web permite automatizar la creación y ajuste de plataformas e-commerce.
+El sub-agente de desarrollo web permite automatizar la creación y ajuste de plataformas e-commerce mediante repositorios de código.
 
 ### Capacidades
 - **E-commerce Repo**: Crea repositorios completos con **React, TypeScript, Tailwind y Supabase**.
-- **Wix Automator**: Ajusta interfaces en Wix mediante su API, permitiendo versionado y cambios rápidos.
 - **Pilot Engine**: Usa el motor Pilot para orquestar la generación de código siguiendo patrones de arquitectura limpia.
 
 ### Comandos
