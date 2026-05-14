@@ -113,7 +113,7 @@ class CoderWebGraph:
             }
         except Exception as e:
             print(f"[CODER-WEB ERROR] Fallo análisis: {e}")
-            return {"project_type": "repo", "plan": {"steps": ["Default Repo Setup"], "architecture": "Basic", "velo_code": ""}}
+            return {"project_type": "repo", "plan": {"steps": ["Default Repo Setup"], "architecture": "Basic"}}
 
     async def _plan_review_node(self, state: CoderWebState) -> dict:
         print("[CODER-WEB GRAPH][REVIEW] Validando plan de Pilot...")

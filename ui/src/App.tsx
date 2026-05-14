@@ -16,7 +16,8 @@ import { WriterView } from "@/components/views/WriterView";
 import { PictureView } from "@/components/views/PictureView";
 import { LeadsView } from "@/components/views/LeadsView";
 import { CoderWebView } from "@/components/views/CoderWebView";
-import { Users, Code } from "lucide-react";
+import { ConsolidationView } from "@/components/views/ConsolidationView";
+import { Users, Code, History } from "lucide-react";
 
 export default function App() {
   const [data, setData] = useState<any>(null);
@@ -76,6 +77,7 @@ export default function App() {
       case "writer": return <WriterView data={data} adminToken={adminToken} onSave={handleSaveConfig} />;
       case "picture": return <PictureView data={data} adminToken={adminToken} onSave={handleSaveConfig} />;
       case "coder": return <CoderWebView data={data} adminToken={adminToken} onSave={handleSaveConfig} />;
+      case "consolidation": return <ConsolidationView />;
       case "wiki": return <WikiView />;
       default: return null;
     }
@@ -121,6 +123,9 @@ export default function App() {
               </TabsTrigger>
               <TabsTrigger value="coder" className="justify-start px-4 py-2 data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
                 <Code className="w-4 h-4 mr-2" /> Coder Web
+              </TabsTrigger>
+              <TabsTrigger value="consolidation" className="justify-start px-4 py-2 data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
+                <History className="w-4 h-4 mr-2" /> Memoria LTM
               </TabsTrigger>
               <div className="my-2 border-t border-border"></div>
               <TabsTrigger value="architecture" className="justify-start px-4 py-2 data-[state=active]:bg-primary/10 data-[state=active]:text-primary">

@@ -57,7 +57,7 @@ class PictureGraph:
         
         system_instruction = (
             "Eres un experto en generación de imágenes y prompt engineering. "
-            "Tu objetivo es crear un prompt altamente detallado para un generador de imágenes (DALL-E 3) "
+            "Tu objetivo es crear un prompt altamente detallado para un generador de imágenes (Imagen 3) "
             "basado en la solicitud del usuario, el contexto de memoria y las imágenes proporcionadas (si las hay). "
             "Si hay imágenes adjuntas, úsalas como referencia estética o temática. "
             "Responde en formato JSON con la clave 'generation_prompt'."
@@ -70,7 +70,7 @@ class PictureGraph:
         try:
             # Usamos el chat con soporte de visión si hay imágenes
             analysis = await self.llm.chat(
-                f"Genera un prompt detallado para DALL-E 3 basado en esto: {user_input}. Responde SOLO el JSON con 'generation_prompt'.",
+                f"Genera un prompt detallado para un generador de imágenes basado en esto: {user_input}. Responde SOLO el JSON con 'generation_prompt'.",
                 images=state.get("images")
             )
             

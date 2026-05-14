@@ -303,6 +303,27 @@ async def get_marketing_leads():
             return {"leads": [], "detail": str(e)}
 
 
+@router.get("/intelligence/memory/consolidation")
+async def get_consolidation_history():
+    url = settings.effective("supabase_url")
+    key = settings.effective("supabase_service_role_key") or settings.effective("supabase_publishable_key")
+    headers = {
+        "apikey": key,
+        "Authorization": f"Bearer {key}",
+    }
+    
+    async with httpx.AsyncClient() as client:
+        try:
+            # Buscamos registros donde metadata->type sea long_term_consolidation
+            query_url = f"{url}/rest/v1/mentis_memory?metadata->>type=eq.long_term_consolidation&order=created_at.desc"
+            response = await client.get(query_url, headers=headers)
+            if response.status_code != 200:
+                return {"history": [], "detail": f"Error de Supabase: {response.text}"}
+            return {"history": response.json()}
+        except Exception as e:
+            return {"history": [], "detail": str(e)}
+
+
 def _supabase_knowledge_base() -> SupabaseVectorKnowledgeBase:
     return SupabaseVectorKnowledgeBase(
         url=settings.effective("supabase_url"),

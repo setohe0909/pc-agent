@@ -215,52 +215,62 @@ class OpenClawLLMAdapter(LLMPort):
 
     async def generate_image(self, prompt: str) -> str:
         from litellm import aimage_generation
+        import os
+        
         provider, _ = self._get_provider_info(policy="smart")
         
+        # Asegurar que las llaves estén en el entorno para LiteLLM
+        gemini_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+        if gemini_key:
+            os.environ["GEMINI_API_KEY"] = gemini_key
+            os.environ["GOOGLE_API_KEY"] = gemini_key
+
         if provider == "gemini":
             # Candidatos de Imagen (Google AI Studio)
-            # Priorizamos modelos 'fast' y 'v3' que suelen ser más accesibles en free tier
+            # Priorizamos modelos estables de la serie 3.0
             candidates = [
-                "gemini/imagen-3.0-fast-generate-001",
                 "gemini/imagen-3.0-generate-001",
-                "gemini/imagen-4.0-fast-generate-001",
-                "gemini/imagen-4.0-generate-001"
+                "gemini/imagen-3.0-fast-generate-001",
+                "google/imagen-3.0-generate-001",
             ]
-            api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
             
             for model in candidates:
                 try:
-                    print(f"[OPEN CLAW] Intentando generar imagen con Gemini ({model})...")
-                    # Intentar con timeout extendido para imágenes
+                    print(f"[OPEN CLAW] Intentando generar imagen con Gemini ({model})...", file=sys.stderr)
                     response = await aimage_generation(
                         model=model,
                         prompt=prompt,
-                        api_key=api_key
+                        api_key=gemini_key
                     )
                     if response.data and len(response.data) > 0:
                         url = response.data[0].url
                         if url:
+                            print(f"[OPEN CLAW SUCCESS] Imagen generada con {model}", file=sys.stderr)
                             return url
-                        # Si LiteLLM devolvió bytes en lugar de URL, esto fallará con 'list index out of range'
-                        # o devolverá None.
-                    print(f"[OPEN CLAW WARNING] {model} no devolvió una URL válida.")
+                    print(f"[OPEN CLAW WARNING] {model} no devolvió una URL válida.", file=sys.stderr)
                 except Exception as e:
-                    # Capturar el error 429 específicamente para informar al usuario
-                    if "429" in str(e):
-                        print(f"[OPEN CLAW ERROR] Quota Exceeded para {model}. Reintenta en unos minutos.")
+                    err_msg = str(e)
+                    if "429" in err_msg:
+                        print(f"[OPEN CLAW ERROR] Quota Exceeded para {model}.", file=sys.stderr)
                     else:
-                        print(f"[OPEN CLAW ERROR] Falló Imagen {model}: {str(e)}")
+                        print(f"[OPEN CLAW ERROR] Falló Imagen {model}: {err_msg}", file=sys.stderr)
                     continue
 
         # Backup a DALL-E 3 si existe la key de OpenAI
         openai_key = os.getenv("OPENAI_API_KEY")
         if openai_key:
-            print(f"[OPEN CLAW] Usando DALL-E 3 como backup...")
-            response = await aimage_generation(
-                model="dall-e-3",
-                prompt=prompt,
-                api_key=openai_key
-            )
-            return response.data[0].url
+            os.environ["OPENAI_API_KEY"] = openai_key
+            print(f"[OPEN CLAW] Usando DALL-E 3 como backup...", file=sys.stderr)
+            try:
+                response = await aimage_generation(
+                    model="openai/dall-e-3",
+                    prompt=prompt,
+                    api_key=openai_key
+                )
+                if response.data and len(response.data) > 0:
+                    return response.data[0].url
+            except Exception as e:
+                print(f"[OPEN CLAW ERROR] Falló backup DALL-E 3: {str(e)}", file=sys.stderr)
             
-        raise Exception("No se pudo generar la imagen con Gemini Imagen y no hay 'OPENAI_API_KEY' configurada para DALL-E 3.")
+        raise Exception("No se pudo generar la imagen. Gemini Imagen falló y el backup de DALL-E 3 también (o no está configurado).")
+
