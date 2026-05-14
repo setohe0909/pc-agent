@@ -789,7 +789,7 @@ async def main() -> None:
                 msg = result.get("message", "No hubo respuesta.")
                 
                 if result.get("status") == "requires_approval":
-                    if sub_command == "publish" and result.get("suggestion"):
+                    if result.get("suggestion"):
                         suggestion = result["suggestion"]
                         embed = discord.Embed(
                             title="📝 Vista Previa del Post",
