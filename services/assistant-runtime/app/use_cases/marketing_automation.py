@@ -402,7 +402,7 @@ class MarketingAutomationService:
 
         suggestion = payload.get("suggestion")
         if suggestion:
-            caption = suggestion.get("caption", content)
+            caption = self._caption_from_suggestion(suggestion, content)
         else:
             hashtags = await self._generate_hashtags(content)
             caption = f"{content}\n\n{' '.join(hashtags)}"
@@ -445,6 +445,20 @@ class MarketingAutomationService:
             return enhanced.strip()
         except Exception:
             return content
+
+    def _caption_from_suggestion(self, suggestion: dict, fallback: str) -> str:
+        caption = suggestion.get("caption")
+        if caption:
+            return caption
+
+        description = suggestion.get("enhanced_description") or fallback
+        hashtags = suggestion.get("hashtags") or []
+        if isinstance(hashtags, str):
+            hashtags_text = hashtags
+        else:
+            hashtags_text = " ".join(str(tag) for tag in hashtags if tag)
+
+        return f"{description}\n\n{hashtags_text}".strip()
 
     async def _generate_hashtags(self, content: str) -> list[str]:
         prompt = (

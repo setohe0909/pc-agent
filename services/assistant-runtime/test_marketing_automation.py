@@ -10,7 +10,11 @@ from app.use_cases.marketing_automation import MarketingAutomationService
 
 
 class FakeLLM:
+    def __init__(self):
+        self.calls = []
+
     async def chat(self, *args, **kwargs):
+        self.calls.append((args, kwargs))
         return "respuesta generica"
 
 
@@ -201,6 +205,57 @@ class MarketingAutomationTests(unittest.TestCase):
             self.assertTrue(marketing.published_posts)
             self.assertTrue(all(post.get("draft") for post in marketing.published_posts))
             self.assertIn("drafts en Zernio", result["message"])
+
+        asyncio.run(scenario())
+
+    def test_approved_post_uses_exact_approved_suggestion_without_regenerating(self):
+        async def scenario():
+            marketing = FakeMarketing()
+            llm = FakeLLM()
+            service = MarketingAutomationService(llm, marketing, FakeMemory())
+            approved_caption = "Texto aprobado por el usuario\n\n#uno #dos #tres"
+
+            result = await service.publish_post(
+                "texto original que no debe publicarse",
+                media_urls=["https://cdn.example.com/post.png"],
+                platform="instagram",
+                payload={
+                    "is_approved": True,
+                    "suggestion": {
+                        "enhanced_description": "Texto aprobado por el usuario",
+                        "hashtags": ["#uno", "#dos", "#tres"],
+                        "caption": approved_caption,
+                    },
+                },
+            )
+
+            self.assertEqual(result["status"], "success")
+            self.assertEqual(marketing.published_posts[0]["content"], approved_caption)
+            self.assertEqual(llm.calls, [])
+
+        asyncio.run(scenario())
+
+    def test_approved_post_rebuilds_caption_from_suggestion_parts_without_regenerating(self):
+        async def scenario():
+            marketing = FakeMarketing()
+            llm = FakeLLM()
+            service = MarketingAutomationService(llm, marketing, FakeMemory())
+
+            result = await service.publish_post(
+                "texto original que no debe publicarse",
+                platform="instagram",
+                payload={
+                    "is_approved": True,
+                    "suggestion": {
+                        "enhanced_description": "Descripción aprobada",
+                        "hashtags": ["#marca", "#contenido"],
+                    },
+                },
+            )
+
+            self.assertEqual(result["status"], "success")
+            self.assertEqual(marketing.published_posts[0]["content"], "Descripción aprobada\n\n#marca #contenido")
+            self.assertEqual(llm.calls, [])
 
         asyncio.run(scenario())
 
