@@ -217,10 +217,6 @@ class ZernioAdapter(MarketingPort):
                 f"/analytics/instagram/account-insights",
                 {"accountId": ig_id, "since": since, "until": until},
             )
-            if isinstance(raw, dict):
-                print(f"[ZERNIO DEBUG] IG insights success={raw.get('success')}, has_metrics={'metrics' in raw}")
-                if raw.get("metrics"):
-                    print(f"[ZERNIO DEBUG] IG metrics keys: {list(raw['metrics'].keys())}")
             if isinstance(raw, dict) and raw.get("success"):
                 ig_insights = raw.get("metrics", {})
 
@@ -230,11 +226,6 @@ class ZernioAdapter(MarketingPort):
                 f"/analytics/tiktok/account-insights",
                 {"accountId": tt_id, "since": since, "until": until},
             )
-            print(f"[ZERNIO DEBUG] TikTok insights raw keys: {list(raw.keys()) if isinstance(raw, dict) else type(raw)}")
-            if isinstance(raw, dict):
-                print(f"[ZERNIO DEBUG] TikTok insights success={raw.get('success')}, has_metrics={'metrics' in raw}")
-                if raw.get("metrics"):
-                    print(f"[ZERNIO DEBUG] TikTok metrics keys: {list(raw['metrics'].keys())}")
             if isinstance(raw, dict) and raw.get("success"):
                 tt_insights = raw.get("metrics", {})
 
@@ -254,7 +245,6 @@ class ZernioAdapter(MarketingPort):
                 {"sortBy": "engagement", "order": "desc", "limit": "10", "platform": "tiktok"},
             )
             if isinstance(tt_analytics_raw, dict):
-                print(f"[ZERNIO DEBUG] TikTok analytics success={tt_analytics_raw.get('success')}, posts_count={len(tt_analytics_raw.get('posts', []))}")
                 tt_posts = tt_analytics_raw.get("posts", [])
                 existing_ids = {p.get("_id") for p in posts_list if p.get("_id")}
                 for tp in tt_posts:
@@ -266,9 +256,6 @@ class ZernioAdapter(MarketingPort):
         follower_accounts = []
         if isinstance(follower_raw, dict):
             follower_accounts = follower_raw.get("accounts", [])
-            print(f"[ZERNIO DEBUG] Follower-stats accounts count={len(follower_accounts)}")
-            for fa in follower_accounts:
-                print(f"[ZERNIO DEBUG]   account platform={fa.get('platform')}, keys={list(fa.keys())}")
 
         # Best times
         best_times_raw = await self._z_get("/analytics/best-time")
@@ -339,6 +326,13 @@ class ZernioAdapter(MarketingPort):
                 "profile_visits": _extract(ig_insights, "profile_visits", "profile_views", "profileVisits"),
                 "website_clicks": _extract(ig_insights, "website_clicks", "websiteClicks"),
             }
+
+        # Estimar impresiones IG desde proporción en daily_data
+        ig_reach_val = ig_metrics.get("reach", 0)
+        ig_impressions_val = ig_metrics.get("impressions", "N/D")
+        if ig_impressions_val == "N/D" and isinstance(ig_reach_val, (int, float)) and ig_reach_val > 0 and total_reach > 0:
+            ig_share = ig_reach_val / total_reach
+            ig_metrics["impressions"] = str(round(total_impressions * ig_share))
 
         ig_insights_gained = _extract(ig_insights or {}, "followers_gained", "followersGained")
         ig_insights_lost = _extract(ig_insights or {}, "followers_lost", "followersLost")
