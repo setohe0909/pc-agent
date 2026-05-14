@@ -48,3 +48,31 @@ class MarketingPort(ABC):
     @abstractmethod
     async def get_best_posting_windows(self) -> dict:
         pass
+
+    @abstractmethod
+    async def list_posts(self, platform: str | None = None, limit: int = 10) -> list[dict]:
+        pass
+
+    @abstractmethod
+    async def save_campaign_draft(self, campaign: dict) -> bool:
+        pass
+
+    @abstractmethod
+    async def save_post_draft(self, post: dict) -> bool:
+        pass
+
+    @abstractmethod
+    async def save_automation_run(self, run: dict) -> bool:
+        pass
+
+    @abstractmethod
+    async def has_processed(self, dedupe_key: str) -> bool:
+        pass
+
+    @abstractmethod
+    async def schedule_post(self, post: dict) -> bool:
+        pass
+
+    @abstractmethod
+    async def publish_post(self, post: dict) -> bool:
+        pass

@@ -4,6 +4,7 @@ from langgraph.graph import StateGraph, END
 from app.domain.ports.llm import LLMPort
 from app.domain.ports.memory import MemoryPort
 from app.domain.ports.marketing import MarketingPort
+from app.use_cases.marketing_automation import MarketingAutomationService
 import json
 import re
 import unicodedata
@@ -32,6 +33,7 @@ class MarketingGraph:
         self.llm = llm
         self.memory = memory
         self.marketing = marketing
+        self.automation = MarketingAutomationService(llm=llm, memory=memory, marketing=marketing)
         self._graph = self._build_graph()
 
     def _get_marketing_tools(self) -> List[dict]:
@@ -123,6 +125,83 @@ class MarketingGraph:
                     },
                     "required": ["report_type"]
                 }
+            },
+            {
+                "name": "get_top_content",
+                "description": "Lista los mejores contenidos de Instagram y TikTok.",
+                "parameters": {"type": "object", "properties": {}}
+            },
+            {
+                "name": "get_audience_insights",
+                "description": "Analiza segmentos de audiencia, ubicaciones, preferencias y oportunidades.",
+                "parameters": {"type": "object", "properties": {}}
+            },
+            {
+                "name": "get_growth_alerts",
+                "description": "Muestra alertas de rendimiento, riesgo y oportunidades de crecimiento.",
+                "parameters": {"type": "object", "properties": {}}
+            },
+            {
+                "name": "review_recent_comments",
+                "description": "Resume comentarios recientes y señales de intención.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "sentiment": {"type": "string", "description": "Filtro opcional: negative"}
+                    }
+                }
+            },
+            {
+                "name": "draft_comment_replies",
+                "description": "Prepara borradores de respuesta sin publicarlos.",
+                "parameters": {"type": "object", "properties": {}}
+            },
+            {
+                "name": "get_sales_leads",
+                "description": "Lista leads detectados y próximos pasos sugeridos.",
+                "parameters": {"type": "object", "properties": {}}
+            },
+            {
+                "name": "generate_content_plan",
+                "description": "Genera un calendario de contenido basado en métricas reales de Zernio.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "horizon": {"type": "string", "description": "Horizonte del plan, por ejemplo 7 días"}
+                    }
+                }
+            },
+            {
+                "name": "repurpose_top_content",
+                "description": "Convierte contenido ganador en nuevas piezas para otros canales.",
+                "parameters": {"type": "object", "properties": {}}
+            },
+            {
+                "name": "get_best_hours",
+                "description": "Recomienda mejores horarios de publicación por canal y formato.",
+                "parameters": {"type": "object", "properties": {}}
+            },
+            {
+                "name": "create_campaign",
+                "description": "Genera una campaña asistida basada en métricas de Zernio y pide aprobación.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "topic": {"type": "string", "description": "Objetivo, producto o tema de la campaña"}
+                    },
+                    "required": ["topic"]
+                }
+            },
+            {
+                "name": "generate_post_queue",
+                "description": "Genera borradores de posts para Instagram y TikTok y pide aprobación para programar/publicar.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "topic": {"type": "string", "description": "Campaña, producto o tema para los posts"}
+                    },
+                    "required": ["topic"]
+                }
             }
         ]
 
@@ -141,6 +220,27 @@ class MarketingGraph:
                     report_type = candidate
                     break
             return {"tool_name": "generate_report", "arguments": {"report_type": report_type}}
+
+        direct_patterns = [
+            (("top content", "mejor contenido", "contenidos top", "top contenidos"), "get_top_content"),
+            (("audiencia", "segmenta", "segmentos"), "get_audience_insights"),
+            (("alerta", "alertas", "riesgo"), "get_growth_alerts"),
+            (("comentarios negativos", "negative comments"), "review_recent_comments"),
+            (("comentarios", "comments"), "review_recent_comments"),
+            (("borradores", "drafts", "respuestas para aprobacion"), "draft_comment_replies"),
+            (("leads", "prospectos", "oportunidades de venta"), "get_sales_leads"),
+            (("calendario", "content plan", "plan de contenido"), "generate_content_plan"),
+            (("repurpose", "reutiliza", "convierte mi mejor"), "repurpose_top_content"),
+            (("mejores horarios", "best hours", "horarios"), "get_best_hours"),
+            (("campana", "campanas", "campaign"), "create_campaign"),
+            (("posts", "post ", "publicaciones"), "generate_post_queue"),
+        ]
+        for keywords, tool_name in direct_patterns:
+            if any(keyword in normalized for keyword in keywords):
+                arguments = {"topic": prompt}
+                if tool_name == "review_recent_comments" and "negativ" in normalized:
+                    arguments["sentiment"] = "negative"
+                return {"tool_name": tool_name, "arguments": arguments}
 
         return None
 
@@ -222,25 +322,47 @@ class MarketingGraph:
         
         forced_cmds = [
             "respond", "qualify", "trends", "sentiment", "plan", "research",
-            "dashboard", "report", "status", "magnet", "funnel", "collab", "memory"
+            "dashboard", "report", "status", "magnet", "funnel", "collab", "memory",
+            "top-content", "audience", "alerts", "comments", "negative-comments",
+            "reply-drafts", "leads", "content-plan", "repurpose", "best-hours",
+            "competitors", "campaign", "posts"
         ]
         if state["sub_command"] in forced_cmds:
             tool_name = state["sub_command"]
-            if tool_name == "respond": tool_name = "respond_to_comments"
-            if tool_name == "qualify": tool_name = "qualify_leads"
-            if tool_name == "plan": tool_name = "plan_campaign"
-            if tool_name == "research": tool_name = "research_competitors"
-            if tool_name == "dashboard": tool_name = "generate_dashboard"
-            if tool_name == "report": tool_name = "generate_report"
-            if tool_name == "status": tool_name = "get_status"
-            if tool_name == "magnet": tool_name = "process_lead_magnets"
-            if tool_name == "funnel": tool_name = "generate_funnel"
-            if tool_name == "collab": tool_name = "find_collaborations"
-            if tool_name == "memory": tool_name = "get_marketing_memory"
+            aliases = {
+                "respond": "respond_to_comments",
+                "qualify": "qualify_leads",
+                "plan": "plan_campaign",
+                "research": "research_competitors",
+                "competitors": "research_competitors",
+                "dashboard": "generate_dashboard",
+                "report": "generate_report",
+                "status": "get_status",
+                "magnet": "process_lead_magnets",
+                "funnel": "generate_funnel",
+                "collab": "find_collaborations",
+                "memory": "get_marketing_memory",
+                "top-content": "get_top_content",
+                "audience": "get_audience_insights",
+                "alerts": "get_growth_alerts",
+                "comments": "review_recent_comments",
+                "negative-comments": "review_recent_comments",
+                "reply-drafts": "draft_comment_replies",
+                "leads": "get_sales_leads",
+                "content-plan": "generate_content_plan",
+                "repurpose": "repurpose_top_content",
+                "best-hours": "get_best_hours",
+                "campaign": "create_campaign",
+                "posts": "generate_post_queue",
+            }
+            tool_name = aliases.get(tool_name, tool_name)
             
             print(f"[GRAPH][INTENT] Comando forzado detectado: {tool_name}")
             return {
-                "suggested_action": {"tool_name": tool_name, "arguments": {"topic": state["prompt"]}},
+                "suggested_action": {
+                    "tool_name": tool_name,
+                    "arguments": {"topic": state["prompt"], "sentiment": "negative" if state["sub_command"] == "negative-comments" else None}
+                },
                 "requires_approval": tool_name == "plan_campaign"
             }
 
@@ -301,14 +423,14 @@ class MarketingGraph:
 
         try:
             if tool_name == "respond_to_comments":
-                result = await self._respond_to_comments()
+                result = await self._respond_to_comments(state.get("payload", {}))
             elif tool_name == "get_status":
                 result = await self._get_status()
             elif tool_name == "research_competitors":
                 competitor = action.get("arguments", {}).get("competitor") or action.get("arguments", {}).get("topic") or state["prompt"]
                 result = await self._research_competitors(competitor)
             elif tool_name == "process_lead_magnets":
-                result = await self._process_lead_magnets()
+                result = await self._process_lead_magnets(state.get("payload", {}))
             elif tool_name == "generate_funnel":
                 topic = action.get("arguments", {}).get("topic") or state["prompt"]
                 result = await self._generate_funnel(topic)
@@ -317,8 +439,32 @@ class MarketingGraph:
                 result = await self._find_collaborations(brand_profile)
             elif tool_name == "get_marketing_memory":
                 result = await self._get_marketing_memory()
+            elif tool_name == "get_top_content":
+                result = await self._get_top_content()
+            elif tool_name == "get_audience_insights":
+                result = await self._get_audience_insights()
+            elif tool_name == "get_growth_alerts":
+                result = await self._get_growth_alerts()
+            elif tool_name == "review_recent_comments":
+                result = await self._review_recent_comments(action.get("arguments", {}).get("sentiment"))
+            elif tool_name == "draft_comment_replies":
+                result = await self._draft_comment_replies()
+            elif tool_name == "get_sales_leads":
+                result = await self._get_sales_leads()
+            elif tool_name == "generate_content_plan":
+                result = await self._generate_content_plan(action.get("arguments", {}).get("horizon") or action.get("arguments", {}).get("topic") or "7 días")
+            elif tool_name == "repurpose_top_content":
+                result = await self._repurpose_top_content()
+            elif tool_name == "get_best_hours":
+                result = await self._get_best_hours()
+            elif tool_name == "create_campaign":
+                topic = action.get("arguments", {}).get("topic") or state["prompt"]
+                result = await self.automation.plan_campaign(topic, payload=state.get("payload", {}), context=state.get("context", ""))
+            elif tool_name == "generate_post_queue":
+                topic = action.get("arguments", {}).get("topic") or state["prompt"]
+                result = await self.automation.generate_post_queue(topic, payload=state.get("payload", {}), context=state.get("context", ""))
             elif "qualify" in tool_name:
-                result = await self._qualify_leads()
+                result = await self._qualify_leads(state.get("payload", {}))
             elif "trends" in tool_name:
                 result = await self._monitor_trends()
             elif "sentiment" in tool_name:
@@ -455,34 +601,18 @@ class MarketingGraph:
             f"Estado: Conectado vía Zernio."
         )
 
-    async def _respond_to_comments(self) -> dict:
-        comments = await self.marketing.get_comments("instagram", "latest_post")
-        responses = []
-
-        for comment in comments:
-            response_prompt = (
-                f"Actúa como un Community Manager empático y positivo. "
-                f"Genera una respuesta corta y amable para este comentario: \"{comment['text']}\"."
-            )
-            reply_text = await self.llm.chat(response_prompt)
-            await self.marketing.reply_to_comment("instagram", comment["id"], reply_text)
-            responses.append({"comment": comment["text"], "reply": reply_text})
-
-        if not responses:
-            return {"status": "success", "message": "No encontré comentarios recientes para responder."}
-
-        summary = "He respondido a los comentarios recientes de Instagram:\n\n"
-        for response in responses:
-            summary += f"- **Comentario:** {response['comment']}\n  **Respuesta:** {response['reply']}\n"
-        return {"status": "success", "message": summary}
+    async def _respond_to_comments(self, payload: dict | None = None) -> dict:
+        return await self.automation.respond_to_comments(payload)
 
     async def _get_status(self) -> dict:
         status_report = (
             "**Estado del Sub-Agente !marketer**\n"
             "✅ Conexión Zernio: Activa\n"
-            "✅ Acciones sociales: respond, qualify, magnet, sentiment\n"
-            "✅ Estrategia: plan, research, trends, collab, funnel\n"
-            "✅ Analítica: dashboard, report\n"
+            "✅ Analítica: dashboard, report, top-content, audience, alerts, best-hours\n"
+            "✅ Comunidad: comments, negative-comments, reply-drafts, respond, qualify, leads, magnet\n"
+            "✅ Estrategia: campaign, posts, content-plan, repurpose, plan, research, competitors, trends, collab, funnel\n"
+            "✅ Autonomía: modo asistido por defecto; publicaciones, DMs y respuestas requieren aprobación\n"
+            "✅ Visual: dashboard con imagen adjunta en Discord\n"
             "🧠 Memoria Mentis: disponible si Supabase está configurado"
         )
         return {"status": "success", "message": status_report}
@@ -497,65 +627,11 @@ class MarketingGraph:
         research = await self.llm.chat(research_prompt)
         return {"status": "success", "message": f"## 🔍 Análisis de Competencia: {competitor}\n\n{research}"}
 
-    async def _qualify_leads(self) -> dict:
-        comments = await self.marketing.get_comments("instagram", "latest_post")
-        leads_found = []
+    async def _qualify_leads(self, payload: dict | None = None) -> dict:
+        return await self.automation.qualify_leads(payload)
 
-        for comment in comments:
-            text = comment.get("text", "")
-            hot_signal = any(word in text.upper() for word in ("INFO", "PRECIO", "COMPRAR", "QUIERO", "CATALOGO"))
-            lead = {
-                "platform": "instagram",
-                "external_user": comment["user"],
-                "comment_text": text,
-                "intent_score": 8 if hot_signal else 5,
-                "category": "hot" if hot_signal else "interested",
-                "reason": "Intención detectada por palabra clave" if hot_signal else "Interacción positiva detectada"
-            }
-            if lead["intent_score"] >= 7:
-                leads_found.append(lead)
-                await self.marketing.save_lead(lead)
-                await self.memory.save_memory(
-                    category="marketing_lead",
-                    summary=f"Lead cualificado detectado: {lead['external_user']} ({lead['category']})"
-                )
-
-        if not leads_found:
-            return {"status": "success", "message": "No se encontraron leads de alta intención en las interacciones recientes."}
-
-        summary = "### 🎯 Leads Cualificados Detectados\n\n"
-        for lead in leads_found:
-            summary += (
-                f"👤 **{lead['external_user']}**: {lead['comment_text']}\n"
-                f"🔥 **Intención**: {lead['intent_score']}/10 ({lead['category']})\n"
-                f"💡 **Razón**: {lead['reason']}\n\n"
-            )
-        return {"status": "success", "message": summary}
-
-    async def _process_lead_magnets(self) -> dict:
-        magnets = {
-            "GUIA": {"link": "https://brand.com/free-guide", "name": "Guía de Estilo"},
-            "INFO": {"link": "https://brand.com/catalog", "name": "Catálogo 2026"}
-        }
-        comments = await self.marketing.get_comments("instagram", "latest_post")
-        details = []
-
-        for comment in comments:
-            text_upper = comment["text"].upper()
-            for trigger, data in magnets.items():
-                if trigger in text_upper:
-                    dm_text = f"¡Hola! Gracias por tu interés. Aquí tienes tu {data['name']}: {data['link']}"
-                    await self.marketing.send_dm("instagram", comment["user"], dm_text)
-                    details.append(f"✅ DM enviado a **{comment['user']}** (Trigger: `{trigger}`)")
-                    break
-
-        if not details:
-            return {"status": "success", "message": "No se encontraron comentarios con palabras clave de Lead Magnet (GUIA, INFO)."}
-
-        return {
-            "status": "success",
-            "message": "### 🧲 Automatización de Lead Magnets\n\n" + "\n".join(details) + f"\n\n**Total procesados:** {len(details)}"
-        }
+    async def _process_lead_magnets(self, payload: dict | None = None) -> dict:
+        return await self.automation.process_lead_magnets(payload)
 
     async def _generate_funnel(self, prompt: str) -> dict:
         funnel_prompt = (
@@ -629,3 +705,143 @@ class MarketingGraph:
         if not context:
             return {"status": "success", "message": "El Marketer aún no tiene aprendizajes guardados."}
         return {"status": "success", "message": f"### 🧠 Memoria de Aprendizaje (Marketer)\n\n{context}"}
+
+    async def _get_top_content(self) -> dict:
+        content = await self.marketing.get_top_content(limit=5)
+        if not content:
+            return {"status": "success", "message": "No encontré contenido destacado en Zernio todavía."}
+
+        lines = ["## 🏆 Top Content Zernio\n"]
+        for index, item in enumerate(content, start=1):
+            metric = item.get("views") or item.get("reach") or "N/D"
+            lines.append(
+                f"{index}. **{item.get('title', 'Contenido')}** ({item.get('platform', 'canal')})\n"
+                f"   - Formato: {item.get('format', 'N/D')} · Alcance/Views: **{metric}** · ER: **{item.get('engagement_rate', 'N/D')}**\n"
+                f"   - Tema: {item.get('topic', 'N/D')} · Shares: {item.get('shares', 'N/D')} · Saves: {item.get('saves', 'N/D')}"
+            )
+        return {"status": "success", "message": "\n".join(lines)}
+
+    async def _get_audience_insights(self) -> dict:
+        audience = await self.marketing.get_audience_insights()
+        segments = audience.get("segments", [])
+        segment_lines = "\n".join(
+            f"- **{segment.get('name')}** ({segment.get('share')}): {segment.get('signal')}"
+            for segment in segments
+        ) or "- Sin segmentos disponibles."
+        preferences = ", ".join(audience.get("content_preferences", [])) or "N/D"
+        windows = ", ".join(audience.get("best_posting_windows", [])) or "N/D"
+        locations = ", ".join(audience.get("top_locations", [])) or "N/D"
+
+        msg = (
+            "## 👥 Audiencia Zernio\n\n"
+            f"- Ubicaciones principales: **{locations}**\n"
+            f"- Edad principal: **{audience.get('top_age_range', 'N/D')}**\n"
+            f"- Mejores horarios: **{windows}**\n"
+            f"- Preferencias de contenido: **{preferences}**\n\n"
+            "### Segmentos\n"
+            f"{segment_lines}"
+        )
+        return {"status": "success", "message": msg}
+
+    async def _get_growth_alerts(self) -> dict:
+        alerts = await self.marketing.get_alerts()
+        if not alerts:
+            return {"status": "success", "message": "No hay alertas activas de crecimiento o reputación."}
+
+        severity_icon = {"high": "🔴", "medium": "🟠", "low": "🟢"}
+        lines = ["## 🚨 Alertas Zernio\n"]
+        for alert in alerts:
+            severity = alert.get("severity", "low")
+            lines.append(
+                f"{severity_icon.get(severity, '⚪')} **{alert.get('title', 'Alerta')}** ({alert.get('platform', 'general')})\n"
+                f"- Detalle: {alert.get('detail', 'N/D')}\n"
+                f"- Acción sugerida: {alert.get('recommendation', 'Revisar manualmente')}"
+            )
+        return {"status": "success", "message": "\n\n".join(lines)}
+
+    async def _review_recent_comments(self, sentiment: str | None = None) -> dict:
+        comments = await self.marketing.get_comments("instagram", "latest_post")
+        if sentiment == "negative":
+            negative_terms = ("malo", "caro", "problema", "no me gusta", "demora", "queja")
+            comments = [comment for comment in comments if any(term in comment.get("text", "").lower() for term in negative_terms)]
+
+        if not comments:
+            label = "negativos " if sentiment == "negative" else ""
+            return {"status": "success", "message": f"No encontré comentarios {label}recientes."}
+
+        lines = ["## 💬 Comentarios recientes\n"]
+        for comment in comments[:8]:
+            text = comment.get("text", "")
+            signal = "lead" if any(word in text.upper() for word in ("INFO", "PRECIO", "COMPRAR", "QUIERO")) else "comunidad"
+            lines.append(f"- **{comment.get('user', 'usuario')}**: {text}\n  Señal: `{signal}`")
+        return {"status": "success", "message": "\n".join(lines)}
+
+    async def _draft_comment_replies(self) -> dict:
+        comments = await self.marketing.get_comments("instagram", "latest_post")
+        if not comments:
+            return {"status": "success", "message": "No encontré comentarios recientes para preparar respuestas."}
+
+        lines = ["## ✍️ Borradores de respuesta\n"]
+        for comment in comments[:5]:
+            prompt = (
+                f"Redacta una respuesta breve, cálida y orientada a conversión para este comentario: "
+                f"\"{comment.get('text', '')}\". No publiques, solo entrega el borrador."
+            )
+            draft = await self.llm.chat(prompt)
+            lines.append(f"- **{comment.get('user', 'usuario')}**: {comment.get('text', '')}\n  Borrador: {draft}")
+        return {"status": "success", "message": "\n".join(lines)}
+
+    async def _get_sales_leads(self) -> dict:
+        leads = await self.marketing.get_leads()
+        if not leads:
+            return {"status": "success", "message": "No hay leads detectados por Zernio en este momento."}
+
+        lines = ["## 🔥 Leads detectados\n"]
+        for lead in leads:
+            lines.append(
+                f"- **{lead.get('user')}** ({lead.get('platform')}) · Score: **{lead.get('intent_score')}/10** · Estado: **{lead.get('status')}**\n"
+                f"  Señal: {lead.get('signal')}\n"
+                f"  Siguiente paso: {lead.get('suggested_next_step', 'Contactar con mensaje personalizado')}"
+            )
+        return {"status": "success", "message": "\n".join(lines)}
+
+    async def _generate_content_plan(self, horizon: str) -> dict:
+        dashboard = await self.marketing.get_dashboard()
+        top_content = await self.marketing.get_top_content(limit=5)
+        best_hours = await self.marketing.get_best_posting_windows()
+        prompt = (
+            f"Crea un plan de contenido para {horizon} usando estos datos reales de Zernio.\n"
+            f"Dashboard: {json.dumps(dashboard, ensure_ascii=False)}\n"
+            f"Top content: {json.dumps(top_content, ensure_ascii=False)}\n"
+            f"Mejores horarios: {json.dumps(best_hours, ensure_ascii=False)}\n\n"
+            "Entrega un calendario claro por día con canal, formato, hook, CTA y métrica objetivo."
+        )
+        plan = await self.llm.chat(prompt, context={"brand_context": "marketing"})
+        return {"status": "success", "message": f"## 🗓️ Plan de contenido basado en Zernio\n\n{plan}"}
+
+    async def _repurpose_top_content(self) -> dict:
+        top_content = await self.marketing.get_top_content(limit=3)
+        if not top_content:
+            return {"status": "success", "message": "No encontré contenido ganador para reutilizar."}
+
+        prompt = (
+            "Convierte estos contenidos ganadores en nuevas piezas para Instagram y TikTok.\n"
+            f"{json.dumps(top_content, ensure_ascii=False)}\n\n"
+            "Para cada contenido entrega: nuevo formato, hook, guion corto, CTA y por qué debería funcionar."
+        )
+        ideas = await self.llm.chat(prompt)
+        return {"status": "success", "message": f"## ♻️ Repurpose de contenido ganador\n\n{ideas}"}
+
+    async def _get_best_hours(self) -> dict:
+        windows = await self.marketing.get_best_posting_windows()
+        by_format = windows.get("by_format", {})
+        format_lines = "\n".join(f"- {name}: **{hour}**" for name, hour in by_format.items()) or "- Sin desglose por formato."
+        msg = (
+            "## ⏰ Mejores horarios Zernio\n\n"
+            f"- Instagram: **{', '.join(windows.get('instagram', [])) or 'N/D'}**\n"
+            f"- TikTok: **{', '.join(windows.get('tiktok', [])) or 'N/D'}**\n\n"
+            "### Por formato\n"
+            f"{format_lines}\n\n"
+            f"Recomendación: {windows.get('recommendation', 'Probar horarios y medir retención.')}"
+        )
+        return {"status": "success", "message": msg}

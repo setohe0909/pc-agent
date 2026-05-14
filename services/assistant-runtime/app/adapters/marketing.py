@@ -2,6 +2,12 @@ import os
 from app.domain.ports.marketing import MarketingPort
 
 class SocialMediaStubAdapter(MarketingPort):
+    def __init__(self):
+        self._processed: set[str] = set()
+        self.campaign_drafts: list[dict] = []
+        self.post_drafts: list[dict] = []
+        self.automation_runs: list[dict] = []
+
     async def get_comments(self, platform: str, post_id: str) -> list[dict]:
         # En una implementación real, aquí se llamaría a la API de Instagram o TikTok
         print(f"[STUB] Obteniendo comentarios de {platform} para el post {post_id}")
@@ -66,3 +72,82 @@ class SocialMediaStubAdapter(MarketingPort):
             "report_type": report_type,
             "data": "Report data stub"
         }
+
+    async def get_top_content(self, platform: str | None = None, limit: int = 5) -> list[dict]:
+        content = [
+            {"platform": "instagram", "title": "Reel lanzamiento", "format": "reel", "reach": "24.1K", "engagement_rate": "7.4%", "topic": "producto"},
+            {"platform": "tiktok", "title": "Proceso creativo", "format": "video", "views": "48.3K", "engagement_rate": "8.9%", "topic": "behind-the-scenes"},
+        ]
+        if platform:
+            content = [item for item in content if item["platform"] == platform]
+        return content[:limit]
+
+    async def get_audience_insights(self) -> dict:
+        return {
+            "top_locations": ["Bogotá", "Medellín", "Ciudad de México"],
+            "top_age_range": "25-34",
+            "segments": [
+                {"name": "Compradores potenciales", "share": "38%", "signal": "guardados y clicks"},
+                {"name": "Comunidad creativa", "share": "31%", "signal": "comentarios y shares"},
+            ],
+            "best_posting_windows": ["12:00-14:00", "19:00-21:00"],
+        }
+
+    async def get_alerts(self) -> list[dict]:
+        return [
+            {"severity": "medium", "platform": "instagram", "title": "Caída de alcance en carruseles", "detail": "-18% vs semana anterior"},
+            {"severity": "low", "platform": "tiktok", "title": "Buen momentum en videos educativos", "detail": "+22% completion rate"},
+        ]
+
+    async def get_leads(self, status: str | None = None) -> list[dict]:
+        leads = [
+            {"platform": "instagram", "user": "user2", "intent_score": 8, "status": "hot", "signal": "pidió INFO"},
+            {"platform": "tiktok", "user": "user_tok", "intent_score": 7, "status": "warm", "signal": "preguntó precio"},
+        ]
+        if status:
+            leads = [lead for lead in leads if lead["status"] == status]
+        return leads
+
+    async def get_best_posting_windows(self) -> dict:
+        return {
+            "instagram": ["12:00-14:00", "19:00-21:00"],
+            "tiktok": ["18:00-22:00", "07:00-09:00"],
+            "recommendation": "Publica Reels al mediodía y TikToks educativos al cierre del día.",
+        }
+
+    async def list_posts(self, platform: str | None = None, limit: int = 10) -> list[dict]:
+        posts = [
+            {"id": "stub-post-1", "platform": "instagram", "format": "reel", "title": "Reel lanzamiento", "status": "published"},
+            {"id": "stub-post-2", "platform": "tiktok", "format": "video", "title": "Proceso creativo", "status": "published"},
+        ]
+        if platform:
+            posts = [post for post in posts if post["platform"] == platform]
+        return posts[:limit]
+
+    async def save_campaign_draft(self, campaign: dict) -> bool:
+        self.campaign_drafts.append(campaign)
+        self._processed.add(campaign.get("id", "campaign-draft"))
+        return True
+
+    async def save_post_draft(self, post: dict) -> bool:
+        self.post_drafts.append(post)
+        self._processed.add(post.get("id", "post-draft"))
+        return True
+
+    async def save_automation_run(self, run: dict) -> bool:
+        self.automation_runs.append(run)
+        dedupe_key = run.get("dedupe_key")
+        if dedupe_key:
+            self._processed.add(dedupe_key)
+        return True
+
+    async def has_processed(self, dedupe_key: str) -> bool:
+        return dedupe_key in self._processed
+
+    async def schedule_post(self, post: dict) -> bool:
+        print(f"[STUB] Scheduling post draft {post.get('id')}")
+        return True
+
+    async def publish_post(self, post: dict) -> bool:
+        print(f"[STUB] Publishing post draft {post.get('id')}")
+        return True

@@ -203,6 +203,10 @@ async def assistant_request(request: AssistantRequest) -> dict:
             "critic_note": result.get("critic_note"),
             "warnings": result.get("warnings", []),
             "dashboard": result.get("dashboard"),
+            "campaign": result.get("campaign"),
+            "posts": result.get("posts"),
+            "actions": result.get("actions", []),
+            "requires_approval": result.get("requires_approval", result.get("status") == "requires_approval"),
             "input": request.model_dump(),
         }
     except Exception as exc:

@@ -44,6 +44,12 @@ class FakeMarketing:
         self.replies = []
         self.dms = []
         self.saved_leads = []
+        self.campaign_drafts = []
+        self.post_drafts = []
+        self.automation_runs = []
+        self.scheduled_posts = []
+        self.published_posts = []
+        self.processed = set()
 
     async def get_comments(self, platform: str, post_id: str):
         return [
@@ -112,6 +118,65 @@ class FakeMarketing:
     async def generate_report(self, report_type: str):
         return {"status": "success", "summary": "ok", "link": "#"}
 
+    async def get_top_content(self, platform=None, limit=5):
+        return [
+            {"platform": "tiktok", "title": "Top TikTok", "format": "video", "views": "54.9K", "engagement_rate": "9.4%", "shares": 100, "saves": 50, "topic": "educativo"},
+            {"platform": "instagram", "title": "Top Reel", "format": "reel", "reach": "38.2K", "engagement_rate": "8.1%", "shares": 80, "saves": 70, "topic": "producto"},
+        ][:limit]
+
+    async def get_audience_insights(self):
+        return {
+            "top_locations": ["Bogotá", "Medellín"],
+            "top_age_range": "25-34",
+            "segments": [{"name": "Compradores", "share": "38%", "signal": "INFO"}],
+            "best_posting_windows": ["12:00-14:00"],
+            "content_preferences": ["educativo"],
+        }
+
+    async def get_alerts(self):
+        return [{"severity": "high", "platform": "tiktok", "title": "Oportunidad", "detail": "Views altas", "recommendation": "Mejorar CTA"}]
+
+    async def get_leads(self, status=None):
+        return [{"platform": "instagram", "user": "lead", "intent_score": 9, "status": "hot", "signal": "INFO", "suggested_next_step": "Enviar catálogo"}]
+
+    async def get_best_posting_windows(self):
+        return {
+            "instagram": ["12:00-14:00"],
+            "tiktok": ["18:00-22:00"],
+            "by_format": {"reels": "12:30"},
+            "recommendation": "Publicar al mediodía.",
+        }
+
+    async def list_posts(self, platform=None, limit=10):
+        return [{"id": "post-1", "platform": "instagram", "format": "reel"}][:limit]
+
+    async def save_campaign_draft(self, campaign: dict):
+        self.campaign_drafts.append(campaign)
+        self.processed.add(campaign.get("id"))
+        return True
+
+    async def save_post_draft(self, post: dict):
+        self.post_drafts.append(post)
+        self.processed.add(post.get("id"))
+        return True
+
+    async def save_automation_run(self, run: dict):
+        self.automation_runs.append(run)
+        if run.get("dedupe_key"):
+            self.processed.add(run["dedupe_key"])
+        return True
+
+    async def has_processed(self, dedupe_key: str):
+        return dedupe_key in self.processed
+
+    async def schedule_post(self, post: dict):
+        self.scheduled_posts.append(post)
+        return True
+
+    async def publish_post(self, post: dict):
+        self.published_posts.append(post)
+        return True
+
 
 class MarketingGraphRegressionTests(unittest.TestCase):
     def test_dashboard_prompt_executes_zernio_without_llm_tool_detection(self):
@@ -129,6 +194,7 @@ class MarketingGraphRegressionTests(unittest.TestCase):
             self.assertIn("Instagram", result["message"])
             self.assertIn("TikTok", result["message"])
             self.assertIn("Próximas acciones", result["message"])
+            self.assertIn("dashboard", result)
             self.assertEqual(marketing.dashboard_calls, 1)
 
         asyncio.run(scenario())
@@ -173,6 +239,19 @@ class MarketingGraphRegressionTests(unittest.TestCase):
                 "collab",
                 "memory",
                 "report",
+                "top-content",
+                "audience",
+                "alerts",
+                "comments",
+                "negative-comments",
+                "reply-drafts",
+                "leads",
+                "content-plan",
+                "repurpose",
+                "best-hours",
+                "competitors",
+                "campaign",
+                "posts",
             ]
 
             for command in commands:
@@ -183,8 +262,45 @@ class MarketingGraphRegressionTests(unittest.TestCase):
                         payload={"sub_command": command},
                     )
 
-                    self.assertEqual(result["status"], "success")
+                    self.assertIn(result["status"], {"success", "requires_approval"})
                     self.assertNotIn("no disponible", result["message"].lower())
+
+        asyncio.run(scenario())
+
+    def test_campaign_and_posts_explicit_commands_do_not_use_llm_tool_detection(self):
+        async def scenario():
+            for command in ("campaign", "posts"):
+                with self.subTest(command=command):
+                    graph = MarketingGraph(llm=FakeLLM(), memory=FakeMemory(), marketing=FakeMarketing())
+                    result = await graph.run(
+                        prompt="lanzar nueva colección",
+                        payload={"sub_command": command, "autonomy_level": "assisted"},
+                    )
+
+                    self.assertEqual(result["status"], "requires_approval")
+                    self.assertIn("Zernio", result["message"])
+
+        asyncio.run(scenario())
+
+    def test_natural_negative_comments_prompt_filters_without_llm_tool_detection(self):
+        class NegativeMarketing(FakeMarketing):
+            async def get_comments(self, platform: str, post_id: str):
+                return [
+                    {"id": "c1", "user": "user1", "text": "Me encanta este diseño!"},
+                    {"id": "c2", "user": "user2", "text": "Tengo un problema con la demora"},
+                ]
+
+        async def scenario():
+            graph = MarketingGraph(llm=FakeLLM(), memory=FakeMemory(), marketing=NegativeMarketing())
+
+            result = await graph.run(
+                prompt="Muestra comentarios negativos",
+                payload={"sub_command": "chat"},
+            )
+
+            self.assertEqual(result["status"], "success")
+            self.assertIn("problema", result["message"])
+            self.assertNotIn("Me encanta", result["message"])
 
         asyncio.run(scenario())
 

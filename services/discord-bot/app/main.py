@@ -104,6 +104,14 @@ async def main() -> None:
         async def qualify(self, interaction: discord.Interaction, button: discord.ui.Button):
             await self._run_marketing(interaction, "qualify", "cualifica leads")
 
+        @discord.ui.button(label="📣 Campaign", style=discord.ButtonStyle.primary)
+        async def campaign(self, interaction: discord.Interaction, button: discord.ui.Button):
+            await self._run_marketing(interaction, "campaign", "campaña de crecimiento")
+
+        @discord.ui.button(label="🗂️ Posts", style=discord.ButtonStyle.secondary)
+        async def posts(self, interaction: discord.Interaction, button: discord.ui.Button):
+            await self._run_marketing(interaction, "posts", "posts para campaña de crecimiento")
+
         @discord.ui.button(label="🚀 Trends", style=discord.ButtonStyle.success)
         async def trends(self, interaction: discord.Interaction, button: discord.ui.Button):
             await self._run_marketing(interaction, "trends", "busca tendencias")
@@ -122,7 +130,7 @@ async def main() -> None:
                 "action_type": "marketing",
                 "prompt": prompt,
                 "source": {"platform": "discord", "channel_id": str(interaction.channel_id), "user_id": str(interaction.user.id)},
-                "payload": {"sub_command": sub_cmd}
+                "payload": {"sub_command": sub_cmd, "autonomy_level": "assisted"}
             }
             try:
                 result = await _send_assistant_request(payload)
@@ -355,8 +363,13 @@ async def main() -> None:
                 inline=False
             )
             embed.add_field(
-                name="📣 Marketing Sub-Agent", 
-                value="`!marketer-status`: Estado del marketer.\n`!marketer memory`: Ver aprendizajes del marketer.\n`!marketer respond`: Responder comentarios.\n`!marketer qualify`: Detectar leads calientes.\n`!marketer magnet`: Lead Magnets (DM).\n`!marketer trends`: Buscar tendencias virales.\n`!marketer sentiment`: Análisis de sentimiento/crisis.\n`!marketer collab <marca>`: Buscar colaboraciones.\n`!marketer funnel <tema>`: Diseñar embudo de ventas.\n`!marketer plan <tema>`: Planear campaña.\n`!marketer research <competidor>`: Sondeo de competencia.", 
+                name="📣 Marketing Datos",
+                value="`!marketer-status`: Estado del marketer.\n`!marketer dashboard`: Dashboard visual Zernio.\n`!marketer top-content`: Mejores contenidos.\n`!marketer audience`: Audiencia y segmentos.\n`!marketer alerts`: Alertas de crecimiento.\n`!marketer comments`: Comentarios recientes.\n`!marketer leads`: Leads detectados.\n`!marketer best-hours`: Mejores horarios.",
+                inline=False
+            )
+            embed.add_field(
+                name="📣 Marketing Acciones",
+                value="`!marketer campaign <objetivo>`: Campaña asistida.\n`!marketer posts <tema>`: Borradores de posts.\n`!marketer reply-drafts`: Borradores para aprobación.\n`!marketer content-plan`: Calendario con métricas.\n`!marketer repurpose`: Reutilizar contenido ganador.\n`!marketer respond`: Borradores de respuesta.\n`!marketer qualify`: Detectar leads calientes.\n`!marketer magnet`: Lead Magnets (DM).\n`!marketer trends`: Buscar tendencias virales.\n`!marketer sentiment`: Análisis de sentimiento/crisis.\n`!marketer funnel <tema>`: Diseñar embudo.",
                 inline=False
             )
             embed.add_field(
@@ -557,6 +570,7 @@ async def main() -> None:
 
             sub_command = "chat"
             prompt = raw_query
+            is_approved_marketing = False
             
             if not raw_query or raw_query.strip() == "":
                 embed = discord.Embed(
@@ -579,12 +593,29 @@ async def main() -> None:
             if raw_query.startswith("respond"):
                 sub_command = "respond"
                 prompt = "responde comentarios"
+            elif raw_query.startswith("campaign "):
+                sub_command = "campaign"
+                prompt = raw_query.removeprefix("campaign ").strip()
+            elif raw_query.startswith("posts "):
+                sub_command = "posts"
+                prompt = raw_query.removeprefix("posts ").strip()
+            elif raw_query.startswith("approve-campaign"):
+                sub_command = "campaign"
+                prompt = raw_query.removeprefix("approve-campaign").strip() or "campaña aprobada"
+                is_approved_marketing = True
+            elif raw_query.startswith("approve-posts"):
+                sub_command = "posts"
+                prompt = raw_query.removeprefix("approve-posts").strip() or "posts aprobados"
+                is_approved_marketing = True
             elif raw_query.startswith("plan "):
                 sub_command = "plan"
                 prompt = raw_query.removeprefix("plan ").strip()
             elif raw_query.startswith("research "):
                 sub_command = "research"
                 prompt = raw_query.removeprefix("research ").strip()
+            elif raw_query.startswith("competitors"):
+                sub_command = "competitors"
+                prompt = raw_query.removeprefix("competitors").strip() or "competidor_generico"
             elif raw_query.startswith("qualify"):
                 sub_command = "qualify"
                 prompt = "cualifica leads"
@@ -606,6 +637,42 @@ async def main() -> None:
             elif raw_query.startswith("memory"):
                 sub_command = "memory"
                 prompt = "ver memoria"
+            elif raw_query.startswith("dashboard"):
+                sub_command = "dashboard"
+                prompt = "genera dashboard"
+            elif raw_query.startswith("report"):
+                sub_command = "report"
+                prompt = raw_query.removeprefix("report").strip() or "general"
+            elif raw_query.startswith("top-content"):
+                sub_command = "top-content"
+                prompt = "ver top content"
+            elif raw_query.startswith("audience"):
+                sub_command = "audience"
+                prompt = "ver audiencia"
+            elif raw_query.startswith("alerts"):
+                sub_command = "alerts"
+                prompt = "ver alertas"
+            elif raw_query.startswith("negative-comments"):
+                sub_command = "negative-comments"
+                prompt = "ver comentarios negativos"
+            elif raw_query.startswith("comments"):
+                sub_command = "comments"
+                prompt = "ver comentarios recientes"
+            elif raw_query.startswith("reply-drafts"):
+                sub_command = "reply-drafts"
+                prompt = "prepara borradores de respuesta"
+            elif raw_query.startswith("leads"):
+                sub_command = "leads"
+                prompt = "ver leads"
+            elif raw_query.startswith("content-plan"):
+                sub_command = "content-plan"
+                prompt = raw_query.removeprefix("content-plan").strip() or "7 días"
+            elif raw_query.startswith("repurpose"):
+                sub_command = "repurpose"
+                prompt = "reutiliza contenido ganador"
+            elif raw_query.startswith("best-hours"):
+                sub_command = "best-hours"
+                prompt = "ver mejores horarios"
 
             try:
                 thread = await _get_or_create_agent_thread(message, "Marketer", raw_query)
@@ -618,7 +685,7 @@ async def main() -> None:
                 "prompt": prompt,
                 "source": {"platform": "discord", "channel_id": str(thread.id), "user_id": str(message.author.id)},
                 "images": images_b64,
-                "payload": {"sub_command": sub_command}
+                "payload": {"sub_command": sub_command, "autonomy_level": "assisted", "is_approved": is_approved_marketing}
             }
             
             await thread.send(f"📣 **Marketer Agent procesando `{sub_command}`...**")
@@ -650,7 +717,8 @@ async def main() -> None:
                             
                             await itn.response.edit_message(content="⏳ Ejecutando acción aprobada...", view=None)
                             res = await _send_assistant_request(self.pld)
-                            await itn.message.edit(content=res.get("message", "Acción completada."))
+                            await itn.message.edit(content="✅ Acción aprobada. Resultado enviado debajo.")
+                            await _send_long(thread, res.get("message", "Acción completada."))
                         @discord.ui.button(label="❌ Denegar", style=discord.ButtonStyle.red)
                         async def deny(self, itn, btn):
                             await itn.response.edit_message(content="🚫 Acción denegada.", embed=None, view=None)
