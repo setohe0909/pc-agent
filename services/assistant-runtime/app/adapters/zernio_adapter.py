@@ -270,7 +270,6 @@ class ZernioAdapter(MarketingPort):
         total_reach = 0
         total_impressions = 0
         total_engagement = 0.0
-        follower_growth = 0
         total_interactions = 0
         post_count_30d = 0
 
@@ -297,7 +296,17 @@ class ZernioAdapter(MarketingPort):
                 "views": ig_insights.get("views", {}).get("total", 0),
                 "accounts_engaged": ig_insights.get("accounts_engaged", {}).get("total", 0),
                 "total_interactions": ig_insights.get("total_interactions", {}).get("total", 0),
+                "impressions": ig_insights.get("impressions", {}).get("total", "N/D"),
+                "profile_visits": ig_insights.get("profile_visits", {}).get("total", "N/D"),
+                "website_clicks": ig_insights.get("website_clicks", {}).get("total", "N/D"),
+                "follower_growth": ig_insights.get("follower_growth", {}).get("total", "N/D"),
             }
+
+        ig_engagement_rate = "N/D"
+        ig_reach = ig_metrics.get("reach", 0)
+        ig_interactions = ig_metrics.get("total_interactions", 0)
+        if isinstance(ig_reach, (int, float)) and isinstance(ig_interactions, (int, float)) and ig_reach > 0:
+            ig_engagement_rate = f"{round((ig_interactions / ig_reach) * 100, 1)}%"
 
         tt_metrics = {}
         if tt_insights:
@@ -305,7 +314,14 @@ class ZernioAdapter(MarketingPort):
                 "follower_count": tt_insights.get("follower_count", {}).get("total", 0),
                 "likes_count": tt_insights.get("likes_count", {}).get("total", 0),
                 "video_count": tt_insights.get("video_count", {}).get("total", 0),
+                "views": tt_insights.get("views", {}).get("total", "N/D"),
+                "shares": tt_insights.get("shares", {}).get("total", "N/D"),
+                "profile_visits": tt_insights.get("profile_visits", {}).get("total", "N/D"),
+                "completion_rate": tt_insights.get("completion_rate", {}).get("total", "N/D"),
+                "follower_growth": tt_insights.get("follower_growth", {}).get("total", "N/D"),
             }
+
+        tt_engagement_rate = "N/D"
 
         # Top content por platform
         ig_top = None
@@ -362,6 +378,19 @@ class ZernioAdapter(MarketingPort):
         # Audiencia
         audience = self._build_audience(demographics, platform_map)
 
+        # Follower growth from follower-stats endpoint
+        ig_follower_growth = "N/D"
+        tt_follower_growth = "N/D"
+        for acc in follower_accounts:
+            plat = acc.get("platform", "")
+            growth = acc.get("followerGrowth")
+            if growth is not None:
+                growth_str = f"+{growth}" if growth >= 0 else str(growth)
+                if plat == "instagram":
+                    ig_follower_growth = growth_str
+                elif plat == "tiktok":
+                    tt_follower_growth = growth_str
+
         return {
             "status": "success",
             "source": "Zernio API (datos reales)",
@@ -374,7 +403,7 @@ class ZernioAdapter(MarketingPort):
                 "total_reach": str(total_reach),
                 "total_impressions": str(total_impressions),
                 "total_engagement_rate": f"{total_engagement}%",
-                "followers_growth": f"+{follower_growth}",
+                "followers_growth": ig_follower_growth,
                 "leads_detected": 0,
                 "sentiment_score": "N/D",
                 "posts_last_30d": post_count_30d,
@@ -385,8 +414,13 @@ class ZernioAdapter(MarketingPort):
                     "external_posts": platform_map.get("instagram", {}).get("posts", 0),
                     "reach": ig_metrics.get("reach", "N/D"),
                     "views": ig_metrics.get("views", "N/D"),
+                    "impressions": ig_metrics.get("impressions", "N/D"),
                     "accounts_engaged": ig_metrics.get("accounts_engaged", "N/D"),
                     "total_interactions": ig_metrics.get("total_interactions", "N/D"),
+                    "engagement_rate": ig_engagement_rate,
+                    "followers_growth": ig_metrics.get("follower_growth", ig_follower_growth),
+                    "profile_visits": ig_metrics.get("profile_visits", "N/D"),
+                    "website_clicks": ig_metrics.get("website_clicks", "N/D"),
                     "top_content": ig_top,
                 },
                 "tiktok": {
@@ -395,6 +429,12 @@ class ZernioAdapter(MarketingPort):
                     "follower_count": tt_metrics.get("follower_count", "N/D"),
                     "likes_count": tt_metrics.get("likes_count", "N/D"),
                     "video_count": tt_metrics.get("video_count", "N/D"),
+                    "views": tt_metrics.get("views", "N/D"),
+                    "shares": tt_metrics.get("shares", "N/D"),
+                    "profile_visits": tt_metrics.get("profile_visits", "N/D"),
+                    "completion_rate": tt_metrics.get("completion_rate", "N/D"),
+                    "engagement_rate": tt_engagement_rate,
+                    "followers_growth": tt_metrics.get("follower_growth", tt_follower_growth),
                     "top_content": tt_top,
                 },
             },

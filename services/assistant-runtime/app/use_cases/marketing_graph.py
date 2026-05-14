@@ -567,7 +567,8 @@ class MarketingGraph:
 
         recommendation_lines = "\n".join(f"- {item}" for item in recommendations[:3]) or "- Sin recomendaciones disponibles."
         location_text = ", ".join(audience.get("top_locations", [])) or "N/D"
-        window_text = ", ".join(audience.get("best_posting_windows", [])) or "N/D"
+        best_windows = data.get("best_posting_windows", {})
+        window_text = best_windows.get("recommendation", "N/D")
 
         return (
             f"## 📊 Dashboard Zernio\n"
