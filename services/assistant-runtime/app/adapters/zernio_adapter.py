@@ -217,6 +217,10 @@ class ZernioAdapter(MarketingPort):
                 f"/analytics/instagram/account-insights",
                 {"accountId": ig_id, "since": since, "until": until},
             )
+            if isinstance(raw, dict):
+                print(f"[ZERNIO DEBUG] IG insights success={raw.get('success')}, has_metrics={'metrics' in raw}")
+                if raw.get("metrics"):
+                    print(f"[ZERNIO DEBUG] IG metrics keys: {list(raw['metrics'].keys())}")
             if isinstance(raw, dict) and raw.get("success"):
                 ig_insights = raw.get("metrics", {})
 
@@ -226,6 +230,11 @@ class ZernioAdapter(MarketingPort):
                 f"/analytics/tiktok/account-insights",
                 {"accountId": tt_id, "since": since, "until": until},
             )
+            print(f"[ZERNIO DEBUG] TikTok insights raw keys: {list(raw.keys()) if isinstance(raw, dict) else type(raw)}")
+            if isinstance(raw, dict):
+                print(f"[ZERNIO DEBUG] TikTok insights success={raw.get('success')}, has_metrics={'metrics' in raw}")
+                if raw.get("metrics"):
+                    print(f"[ZERNIO DEBUG] TikTok metrics keys: {list(raw['metrics'].keys())}")
             if isinstance(raw, dict) and raw.get("success"):
                 tt_insights = raw.get("metrics", {})
 
@@ -245,6 +254,7 @@ class ZernioAdapter(MarketingPort):
                 {"sortBy": "engagement", "order": "desc", "limit": "10", "platform": "tiktok"},
             )
             if isinstance(tt_analytics_raw, dict):
+                print(f"[ZERNIO DEBUG] TikTok analytics success={tt_analytics_raw.get('success')}, posts_count={len(tt_analytics_raw.get('posts', []))}")
                 tt_posts = tt_analytics_raw.get("posts", [])
                 existing_ids = {p.get("_id") for p in posts_list if p.get("_id")}
                 for tp in tt_posts:
@@ -256,6 +266,9 @@ class ZernioAdapter(MarketingPort):
         follower_accounts = []
         if isinstance(follower_raw, dict):
             follower_accounts = follower_raw.get("accounts", [])
+            print(f"[ZERNIO DEBUG] Follower-stats accounts count={len(follower_accounts)}")
+            for fa in follower_accounts:
+                print(f"[ZERNIO DEBUG]   account platform={fa.get('platform')}, keys={list(fa.keys())}")
 
         # Best times
         best_times_raw = await self._z_get("/analytics/best-time")
@@ -325,8 +338,14 @@ class ZernioAdapter(MarketingPort):
                 "impressions": _extract(ig_insights, "impressions", "impression", "total_impressions"),
                 "profile_visits": _extract(ig_insights, "profile_visits", "profile_views", "profileVisits"),
                 "website_clicks": _extract(ig_insights, "website_clicks", "websiteClicks"),
-                "follower_growth": _extract(ig_insights, "follower_growth", "followerGrowth"),
             }
+
+        ig_insights_gained = _extract(ig_insights or {}, "followers_gained", "followersGained")
+        ig_insights_lost = _extract(ig_insights or {}, "followers_lost", "followersLost")
+        if ig_insights_gained != "N/D" and ig_insights_lost != "N/D":
+            net = int(ig_insights_gained) - int(ig_insights_lost)
+            ig_metrics["follower_growth"] = f"+{net}" if net >= 0 else str(
+                net)
 
         ig_engagement_rate = "N/D"
         ig_reach = ig_metrics.get("reach", 0)
@@ -346,6 +365,15 @@ class ZernioAdapter(MarketingPort):
                 "completion_rate": _extract(tt_insights, "completion_rate", "completionRate", "video_views_rate"),
                 "follower_growth": _extract(tt_insights, "follower_growth", "followerGrowth"),
             }
+
+        if tt_insights:
+            tt_gained = _extract(
+                tt_insights, "followers_gained", "followersGained")
+            tt_lost = _extract(
+                tt_insights, "followers_lost", "followersLost")
+            if tt_gained != "N/D" and tt_lost != "N/D":
+                net = int(tt_gained) - int(tt_lost)
+                tt_metrics["follower_growth"] = f"+{net}" if net >= 0 else str(net)
 
         # Agregar métricas TT desde todos los posts TikTok en el listado
         tt_total_views = 0
@@ -432,7 +460,7 @@ class ZernioAdapter(MarketingPort):
         tt_follower_growth = "N/D"
         for acc in follower_accounts:
             plat = acc.get("platform", "")
-            growth = acc.get("followerGrowth") or acc.get("growth") or acc.get("follower_growth")
+            growth = acc.get("growth")
             if growth is not None:
                 try:
                     g = int(growth)
