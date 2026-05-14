@@ -654,7 +654,7 @@ async def main() -> None:
                 await message.reply(embed=embed, view=MarketingView(message.author))
                 return
 
-            # Capturar imágenes adjuntas
+            # Capturar imágenes/video adjuntos
             images_b64 = []
             if message.attachments:
                 import base64
@@ -663,7 +663,21 @@ async def main() -> None:
                         img_data = await att.read()
                         images_b64.append(base64.b64encode(img_data).decode("utf-8"))
 
-            if raw_query.startswith("respond"):
+            extra = {}
+            if raw_query.startswith("post "):
+                sub_command = "publish"
+                rest = raw_query.removeprefix("post ").strip()
+                import re as _re
+                plat_match = _re.search(r'--platform\s+(\S+)', rest)
+                if plat_match:
+                    extra["platform"] = plat_match.group(1).lower()
+                    rest = rest.replace(plat_match.group(0), "")
+                sched_match = _re.search(r'--schedule\s+"([^"]+)"', rest)
+                if sched_match:
+                    extra["scheduled_for"] = sched_match.group(1)
+                    rest = rest.replace(sched_match.group(0), "")
+                prompt = rest.strip()
+            elif raw_query.startswith("respond"):
                 sub_command = "respond"
                 prompt = "responde comentarios"
             elif raw_query.startswith("campaign "):
@@ -758,7 +772,7 @@ async def main() -> None:
                 "prompt": prompt,
                 "source": {"platform": "discord", "channel_id": str(thread.id), "user_id": str(message.author.id)},
                 "images": images_b64,
-                "payload": {"sub_command": sub_command, "autonomy_level": "assisted", "is_approved": is_approved_marketing}
+                "payload": {"sub_command": sub_command, "autonomy_level": "assisted", "is_approved": is_approved_marketing, **extra}
             }
             
             await thread.send(f"📣 **Marketer Agent procesando `{sub_command}`...**")

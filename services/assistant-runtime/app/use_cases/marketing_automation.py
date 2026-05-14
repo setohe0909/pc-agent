@@ -375,6 +375,45 @@ class MarketingAutomationService:
             return "Por definir"
         return values[min(index, len(values) - 1)]
 
+    async def publish_post(self, content: str, media: list[str] | None = None,
+                           platform: str = "instagram",
+                           scheduled_for: str | None = None) -> dict:
+        hashtags = await self._generate_hashtags(content)
+        caption = f"{content}\n\n{' '.join(hashtags)}"
+        media_urls = []
+        if media:
+            for b64_data in media:
+                media_urls.append(f"data:image/png;base64,{b64_data}")
+        post_data = {
+            "platform": platform,
+            "content": caption,
+            "media_urls": media_urls,
+        }
+        if scheduled_for:
+            post_data["scheduled_for"] = scheduled_for
+            ok = await self.marketing.schedule_post(post_data)
+        else:
+            ok = await self.marketing.publish_post(post_data)
+        if ok:
+            return {
+                "status": "success",
+                "message": f"Post {'programado' if scheduled_for else 'publicado'} en {platform}.\n\n{caption}",
+            }
+        return {"status": "error", "message": f"No se pudo {'programar' if scheduled_for else 'publicar'} el post en {platform}."}
+
+    async def _generate_hashtags(self, content: str) -> list[str]:
+        prompt = (
+            "Genera exactamente 5 hashtags relevantes en español para este contenido de Instagram/TikTok. "
+            "Devuelve SOLO los hashtags separados por espacios, sin números ni viñetas, sin explicación.\n\n"
+            f"Contenido: {content}"
+        )
+        try:
+            raw = await self.llm.chat(prompt)
+            tags = [w.strip() for w in raw.replace("#", "").split() if w.strip()]
+            return [f"#{t}" for t in tags[:5]]
+        except Exception:
+            return ["#marketing", "#contenido", "#crecimiento", "#trending", "#viral"]
+
     def _stable_id(self, *parts: str) -> str:
         raw = json.dumps(parts, ensure_ascii=False, sort_keys=True)
         digest = hashlib.sha1(raw.encode("utf-8")).hexdigest()[:12]

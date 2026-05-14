@@ -67,140 +67,19 @@ class MarketingGraph:
                         "topic": {"type": "string", "description": "Tema de la campaña"},
                         "goal": {"type": "string", "description": "Objetivo (ventas, awareness)"}
                     },
-                    "required": ["topic"]
-                }
+                "required": ["topic"]
             },
             {
-                "name": "research_competitors",
-                "description": "Analiza un competidor y propone una estrategia para superarlo.",
+                "name": "publish_post",
+                "description": "Publica o programa un post en Instagram o TikTok con imagen/video, descripción y hashtags generados por IA.",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "competitor": {"type": "string", "description": "Marca, cuenta o competidor a analizar"}
-                    }
-                }
-            },
-            {
-                "name": "process_lead_magnets",
-                "description": "Envía lead magnets por DM cuando encuentra palabras clave en comentarios.",
-                "parameters": {"type": "object", "properties": {}}
-            },
-            {
-                "name": "generate_funnel",
-                "description": "Diseña un funnel de ventas para un tema, producto o marca.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "topic": {"type": "string", "description": "Tema, producto o marca para el funnel"}
-                    }
-                }
-            },
-            {
-                "name": "find_collaborations",
-                "description": "Propone colaboraciones, micro-influencers y alianzas de marca.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "brand_profile": {"type": "string", "description": "Perfil de marca o nicho"}
-                    }
-                }
-            },
-            {
-                "name": "get_marketing_memory",
-                "description": "Muestra aprendizajes guardados del marketer.",
-                "parameters": {"type": "object", "properties": {}}
-            },
-            {
-                "name": "generate_dashboard",
-                "description": "Genera y analiza un dashboard de marketing desde Zernio.",
-                "parameters": {"type": "object", "properties": {}}
-            },
-            {
-                "name": "generate_report",
-                "description": "Genera un informe detallado de marketing desde Zernio.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "report_type": {"type": "string", "description": "Tipo de informe (ej. mensual, semanal, crecimiento)"}
+                        "content": {"type": "string", "description": "Texto de descripción para el post"},
+                        "platform": {"type": "string", "description": "Plataforma: instagram o tiktok"},
+                        "scheduled_for": {"type": "string", "description": "Fecha/hora opcional para programar (ISO 8601)"}
                     },
-                    "required": ["report_type"]
-                }
-            },
-            {
-                "name": "get_top_content",
-                "description": "Lista los mejores contenidos de Instagram y TikTok.",
-                "parameters": {"type": "object", "properties": {}}
-            },
-            {
-                "name": "get_audience_insights",
-                "description": "Analiza segmentos de audiencia, ubicaciones, preferencias y oportunidades.",
-                "parameters": {"type": "object", "properties": {}}
-            },
-            {
-                "name": "get_growth_alerts",
-                "description": "Muestra alertas de rendimiento, riesgo y oportunidades de crecimiento.",
-                "parameters": {"type": "object", "properties": {}}
-            },
-            {
-                "name": "review_recent_comments",
-                "description": "Resume comentarios recientes y señales de intención.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "sentiment": {"type": "string", "description": "Filtro opcional: negative"}
-                    }
-                }
-            },
-            {
-                "name": "draft_comment_replies",
-                "description": "Prepara borradores de respuesta sin publicarlos.",
-                "parameters": {"type": "object", "properties": {}}
-            },
-            {
-                "name": "get_sales_leads",
-                "description": "Lista leads detectados y próximos pasos sugeridos.",
-                "parameters": {"type": "object", "properties": {}}
-            },
-            {
-                "name": "generate_content_plan",
-                "description": "Genera un calendario de contenido basado en métricas reales de Zernio.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "horizon": {"type": "string", "description": "Horizonte del plan, por ejemplo 7 días"}
-                    }
-                }
-            },
-            {
-                "name": "repurpose_top_content",
-                "description": "Convierte contenido ganador en nuevas piezas para otros canales.",
-                "parameters": {"type": "object", "properties": {}}
-            },
-            {
-                "name": "get_best_hours",
-                "description": "Recomienda mejores horarios de publicación por canal y formato.",
-                "parameters": {"type": "object", "properties": {}}
-            },
-            {
-                "name": "create_campaign",
-                "description": "Genera una campaña asistida basada en métricas de Zernio y pide aprobación.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "topic": {"type": "string", "description": "Objetivo, producto o tema de la campaña"}
-                    },
-                    "required": ["topic"]
-                }
-            },
-            {
-                "name": "generate_post_queue",
-                "description": "Genera borradores de posts para Instagram y TikTok y pide aprobación para programar/publicar.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "topic": {"type": "string", "description": "Campaña, producto o tema para los posts"}
-                    },
-                    "required": ["topic"]
+                    "required": ["content"]
                 }
             }
         ]
@@ -234,6 +113,7 @@ class MarketingGraph:
             (("mejores horarios", "best hours", "horarios"), "get_best_hours"),
             (("campana", "campanas", "campaign"), "create_campaign"),
             (("posts", "post ", "publicaciones"), "generate_post_queue"),
+            (("publish", "publicar", "postear"), "publish_post"),
         ]
         for keywords, tool_name in direct_patterns:
             if any(keyword in normalized for keyword in keywords):
@@ -354,6 +234,7 @@ class MarketingGraph:
                 "best-hours": "get_best_hours",
                 "campaign": "create_campaign",
                 "posts": "generate_post_queue",
+                "publish": "publish_post",
             }
             tool_name = aliases.get(tool_name, tool_name)
             
@@ -463,6 +344,14 @@ class MarketingGraph:
             elif tool_name == "generate_post_queue":
                 topic = action.get("arguments", {}).get("topic") or state["prompt"]
                 result = await self.automation.generate_post_queue(topic, payload=state.get("payload", {}), context=state.get("context", ""))
+            elif tool_name == "publish_post":
+                content = action.get("arguments", {}).get("content") or state["prompt"]
+                payload = state.get("payload", {})
+                platform = action.get("arguments", {}).get("platform") or payload.get("platform", "instagram")
+                scheduled_for = action.get("arguments", {}).get("scheduled_for") or payload.get("scheduled_for")
+                import base64
+                media = [base64.b64encode(img).decode("utf-8") for img in (state.get("images") or [])]
+                result = await self.automation.publish_post(content, media=media, platform=platform, scheduled_for=scheduled_for)
             elif "qualify" in tool_name:
                 result = await self._qualify_leads(state.get("payload", {}))
             elif "trends" in tool_name:
