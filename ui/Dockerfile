@@ -3,7 +3,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 COPY . .
-RUN echo "force rebuild 1"
+RUN echo "force rebuild consolidation history v1"
 RUN npm run build
 
 FROM nginx:1.27-alpine
