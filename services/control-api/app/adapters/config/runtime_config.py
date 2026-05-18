@@ -27,6 +27,13 @@ PUBLIC_KEYS = {
     "coder_web_autonomy",
     "coder_web_perf",
     "github_org",
+    "kalshi_env",
+    "kalshi_trading_enabled",
+    "kalshi_api_base_url",
+    "kalshi_max_order_amount",
+    "kalshi_max_daily_notional",
+    "kalshi_allowed_tickers",
+    "kalshi_denied_tickers",
 }
 
 SECRET_KEYS = {
@@ -45,6 +52,9 @@ SECRET_KEYS = {
     "marketing_tone",
     "marketing_poll_frequency",
     "github_token",
+    "kalshi_username",
+    "kalshi_password",
+    "kalshi_key_id",
 }
 
 
@@ -82,11 +92,28 @@ class RuntimeConfigUpdate(BaseModel):
     marketing_poll_frequency: str | None = Field(default=None, max_length=80)
     github_token: str | None = Field(default=None, max_length=4096)
     github_org: str | None = Field(default=None, max_length=4096)
+    kalshi_username: str | None = Field(default=None, max_length=4096)
+    kalshi_password: str | None = Field(default=None, max_length=4096)
+    kalshi_key_id: str | None = Field(default=None, max_length=4096)
+    kalshi_env: str | None = Field(default=None, max_length=20)
+    kalshi_trading_enabled: bool | None = None
+    kalshi_api_base_url: str | None = Field(default=None, max_length=2048)
+    kalshi_max_order_amount: float | None = Field(default=None, ge=0, le=1000000)
+    kalshi_max_daily_notional: float | None = Field(default=None, ge=0, le=1000000)
+    kalshi_allowed_tickers: str | None = Field(default=None, max_length=4096)
+    kalshi_denied_tickers: str | None = Field(default=None, max_length=4096)
     coder_web_stack: str | None = Field(default=None, max_length=80)
     coder_web_autonomy: str | None = Field(default=None, max_length=80)
     coder_web_perf: str | None = Field(default=None, max_length=80)
 
-    @field_validator("open_claw_base_url", "mentis_base_url", "langfuse_host", "supabase_url", "ollama_base_url")
+    @field_validator(
+        "open_claw_base_url",
+        "mentis_base_url",
+        "langfuse_host",
+        "supabase_url",
+        "ollama_base_url",
+        "kalshi_api_base_url",
+    )
     @classmethod
     def validate_url(cls, value: str | None) -> str | None:
         if value is None or value == "":

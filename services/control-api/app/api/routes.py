@@ -10,14 +10,17 @@ from app.adapters.config.in_memory import InMemoryKnowledgeSourceRepository
 from app.adapters.config.probes import HttpSystemProbe
 from app.adapters.config.runtime_config import RuntimeConfigStore, RuntimeConfigUpdate
 from app.adapters.config.settings import settings
-from app.adapters.mentis.client import MentisHttpMemory
+from app.adapters.mentis.repository import SupabaseMentisMemoryRepository
 from app.adapters.supabase.client import SupabaseVectorKnowledgeBase
 from app.application.use_cases import (
     CheckSystemStatus,
     GetIngestionSchedule,
     ListIngestionRuns,
+    ListConsolidationHistory,
+    ListMemoryFragments,
     ListKnowledgeSources,
     RegisterKnowledgeSource,
+    ClearMemoryContext,
     TriggerIngestionRun,
     UpdateIngestionSchedule,
     VerifyMentisHealth,
@@ -172,7 +175,7 @@ async def verify_mentis() -> dict:
                 "enabled": False,
             }
         }
-    use_case = VerifyMentisHealth(MentisHttpMemory(settings.effective("mentis_base_url")))
+    use_case = VerifyMentisHealth(_mentis_memory_repository())
     return {"mentis": await use_case.execute(), "enabled": True}
 
 
@@ -210,38 +213,11 @@ async def trigger_ingestion_run(request: TriggerIngestionRequest) -> dict:
 
 @router.get("/intelligence/memory/today")
 async def get_today_intelligence(context: str | None = None):
-    from datetime import datetime, timezone
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    
-    url = settings.effective("supabase_url")
-    key = settings.effective("supabase_service_role_key") or settings.effective("supabase_publishable_key")
-    headers = {
-        "apikey": key,
-        "Authorization": f"Bearer {key}",
-    }
-    
-    # Determinar filtro segun el contexto
-    if context == "marketer":
-        category_filter = "&category=ilike.marketing_*"
-    elif context == "picture":
-        category_filter = "&category=ilike.picture_*"
-    elif context == "coder-web":
-        category_filter = "&category=ilike.coder-web_*"
-    else:
-        # Por defecto excluimos marketing, picture y coder-web para la memoria de inteligencia general
-        category_filter = "&category=not.ilike.marketing_*,category=not.ilike.picture_*,category=not.ilike.coder-web_*"
-
-    async with httpx.AsyncClient() as client:
-        try:
-            # Ya no filtramos por fecha diaria. Buscamos los registros más recientes (LTM)
-            # para que el agente siempre tenga contexto evolutivo.
-            query_url = f"{url}/rest/v1/mentis_memory?{category_filter[1:]}&order=created_at.desc&limit=50"
-            response = await client.get(query_url, headers=headers)
-            if response.status_code != 200:
-                return {"memory": [], "detail": f"Error de Supabase: {response.text}"}
-            return {"memory": response.json()}
-        except Exception as e:
-            return {"memory": [], "detail": str(e)}
+    try:
+        memory = await ListMemoryFragments(_mentis_memory_repository()).execute(context=context, limit=50)
+        return {"memory": memory}
+    except Exception as exc:
+        return {"memory": [], "detail": str(exc)}
 
 
 @router.get("/mentis/memory")
@@ -251,36 +227,16 @@ async def get_mentis_memory(context: str | None = None):
 
 @router.delete("/intelligence/memory/today")
 async def clear_today_intelligence(context: str | None = None):
-    url = settings.effective("supabase_url")
-    key = settings.effective("supabase_service_role_key") or settings.effective("supabase_publishable_key")
-    headers = {
-        "apikey": key,
-        "Authorization": f"Bearer {key}",
-    }
-    
-    # Determinar filtro segun el contexto
-    if context == "marketer":
-        category_filter = "category=ilike.marketing_*"
-    elif context == "picture":
-        category_filter = "category=ilike.picture_*"
-    elif context == "coder-web":
-        category_filter = "category=ilike.coder-web_*"
-    else:
-        category_filter = "category=not.ilike.marketing_*,category=not.ilike.picture_*,category=not.ilike.coder-web_*"
-
-    async with httpx.AsyncClient() as client:
-        try:
-            query_url = f"{url}/rest/v1/mentis_memory?{category_filter}"
-            response = await client.delete(query_url, headers=headers)
-            if response.status_code not in [200, 204]:
-                print(f"[MEMORY DELETE ERROR] Supabase returned {response.status_code}: {response.text}")
-                raise HTTPException(status_code=response.status_code, detail=f"Supabase Error: {response.text}")
-            return {"status": "success", "message": f"Memoria ({context or 'general'}) eliminada correctamente."}
-        except HTTPException:
-            raise
-        except Exception as e:
-            print(f"[MEMORY DELETE ERROR] Unexpected error: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
+    try:
+        deleted = await ClearMemoryContext(_mentis_memory_repository()).execute(context=context)
+        return {
+            "status": "success",
+            "deleted": deleted,
+            "message": f"Memoria ({context or 'general'}) eliminada correctamente.",
+        }
+    except Exception as exc:
+        print(f"[MEMORY DELETE ERROR] Unexpected error: {exc}")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @router.get("/marketing/leads")
@@ -305,27 +261,23 @@ async def get_marketing_leads():
 
 @router.get("/intelligence/memory/consolidation")
 async def get_consolidation_history():
-    url = settings.effective("supabase_url")
-    key = settings.effective("supabase_service_role_key") or settings.effective("supabase_publishable_key")
-    headers = {
-        "apikey": key,
-        "Authorization": f"Bearer {key}",
-    }
-    
-    async with httpx.AsyncClient() as client:
-        try:
-            # Buscamos registros donde metadata->type sea long_term_consolidation
-            query_url = f"{url}/rest/v1/mentis_memory?metadata->>type=eq.long_term_consolidation&order=created_at.desc"
-            response = await client.get(query_url, headers=headers)
-            if response.status_code != 200:
-                return {"history": [], "detail": f"Error de Supabase: {response.text}"}
-            return {"history": response.json()}
-        except Exception as e:
-            return {"history": [], "detail": str(e)}
+    try:
+        history = await ListConsolidationHistory(_mentis_memory_repository()).execute()
+        return {"history": history}
+    except Exception as exc:
+        return {"history": [], "detail": str(exc)}
 
 
 def _supabase_knowledge_base() -> SupabaseVectorKnowledgeBase:
     return SupabaseVectorKnowledgeBase(
+        url=settings.effective("supabase_url"),
+        publishable_key=settings.effective("supabase_publishable_key"),
+        service_role_key=settings.effective("supabase_service_role_key"),
+    )
+
+
+def _mentis_memory_repository() -> SupabaseMentisMemoryRepository:
+    return SupabaseMentisMemoryRepository(
         url=settings.effective("supabase_url"),
         publishable_key=settings.effective("supabase_publishable_key"),
         service_role_key=settings.effective("supabase_service_role_key"),

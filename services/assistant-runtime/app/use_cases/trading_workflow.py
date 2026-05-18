@@ -1,13 +1,30 @@
+import os
+
 from app.domain.ports.llm import LLMPort
 from app.domain.ports.memory import MemoryPort
-from app.domain.ports.trading import TradingPort
+from app.domain.ports.trading import RiskPolicyPort, TradeAuditEvent, TradeAuditRepository, TradingPort
+from app.domain.trading_policies import ConfigurableRiskPolicy
+
+
+class NoopTradeAuditRepository(TradeAuditRepository):
+    async def record(self, event: TradeAuditEvent) -> None:
+        return None
 
 
 class TradingWorkflow:
-    def __init__(self, trading_port: TradingPort, llm_port: LLMPort, memory_port: MemoryPort | None = None) -> None:
+    def __init__(
+        self,
+        trading_port: TradingPort,
+        llm_port: LLMPort,
+        memory_port: MemoryPort | None = None,
+        risk_policy: RiskPolicyPort | None = None,
+        audit_repository: TradeAuditRepository | None = None,
+    ) -> None:
         self.trading = trading_port
         self.llm = llm_port
         self.memory = memory_port
+        self.risk_policy = risk_policy or ConfigurableRiskPolicy()
+        self.audit = audit_repository or NoopTradeAuditRepository()
 
     async def execute_chat(self, prompt: str, user_id: str | None = None) -> str:
         context = None
@@ -40,6 +57,12 @@ class TradingWorkflow:
         
         # 3. FASE ANALISTA: Proponer una jugada
         analysis = await self.llm.analyze_trade(market_data=markets, prompt=prompt)
+        await self.audit.record(TradeAuditEvent(
+            event_type="trade_analysis_created",
+            actor_id=user_id,
+            environment=getattr(self.risk_policy, "policy", None).environment if hasattr(self.risk_policy, "policy") else "paper",
+            payload={"analysis": analysis, "prompt": prompt},
+        ))
         
         if not analysis.get("should_trade"):
             return {
@@ -47,13 +70,32 @@ class TradingWorkflow:
                 "message": analysis.get("decision", "El Analista recomendo no operar.")
             }
             
-        # 4. MOTOR DE RIESGO (Backend logic)
+        # 4. MOTOR DE RIESGO
         amount = analysis.get("amount", 10)
-        max_investment = 50.0 # Limite de seguridad configurable
-        if amount > max_investment:
+        ticker = analysis.get("ticker", markets[0]["ticker"] if markets else "")
+        action = analysis.get("action", "BUY YES")
+        risk = await self.risk_policy.evaluate(ticker=ticker, action=action, amount=float(amount), actor_id=user_id)
+        await self.audit.record(TradeAuditEvent(
+            event_type="trade_risk_decision",
+            actor_id=user_id,
+            ticker=ticker,
+            environment=risk.policy.environment,
+            payload={
+                "approved": risk.approved,
+                "reason": risk.reason,
+                "amount": amount,
+                "action": action,
+                "policy": {
+                    "max_order_amount": risk.policy.max_order_amount,
+                    "max_daily_notional": risk.policy.max_daily_notional,
+                    "trading_enabled": risk.policy.trading_enabled,
+                },
+            },
+        ))
+        if not risk.approved:
             return {
                 "status": "rejected_by_risk",
-                "message": f"La orden de ${amount} excede el limite de seguridad de ${max_investment}."
+                "message": risk.reason,
             }
 
         # 5. FASE CRITICO: ¿Tiene sentido la propuesta?
@@ -70,15 +112,28 @@ class TradingWorkflow:
 
         # 6. Si todo paso, preparar ejecucion con ID unico (Idempotencia)
         client_order_id = f"trade-{os.urandom(4).hex()}"
-        ticker = analysis.get("ticker", markets[0]["ticker"])
-        action = analysis.get("action", "BUY YES")
-        
+        await self.audit.record(TradeAuditEvent(
+            event_type="trade_submit_attempt",
+            actor_id=user_id,
+            order_id=client_order_id,
+            ticker=ticker,
+            environment=risk.policy.environment,
+            payload={"amount": amount, "action": action},
+        ))
         order = await self.trading.place_order(
             ticker=ticker, 
             action=action, 
             amount=amount, 
             client_order_id=client_order_id
         )
+        await self.audit.record(TradeAuditEvent(
+            event_type="trade_submit_result",
+            actor_id=user_id,
+            order_id=client_order_id,
+            ticker=ticker,
+            environment=risk.policy.environment,
+            payload={"order": order},
+        ))
         
         # 7. Guardar en memoria
         if self.memory and user_id:

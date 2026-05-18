@@ -2,6 +2,8 @@ from app.domain.models import (
     IngestionRun,
     IngestionSchedule,
     KnowledgeSource,
+    ConsolidationRecord,
+    MemoryFragment,
     MentisVerification,
     ServiceStatus,
     SupabaseVerification,
@@ -10,6 +12,7 @@ from app.ports.gateways import (
     IngestionControl,
     KnowledgeSourceRepository,
     MentisMemory,
+    MemoryRepository,
     SystemProbe,
     VectorKnowledgeBase,
 )
@@ -45,6 +48,30 @@ class VerifyMentisHealth:
 
     async def execute(self) -> MentisVerification:
         return await self.memory.verify()
+
+
+class ListMemoryFragments:
+    def __init__(self, repository: MemoryRepository) -> None:
+        self.repository = repository
+
+    async def execute(self, context: str | None = None, limit: int = 50) -> list[MemoryFragment]:
+        return await self.repository.list_recent(context=context, limit=limit)
+
+
+class ClearMemoryContext:
+    def __init__(self, repository: MemoryRepository) -> None:
+        self.repository = repository
+
+    async def execute(self, context: str | None = None) -> int:
+        return await self.repository.clear_context(context=context)
+
+
+class ListConsolidationHistory:
+    def __init__(self, repository: MemoryRepository) -> None:
+        self.repository = repository
+
+    async def execute(self, limit: int = 100) -> list[ConsolidationRecord]:
+        return await self.repository.list_consolidations(limit=limit)
 
 
 class VerifySupabaseVectorStore:

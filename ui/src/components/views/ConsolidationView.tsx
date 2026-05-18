@@ -5,14 +5,27 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { getJson } from "@/lib/api";
 
+type ConsolidationRecord = {
+  id: string;
+  category: string;
+  title: string;
+  summary: string;
+  status: string;
+  memory_count: number;
+  metadata: Record<string, any>;
+  created_at: string;
+};
+
 export function ConsolidationView() {
-  const [history, setHistory] = useState<any[]>([]);
+  const [history, setHistory] = useState<ConsolidationRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedItem, setSelectedItem] = useState<ConsolidationRecord | null>(null);
 
   const fetchHistory = async () => {
     try {
       setLoading(true);
+      setError(null);
       const data = await getJson("/intelligence/memory/consolidation");
       setHistory(data.history || []);
       if (data.history?.length > 0 && !selectedItem) {
@@ -20,6 +33,7 @@ export function ConsolidationView() {
       }
     } catch (err) {
       console.error("Error fetching consolidation history", err);
+      setError("No pude cargar el historial de consolidaciones.");
     } finally {
       setLoading(false);
     }
@@ -44,11 +58,13 @@ export function ConsolidationView() {
           <ScrollArea className="h-full">
             {loading ? (
               <div className="p-8 text-center text-muted-foreground animate-pulse">Cargando historial...</div>
+            ) : error ? (
+              <div className="p-8 text-center text-red-500">{error}</div>
             ) : history.length > 0 ? (
               <div className="divide-y">
-                {history.map((item, idx) => (
+                {history.map((item) => (
                   <button
-                    key={idx}
+                    key={item.id}
                     onClick={() => setSelectedItem(item)}
                     className={`w-full text-left p-4 hover:bg-muted/50 transition-colors flex items-center justify-between group ${
                       selectedItem === item ? "bg-blue-500/10 border-r-2 border-blue-500" : ""
@@ -59,13 +75,16 @@ export function ConsolidationView() {
                         <Badge variant="outline" className="text-[10px] capitalize">
                           {item.category.replace("consolidated_", "")}
                         </Badge>
+                        <Badge variant={item.status === "succeeded" ? "secondary" : "destructive"} className="text-[10px]">
+                          {item.status}
+                        </Badge>
                         <span className="text-[10px] text-muted-foreground flex items-center gap-1">
                           <Calendar className="w-3 h-3" />
                           {new Date(item.created_at).toLocaleDateString()}
                         </span>
                       </div>
                       <p className="text-sm font-medium truncate">
-                        {item.summary.split('\n')[0].replace(/#/g, '').trim() || "Consolidación de Memoria"}
+                        {item.title || "Consolidación de Memoria"}
                       </p>
                     </div>
                     <ChevronRight className={`w-4 h-4 text-muted-foreground group-hover:text-blue-500 transition-transform ${selectedItem === item ? "rotate-90 text-blue-500" : ""}`} />
@@ -126,6 +145,14 @@ export function ConsolidationView() {
                     <div className="bg-muted/30 p-3 rounded-lg border">
                       <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Batch ID</p>
                       <p className="text-xs">#{selectedItem.metadata?.batch || 1}</p>
+                    </div>
+                    <div className="bg-muted/30 p-3 rounded-lg border">
+                      <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Estado</p>
+                      <p className="text-xs capitalize">{selectedItem.status}</p>
+                    </div>
+                    <div className="bg-muted/30 p-3 rounded-lg border">
+                      <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Memorias Fuente</p>
+                      <p className="text-xs">{selectedItem.memory_count || "No registrado"}</p>
                     </div>
                   </div>
                 </div>

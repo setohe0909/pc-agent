@@ -3,7 +3,9 @@ from typing import Protocol
 from app.domain.models import (
     IngestionRun,
     IngestionSchedule,
+    MemoryFragment,
     KnowledgeSource,
+    ConsolidationRecord,
     MentisVerification,
     ServiceStatus,
     SupabaseVerification,
@@ -25,6 +27,23 @@ class KnowledgeSourceRepository(Protocol):
 
 class MentisMemory(Protocol):
     async def verify(self) -> MentisVerification:
+        ...
+
+
+class MemoryRepository(Protocol):
+    async def verify(self) -> MentisVerification:
+        ...
+
+    async def list_recent(self, context: str | None, limit: int = 50) -> list[MemoryFragment]:
+        ...
+
+    async def clear_context(self, context: str | None) -> int:
+        ...
+
+    async def save_fragment(self, fragment: MemoryFragment) -> MemoryFragment:
+        ...
+
+    async def list_consolidations(self, limit: int = 100) -> list[ConsolidationRecord]:
         ...
 
 

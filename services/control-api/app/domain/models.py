@@ -50,6 +50,7 @@ class MentisVerification:
     can_read: bool
     can_write: bool
     detail: str
+    latency_ms: int | None = None
 
 
 @dataclass(frozen=True)
@@ -77,3 +78,24 @@ class IngestionRun:
     detail: str
     started_at: datetime
     finished_at: datetime | None = None
+
+
+@dataclass(frozen=True)
+class MemoryFragment:
+    category: str
+    summary: str
+    metadata: dict = field(default_factory=dict)
+    id: str | None = None
+    created_at: datetime | None = None
+
+
+@dataclass(frozen=True)
+class ConsolidationRecord:
+    id: str
+    category: str
+    title: str
+    summary: str
+    status: str
+    memory_count: int
+    metadata: dict
+    created_at: datetime
