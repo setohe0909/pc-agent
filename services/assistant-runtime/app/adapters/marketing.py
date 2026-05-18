@@ -108,6 +108,16 @@ class SocialMediaStubAdapter(MarketingPort):
             leads = [lead for lead in leads if lead["status"] == status]
         return leads
 
+    async def get_whatsapp_outreach(self) -> dict:
+        return {
+            "contacts": [
+                {"phone_number": "+573001112233", "display_name": "Lead demo", "consent_status": "opted_in", "tags": ["demo"]}
+            ],
+            "campaigns": [
+                {"name": "Campana demo", "status": "draft", "recipient_count": 1, "target_tag": "demo"}
+            ],
+        }
+
     async def get_best_posting_windows(self) -> dict:
         return {
             "instagram": ["12:00-14:00", "19:00-21:00"],

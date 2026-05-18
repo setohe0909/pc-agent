@@ -99,3 +99,28 @@ class ConsolidationRecord:
     memory_count: int
     metadata: dict
     created_at: datetime
+
+
+@dataclass(frozen=True)
+class WhatsAppContact:
+    phone_number: str
+    display_name: str | None = None
+    source: str = "manual"
+    consent_status: str = "opted_in"
+    tags: list[str] = field(default_factory=list)
+    metadata: dict = field(default_factory=dict)
+    id: str | None = None
+    created_at: datetime | None = None
+
+
+@dataclass(frozen=True)
+class WhatsAppCampaign:
+    name: str
+    message_template: str
+    status: str = "draft"
+    target_tag: str | None = None
+    scheduled_for: datetime | None = None
+    recipient_count: int = 0
+    metadata: dict = field(default_factory=dict)
+    id: str | None = None
+    created_at: datetime | None = None

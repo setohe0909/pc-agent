@@ -1,5 +1,6 @@
 import os
 import httpx
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from apscheduler.triggers.cron import CronTrigger
 from pydantic import BaseModel, Field, field_validator
@@ -12,9 +13,13 @@ from app.adapters.config.runtime_config import RuntimeConfigStore, RuntimeConfig
 from app.adapters.config.settings import settings
 from app.adapters.mentis.repository import SupabaseMentisMemoryRepository
 from app.adapters.supabase.client import SupabaseVectorKnowledgeBase
+from app.adapters.whatsapp.repository import SupabaseWhatsAppOutreachRepository
 from app.application.use_cases import (
     CheckSystemStatus,
+    CreateWhatsAppCampaign,
     GetIngestionSchedule,
+    ListWhatsAppCampaigns,
+    ListWhatsAppContacts,
     ListIngestionRuns,
     ListConsolidationHistory,
     ListMemoryFragments,
@@ -22,11 +27,12 @@ from app.application.use_cases import (
     RegisterKnowledgeSource,
     ClearMemoryContext,
     TriggerIngestionRun,
+    UpsertWhatsAppContact,
     UpdateIngestionSchedule,
     VerifyMentisHealth,
     VerifySupabaseVectorStore,
 )
-from app.domain.models import DiscordConfig, IngestionSchedule, KnowledgeSource, SourceType
+from app.domain.models import DiscordConfig, IngestionSchedule, KnowledgeSource, SourceType, WhatsAppCampaign, WhatsAppContact
 
 router = APIRouter()
 source_repository = InMemoryKnowledgeSourceRepository()
@@ -68,6 +74,23 @@ class IngestionScheduleRequest(BaseModel):
 
 class TriggerIngestionRequest(BaseModel):
     target: str = Field(pattern="^(markets|trends|mentis|consolidation|all)$")
+
+
+class WhatsAppContactRequest(BaseModel):
+    phone_number: str = Field(min_length=8, max_length=32, pattern=r"^\+?[0-9]{8,32}$")
+    display_name: str | None = Field(default=None, max_length=160)
+    source: str = Field(default="manual", max_length=80)
+    consent_status: str = Field(default="opted_in", pattern="^(opted_in|opted_out|unknown)$")
+    tags: list[str] = Field(default_factory=list, max_length=20)
+    metadata: dict = Field(default_factory=dict)
+
+
+class WhatsAppCampaignRequest(BaseModel):
+    name: str = Field(min_length=3, max_length=160)
+    message_template: str = Field(min_length=5, max_length=2000)
+    target_tag: str | None = Field(default=None, max_length=80)
+    scheduled_for: datetime | None = None
+    metadata: dict = Field(default_factory=dict)
 
 
 @router.get("/health")
@@ -119,6 +142,11 @@ async def config() -> dict:
                 (runtime.get("kalshi_username") or settings.kalshi_username) and 
                 (runtime.get("kalshi_password") or settings.kalshi_password)
             ),
+            "openwa": {
+                "base_url": settings.effective("openwa_base_url"),
+                "session_id": settings.effective("openwa_session_id"),
+                "configured": bool(runtime.get("openwa_api_key") or settings.openwa_api_key),
+            },
             "coder_web": {
                 "has_github_auth": bool(runtime.get("github_token")),
                 "stack": runtime.get("coder_web_stack", "react-ts")
@@ -259,6 +287,43 @@ async def get_marketing_leads():
             return {"leads": [], "detail": str(e)}
 
 
+@router.get("/marketing/whatsapp")
+async def get_whatsapp_outreach() -> dict:
+    repository = _whatsapp_outreach_repository()
+    try:
+        contacts = await ListWhatsAppContacts(repository).execute(limit=200)
+        campaigns = await ListWhatsAppCampaigns(repository).execute(limit=100)
+        return {"contacts": contacts, "campaigns": campaigns}
+    except Exception as exc:
+        return {"contacts": [], "campaigns": [], "detail": str(exc)}
+
+
+@router.post("/marketing/whatsapp/contacts", dependencies=[Depends(require_admin)])
+async def upsert_whatsapp_contact(request: WhatsAppContactRequest) -> dict:
+    repository = _whatsapp_outreach_repository()
+    contact = WhatsAppContact(**request.model_dump())
+    try:
+        saved = await UpsertWhatsAppContact(repository).execute(contact)
+        return {"contact": saved}
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+
+
+@router.post("/marketing/whatsapp/campaigns", dependencies=[Depends(require_admin)])
+async def create_whatsapp_campaign(request: WhatsAppCampaignRequest) -> dict:
+    repository = _whatsapp_outreach_repository()
+    campaign = WhatsAppCampaign(**request.model_dump())
+    try:
+        saved = await CreateWhatsAppCampaign(repository).execute(campaign)
+        return {"campaign": saved}
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+
+
 @router.get("/intelligence/memory/consolidation")
 async def get_consolidation_history():
     try:
@@ -280,6 +345,13 @@ def _mentis_memory_repository() -> SupabaseMentisMemoryRepository:
     return SupabaseMentisMemoryRepository(
         url=settings.effective("supabase_url"),
         publishable_key=settings.effective("supabase_publishable_key"),
+        service_role_key=settings.effective("supabase_service_role_key"),
+    )
+
+
+def _whatsapp_outreach_repository() -> SupabaseWhatsAppOutreachRepository:
+    return SupabaseWhatsAppOutreachRepository(
+        url=settings.effective("supabase_url"),
         service_role_key=settings.effective("supabase_service_role_key"),
     )
 

@@ -46,6 +46,10 @@ class MarketingPort(ABC):
         pass
 
     @abstractmethod
+    async def get_whatsapp_outreach(self) -> dict:
+        pass
+
+    @abstractmethod
     async def get_best_posting_windows(self) -> dict:
         pass
 

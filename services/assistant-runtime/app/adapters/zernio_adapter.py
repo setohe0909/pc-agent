@@ -810,6 +810,17 @@ class ZernioAdapter(MarketingPort):
             })
         return leads
 
+    async def get_whatsapp_outreach(self) -> dict:
+        contacts = await self._supa_get(
+            "whatsapp_contacts",
+            "select=id,phone_number,display_name,consent_status,tags,created_at&order=created_at.desc&limit=50",
+        )
+        campaigns = await self._supa_get(
+            "whatsapp_campaigns",
+            "select=id,name,message_template,status,target_tag,recipient_count,created_at&order=created_at.desc&limit=20",
+        )
+        return {"contacts": contacts or [], "campaigns": campaigns or []}
+
     async def get_best_posting_windows(self) -> dict:
         print("[ZERNIO] Mejores horarios desde Zernio API")
         raw = await self._z_get("/analytics/best-time")

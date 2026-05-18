@@ -221,6 +221,7 @@ bot infiere el agente desde el nombre del hilo.
 | `!marketer comments` | Comentarios recientes. |
 | `!marketer negative-comments` | Comentarios negativos o de riesgo. |
 | `!marketer leads` | Leads detectados. |
+| `!marketer whatsapp` | Contactos opt-in y campanas WhatsApp creadas para OpenWA. |
 | `!marketer best-hours` | Mejores horarios para publicar. |
 | `!marketer memory` | Memoria de marketing. |
 | `!marketer memory --clean` | Confirmacion para borrar memoria de marketing. |
@@ -406,6 +407,7 @@ python3 services/discord-bot/test_marketer_approval.py
 - [Marketer memory](docs/marketer-memory.md)
 - [Marketer lead qualification](docs/marketer-lead-qualification.md)
 - [Marketer trend discovery](docs/marketer-trend-discovery.md)
+- [Marketer WhatsApp OpenWA](docs/marketer-whatsapp-openwa.md)
 - [Picture subagent](docs/picture-subagent.md)
 - [Writer subagent](docs/writer-subagent.md)
 - [Coder web subagent](docs/coder-web-subagent.md)
@@ -422,6 +424,8 @@ python3 services/discord-bot/test_marketer_approval.py
 - [x] Adapter MentisDB/Supabase Memory para read/write estable, healthcheck real y RLS service-role.
 - [x] Historial visual de consolidaciones en UI con contrato normalizado.
 - [x] Base Kalshi con limites de riesgo, auditoria durable y fail-closed para ordenes bloqueadas.
+- [x] Base WhatsApp/OpenWA para contactos opt-in, campanas draft, UI y acceso desde `!marketer whatsapp`.
+- [ ] Envio WhatsApp/OpenWA con aprobacion humana, rate limits, opt-out y webhooks de entrega.
 - [ ] Adapter Kalshi live con autenticacion RSA-PSS, submit real de ordenes e idempotencia end-to-end.
 - [ ] Reconciliacion Kalshi de ordenes, fills, cancelaciones y drift de posicion.
 - [ ] Dashboard operativo de auditoria trading, rechazos de riesgo y exposicion diaria.

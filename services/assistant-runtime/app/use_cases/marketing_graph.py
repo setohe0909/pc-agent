@@ -102,6 +102,7 @@ class MarketingGraph:
             return {"tool_name": "generate_report", "arguments": {"report_type": report_type}}
 
         direct_patterns = [
+            (("whatsapp", "openwa", "campana whatsapp", "campanas whatsapp"), "get_whatsapp_outreach"),
             (("top content", "mejor contenido", "contenidos top", "top contenidos"), "get_top_content"),
             (("audiencia", "segmenta", "segmentos"), "get_audience_insights"),
             (("alerta", "alertas", "riesgo"), "get_growth_alerts"),
@@ -208,7 +209,7 @@ class MarketingGraph:
             "dashboard", "report", "status", "magnet", "funnel", "collab", "memory",
             "top-content", "audience", "alerts", "comments", "negative-comments",
             "reply-drafts", "leads", "content-plan", "repurpose", "best-hours",
-            "competitors", "campaign", "posts", "publish"
+            "competitors", "campaign", "posts", "publish", "whatsapp"
         ]
         if state["sub_command"] in forced_cmds:
             tool_name = state["sub_command"]
@@ -232,6 +233,7 @@ class MarketingGraph:
                 "negative-comments": "review_recent_comments",
                 "reply-drafts": "draft_comment_replies",
                 "leads": "get_sales_leads",
+                "whatsapp": "get_whatsapp_outreach",
                 "content-plan": "generate_content_plan",
                 "repurpose": "repurpose_top_content",
                 "best-hours": "get_best_hours",
@@ -339,6 +341,8 @@ class MarketingGraph:
                 result = await self._draft_comment_replies()
             elif tool_name == "get_sales_leads":
                 result = await self._get_sales_leads()
+            elif tool_name == "get_whatsapp_outreach":
+                result = await self._get_whatsapp_outreach()
             elif tool_name == "generate_content_plan":
                 result = await self._generate_content_plan(action.get("arguments", {}).get("horizon") or action.get("arguments", {}).get("topic") or "7 días")
             elif tool_name == "repurpose_top_content":
@@ -719,6 +723,28 @@ class MarketingGraph:
                 f"  Siguiente paso: {lead.get('suggested_next_step', 'Contactar con mensaje personalizado')}"
             )
         return {"status": "success", "message": "\n".join(lines)}
+
+    async def _get_whatsapp_outreach(self) -> dict:
+        data = await self.marketing.get_whatsapp_outreach()
+        contacts = data.get("contacts", [])
+        campaigns = data.get("campaigns", [])
+        lines = [
+            "## WhatsApp Outreach",
+            f"- Contactos opt-in en CRM: **{len(contacts)}**",
+            f"- Campanas creadas: **{len(campaigns)}**",
+            "",
+            "### Ultimas campanas",
+        ]
+        if not campaigns:
+            lines.append("- No hay campanas WhatsApp todavia. Crea una desde la UI.")
+        for campaign in campaigns[:5]:
+            lines.append(
+                f"- **{campaign.get('name')}** · Estado: `{campaign.get('status')}` · "
+                f"Destinatarios: **{campaign.get('recipient_count', 0)}** · Tag: `{campaign.get('target_tag') or 'todos'}`"
+            )
+        lines.append("")
+        lines.append("_Envio masivo real queda bloqueado hasta tener aprobacion, rate limits y OpenWA configurado._")
+        return {"status": "success", "message": "\n".join(lines), "dashboard": data}
 
     async def _generate_content_plan(self, horizon: str) -> dict:
         dashboard = await self.marketing.get_dashboard()

@@ -9,6 +9,8 @@ from app.domain.models import (
     MentisVerification,
     ServiceStatus,
     SupabaseVerification,
+    WhatsAppCampaign,
+    WhatsAppContact,
 )
 
 
@@ -44,6 +46,23 @@ class MemoryRepository(Protocol):
         ...
 
     async def list_consolidations(self, limit: int = 100) -> list[ConsolidationRecord]:
+        ...
+
+
+class WhatsAppOutreachRepository(Protocol):
+    async def list_contacts(self, limit: int = 100) -> list[WhatsAppContact]:
+        ...
+
+    async def upsert_contact(self, contact: WhatsAppContact) -> WhatsAppContact:
+        ...
+
+    async def list_campaigns(self, limit: int = 100) -> list[WhatsAppCampaign]:
+        ...
+
+    async def create_campaign(self, campaign: WhatsAppCampaign) -> WhatsAppCampaign:
+        ...
+
+    async def count_opted_in_recipients(self, target_tag: str | None = None) -> int:
         ...
 
 

@@ -7,6 +7,8 @@ from app.domain.models import (
     MentisVerification,
     ServiceStatus,
     SupabaseVerification,
+    WhatsAppCampaign,
+    WhatsAppContact,
 )
 from app.ports.gateways import (
     IngestionControl,
@@ -15,6 +17,7 @@ from app.ports.gateways import (
     MemoryRepository,
     SystemProbe,
     VectorKnowledgeBase,
+    WhatsAppOutreachRepository,
 )
 
 
@@ -72,6 +75,54 @@ class ListConsolidationHistory:
 
     async def execute(self, limit: int = 100) -> list[ConsolidationRecord]:
         return await self.repository.list_consolidations(limit=limit)
+
+
+class ListWhatsAppContacts:
+    def __init__(self, repository: WhatsAppOutreachRepository) -> None:
+        self.repository = repository
+
+    async def execute(self, limit: int = 100) -> list[WhatsAppContact]:
+        return await self.repository.list_contacts(limit=limit)
+
+
+class UpsertWhatsAppContact:
+    def __init__(self, repository: WhatsAppOutreachRepository) -> None:
+        self.repository = repository
+
+    async def execute(self, contact: WhatsAppContact) -> WhatsAppContact:
+        if contact.consent_status != "opted_in":
+            raise ValueError("Solo se pueden activar contactos con consentimiento opt-in.")
+        return await self.repository.upsert_contact(contact)
+
+
+class ListWhatsAppCampaigns:
+    def __init__(self, repository: WhatsAppOutreachRepository) -> None:
+        self.repository = repository
+
+    async def execute(self, limit: int = 100) -> list[WhatsAppCampaign]:
+        return await self.repository.list_campaigns(limit=limit)
+
+
+class CreateWhatsAppCampaign:
+    def __init__(self, repository: WhatsAppOutreachRepository) -> None:
+        self.repository = repository
+
+    async def execute(self, campaign: WhatsAppCampaign) -> WhatsAppCampaign:
+        recipients = await self.repository.count_opted_in_recipients(campaign.target_tag)
+        if recipients <= 0:
+            raise ValueError("No hay destinatarios opt-in para esta campana.")
+        draft = WhatsAppCampaign(
+            id=campaign.id,
+            name=campaign.name,
+            message_template=campaign.message_template,
+            status="draft",
+            target_tag=campaign.target_tag,
+            scheduled_for=campaign.scheduled_for,
+            recipient_count=recipients,
+            metadata={**campaign.metadata, "requires_approval": True, "channel": "whatsapp"},
+            created_at=campaign.created_at,
+        )
+        return await self.repository.create_campaign(draft)
 
 
 class VerifySupabaseVectorStore:

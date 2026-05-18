@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     kalshi_username: str | None = None
     kalshi_password: str | None = None
     kalshi_key_id: str | None = None
+    openwa_base_url: str = "http://openwa:2785"
+    openwa_api_key: str | None = None
+    openwa_session_id: str = "default"
     default_llm_provider: str = "openai"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")

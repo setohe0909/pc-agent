@@ -34,6 +34,8 @@ PUBLIC_KEYS = {
     "kalshi_max_daily_notional",
     "kalshi_allowed_tickers",
     "kalshi_denied_tickers",
+    "openwa_base_url",
+    "openwa_session_id",
 }
 
 SECRET_KEYS = {
@@ -55,6 +57,7 @@ SECRET_KEYS = {
     "kalshi_username",
     "kalshi_password",
     "kalshi_key_id",
+    "openwa_api_key",
 }
 
 
@@ -102,6 +105,9 @@ class RuntimeConfigUpdate(BaseModel):
     kalshi_max_daily_notional: float | None = Field(default=None, ge=0, le=1000000)
     kalshi_allowed_tickers: str | None = Field(default=None, max_length=4096)
     kalshi_denied_tickers: str | None = Field(default=None, max_length=4096)
+    openwa_base_url: str | None = Field(default=None, max_length=2048)
+    openwa_api_key: str | None = Field(default=None, max_length=4096)
+    openwa_session_id: str | None = Field(default=None, max_length=120)
     coder_web_stack: str | None = Field(default=None, max_length=80)
     coder_web_autonomy: str | None = Field(default=None, max_length=80)
     coder_web_perf: str | None = Field(default=None, max_length=80)
@@ -113,6 +119,7 @@ class RuntimeConfigUpdate(BaseModel):
         "supabase_url",
         "ollama_base_url",
         "kalshi_api_base_url",
+        "openwa_base_url",
     )
     @classmethod
     def validate_url(cls, value: str | None) -> str | None:
