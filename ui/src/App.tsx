@@ -177,6 +177,10 @@ export default function App() {
   }, [adminToken]);
 
   useEffect(() => {
+    document.documentElement.classList.remove("dark");
+  }, []);
+
+  useEffect(() => {
     refresh();
     const iv = setInterval(refresh, 5000);
     return () => clearInterval(iv);
@@ -228,15 +232,15 @@ export default function App() {
   const healthy = services.filter((service) => service.state === "healthy").length;
 
   return (
-    <div className="min-h-screen bg-[#b9dcf2] text-slate-950">
+    <div className="min-h-screen bg-[#dff2fb] text-slate-950">
       <div className="min-h-screen bg-[#eaf6fc]">
-        <Tabs value={activeTab} onValueChange={setActiveTab} orientation="vertical" className="min-h-screen flex-row gap-0">
-          <aside className="fixed inset-y-0 left-0 z-20 flex w-[112px] flex-col items-center border-r border-white/80 bg-white/70 px-5 py-5 shadow-[12px_0_30px_rgba(72,124,157,0.08)] backdrop-blur">
-            <div className="mb-7 flex size-16 items-center justify-center rounded-[8px] bg-white shadow-sm ring-1 ring-slate-200/80">
-              <img src="/pc-agent-logo.png" alt="PC Agent" className="size-12 object-contain" />
+        <Tabs value={activeTab} onValueChange={setActiveTab} orientation="vertical" className="min-h-screen w-full flex-row gap-0">
+          <aside className="fixed inset-y-0 left-0 z-20 flex w-[76px] flex-col items-center border-r border-[#d3e3ee] bg-[#f9fdff] px-2.5 py-4 shadow-[8px_0_24px_rgba(68,112,143,0.07)]">
+            <div className="mb-5 flex size-11 shrink-0 items-center justify-center rounded-[8px] bg-white shadow-sm ring-1 ring-[#d3e3ee]">
+              <img src="/pc-agent-logo.png" alt="PC Agent" className="size-7 object-contain" />
             </div>
 
-            <TabsList className="h-auto w-full flex-1 items-center justify-start gap-2 overflow-y-auto bg-transparent p-0 text-slate-500">
+            <TabsList className="h-auto w-full flex-1 items-center justify-start gap-1.5 overflow-y-auto bg-transparent p-0 text-[#748394]">
               {navItems.map((item, index) => {
                 const Icon = item.icon;
                 const previous = navItems[index - 1];
@@ -244,12 +248,12 @@ export default function App() {
 
                 return (
                   <div key={item.value} className="w-full">
-                    {startsGroup ? <div className="mx-auto my-2 h-px w-11 bg-slate-300/80" /> : null}
+                    {startsGroup ? <div className="mx-auto my-2.5 h-px w-7 bg-[#d3e3ee]" /> : null}
                     <TabsTrigger
                       value={item.value}
                       title={item.label}
                       aria-label={item.label}
-                      className="mx-auto flex size-12 items-center justify-center rounded-[8px] p-0 text-slate-500 hover:bg-white hover:text-slate-950 data-active:!bg-[#58aee9] data-active:!text-white data-active:shadow-[0_10px_24px_rgba(57,143,212,0.32)]"
+                      className="relative mx-auto !flex !size-9 !flex-none !grow-0 !basis-auto items-center justify-center rounded-[8px] border border-transparent bg-transparent p-0 text-[#8293a3] shadow-none transition-colors before:absolute before:-left-2 before:top-1/2 before:h-5 before:w-1 before:-translate-y-1/2 before:rounded-full before:bg-transparent hover:border-[#d3e3ee] hover:bg-white hover:text-[#27384d] data-active:!border-[#cfe8f8] data-active:!bg-[#e8f5fd] data-active:!text-[#1688d8] data-active:shadow-none data-active:before:bg-[#1688d8] [&_svg]:!size-5"
                     >
                       <Icon className="size-5" />
                     </TabsTrigger>
@@ -258,21 +262,21 @@ export default function App() {
               })}
             </TabsList>
 
-            <div className="mt-4 flex flex-col items-center gap-3">
-              <div className="h-px w-11 bg-slate-300/80" />
-              <Button variant="ghost" size="icon" onClick={refresh} title="Refrescar" aria-label="Refrescar" className="size-12 rounded-[8px] text-slate-500 hover:bg-white hover:text-slate-950">
+            <div className="mt-3 flex flex-col items-center gap-2.5">
+              <div className="h-px w-7 bg-[#d3e3ee]" />
+              <Button variant="ghost" size="icon" onClick={refresh} title="Refrescar" aria-label="Refrescar" className="size-9 rounded-[8px] text-[#65778d] hover:bg-white hover:text-[#26394d]">
                 <RefreshCw className="size-5" />
               </Button>
-              <div className="flex size-12 items-center justify-center rounded-[8px] bg-white text-slate-500 ring-1 ring-slate-200/80" title="Perfil">
-                <UserCircle className="size-6" />
+              <div className="flex size-9 items-center justify-center rounded-[8px] bg-white text-[#65778d] ring-1 ring-[#d3e3ee]" title="Perfil">
+                <UserCircle className="size-5" />
               </div>
             </div>
           </aside>
 
-          <main className="min-h-screen pl-[112px]">
+          <main className="min-h-screen min-w-0 flex-1 pl-[76px]">
             <div className="min-h-screen bg-[#eaf6fc]">
-              <header className="border-b border-white/70 bg-[#dceffb]/80 px-5 py-6 backdrop-blur sm:px-8 lg:px-12">
-                <div className="mx-auto flex max-w-[1680px] flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+              <header className="w-full border-b border-white/70 bg-[#dceffb]/80 px-5 py-6 backdrop-blur sm:px-8 lg:px-12">
+                <div className="flex w-full flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
                   <div className="max-w-4xl">
                     <div className="mb-3 flex items-center gap-3">
                       <span className="inline-flex items-center gap-2 rounded-full bg-white/70 px-3 py-1 text-xs font-medium text-slate-600 ring-1 ring-slate-200/80">
@@ -308,8 +312,8 @@ export default function App() {
                 </div>
               </header>
 
-              <div className="px-5 py-7 sm:px-8 lg:px-12">
-                <div className="mx-auto max-w-[1680px]">
+              <div className="w-full px-5 py-7 sm:px-8 lg:px-12">
+                <div className="w-full">
                   {renderContent()}
                 </div>
               </div>

@@ -7,7 +7,27 @@ import { Button } from "@/components/ui/button";
 
 function StateBadge({ state }: { state: string }) {
   const variant = state === "healthy" ? "default" : state === "offline" ? "destructive" : "secondary";
-  return <Badge variant={variant} className="uppercase text-[10px]">{state}</Badge>;
+  const tone = state === "healthy"
+    ? "bg-[#159947] text-white"
+    : state === "offline"
+      ? "bg-red-100 text-red-700"
+      : "bg-amber-100 text-amber-700";
+
+  return <Badge variant={variant} className={`rounded-[4px] px-2 uppercase text-[10px] ${tone}`}>{state}</Badge>;
+}
+
+function DiscordStatusCard({ title, value, state }: { title: string; value: string; state: string }) {
+  return (
+    <Card className="rounded-[8px] border-white/80 bg-white py-0 shadow-sm ring-1 ring-slate-200/70">
+      <CardHeader className="p-5">
+        <div className="mb-6 flex items-center justify-between gap-3">
+          <CardTitle className="text-base text-slate-950">{title}</CardTitle>
+          <StateBadge state={state} />
+        </div>
+        <CardDescription className="break-words text-sm text-slate-500">{value}</CardDescription>
+      </CardHeader>
+    </Card>
+  );
 }
 
 export function DiscordView({ data, onSave }: { data: any, adminToken: string, onSave: (payload: any) => Promise<void> }) {
@@ -30,62 +50,22 @@ export function DiscordView({ data, onSave }: { data: any, adminToken: string, o
   };
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="p-4">
-            <div className="flex items-center justify-between mb-2">
-              <CardTitle className="text-base">Solicitudes</CardTitle>
-              <StateBadge state={discord.requests_channel_id ? "healthy" : "offline"} />
-            </div>
-            <CardDescription className="text-xs break-words">{discord.requests_channel_id || "Sin configurar"}</CardDescription>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="p-4">
-            <div className="flex items-center justify-between mb-2">
-              <CardTitle className="text-base">Notificaciones</CardTitle>
-              <StateBadge state={discord.notifications_channel_id ? "healthy" : "offline"} />
-            </div>
-            <CardDescription className="text-xs break-words">{discord.notifications_channel_id || "Sin configurar"}</CardDescription>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="p-4">
-            <div className="flex items-center justify-between mb-2">
-              <CardTitle className="text-base">Estado</CardTitle>
-              <StateBadge state={discord.status_channel_id ? "healthy" : "offline"} />
-            </div>
-            <CardDescription className="text-xs break-words">{discord.status_channel_id || "Sin configurar"}</CardDescription>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="p-4">
-            <div className="flex items-center justify-between mb-2">
-              <CardTitle className="text-base">Bot</CardTitle>
-              <StateBadge state={control.has_bot_token ? "healthy" : "offline"} />
-            </div>
-            <CardDescription className="text-xs break-words">{control.has_bot_token ? "Token configurado" : "Sin token"}</CardDescription>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="p-4">
-            <div className="flex items-center justify-between mb-2">
-              <CardTitle className="text-base">Aprobadores</CardTitle>
-              <StateBadge state={control.approver_user_ids ? "healthy" : "offline"} />
-            </div>
-            <CardDescription className="text-xs break-words">{control.approver_user_ids || "Sin configurar"}</CardDescription>
-          </CardHeader>
-        </Card>
+    <div className="w-full space-y-7">
+      <div className="grid w-full grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-5">
+        <DiscordStatusCard title="Solicitudes" value={discord.requests_channel_id || "Sin configurar"} state={discord.requests_channel_id ? "healthy" : "offline"} />
+        <DiscordStatusCard title="Notificaciones" value={discord.notifications_channel_id || "Sin configurar"} state={discord.notifications_channel_id ? "healthy" : "offline"} />
+        <DiscordStatusCard title="Estado" value={discord.status_channel_id || "Sin configurar"} state={discord.status_channel_id ? "healthy" : "offline"} />
+        <DiscordStatusCard title="Bot" value={control.has_bot_token ? "Token configurado" : "Sin token"} state={control.has_bot_token ? "healthy" : "offline"} />
+        <DiscordStatusCard title="Aprobadores" value={control.approver_user_ids || "Sin configurar"} state={control.approver_user_ids ? "healthy" : "offline"} />
       </div>
 
-      <Card>
+      <Card className="w-full rounded-[8px] border-white/80 bg-white py-0 shadow-sm ring-1 ring-slate-200/70">
         <CardHeader>
-          <CardTitle>Configurar Discord</CardTitle>
-          <CardDescription>Canales y autorizaciones para solicitudes y notificaciones.</CardDescription>
+          <CardTitle className="text-slate-950">Configurar Discord</CardTitle>
+          <CardDescription className="text-slate-500">Canales y autorizaciones para solicitudes y notificaciones.</CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSave} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <form onSubmit={handleSave} className="grid grid-cols-1 gap-5 xl:grid-cols-4">
             <div className="space-y-2">
               <Label>Discord Bot Token</Label>
               <Input name="discord_bot_token" type="password" placeholder="Token del bot" autoComplete="off" />
@@ -102,11 +82,11 @@ export function DiscordView({ data, onSave }: { data: any, adminToken: string, o
               <Label>Canal Estado</Label>
               <Input name="discord_status_channel_id" defaultValue={discord.status_channel_id} placeholder="ID del canal" />
             </div>
-            <div className="space-y-2 md:col-span-2">
+            <div className="space-y-2 xl:col-span-3">
               <Label>Usuarios Aprobadores</Label>
               <Input name="discord_approver_user_ids" defaultValue={control.approver_user_ids} placeholder="IDs separados por coma" />
             </div>
-            <div className="md:col-span-2 flex justify-end">
+            <div className="flex items-end justify-end">
               <Button type="submit">Guardar Discord</Button>
             </div>
           </form>

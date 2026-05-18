@@ -45,7 +45,7 @@ export function CoderWebView({ data, onSave }: { data: any, adminToken: string, 
         <Card>
           <CardHeader>
             <CardTitle className="text-md flex items-center gap-2">
-              <Code className="w-5 h-5 text-slate-900 dark:text-white" />
+              <Code className="w-5 h-5 text-slate-900" />
               GitHub Repository Control
             </CardTitle>
             <CardDescription>Configuración para el despliegue de proyectos React/TS.</CardDescription>
@@ -170,7 +170,7 @@ export function CoderWebView({ data, onSave }: { data: any, adminToken: string, 
                 </div>
               </div>
               
-              <div className="p-4 rounded-lg bg-black text-green-400 font-mono text-[10px] space-y-1">
+              <div className="p-4 rounded-lg border border-slate-200 bg-slate-50 text-slate-700 font-mono text-[10px] space-y-1">
                 <p>{">"} [SYSTEM] Pilot initialized.</p>
                 <p>{">"} [INFO] Monitoring repository ecommerce-3a2f...</p>
                 <p>{">"} [STATUS] Awaiting next instruction...</p>

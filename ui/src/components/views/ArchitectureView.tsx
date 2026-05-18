@@ -129,21 +129,21 @@ export function ArchitectureView() {
           </section>
 
           {/* 05. OBSERVABILIDAD (LANGFUSE STACK) */}
-          <section className="p-6 rounded-2xl bg-slate-900 text-white space-y-4 shadow-xl">
+          <section className="p-6 rounded-[8px] border border-green-200 bg-green-50 text-slate-950 space-y-4 shadow-sm">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-black uppercase tracking-widest flex items-center gap-2 text-slate-300">
-                <ShieldCheck className="w-5 h-5 text-green-400" /> 05. Observability (Langfuse 5-Container Stack)
+              <h3 className="text-sm font-black uppercase tracking-widest flex items-center gap-2 text-green-800">
+                <ShieldCheck className="w-5 h-5 text-green-600" /> 05. Observability (Langfuse 5-Container Stack)
               </h3>
-              <Badge variant="outline" className="text-white border-white/20">Full Traceability</Badge>
+              <Badge variant="outline" className="border-green-300 text-green-800">Full Traceability</Badge>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-              <div className="p-2 border border-white/10 rounded text-center"><p className="text-[9px] font-black">LF Web</p></div>
-              <div className="p-2 border border-white/10 rounded text-center"><p className="text-[9px] font-black">LF Worker</p></div>
-              <div className="p-2 border border-white/10 rounded text-center"><p className="text-[9px] font-black">ClickHouse</p></div>
-              <div className="p-2 border border-white/10 rounded text-center"><p className="text-[9px] font-black">Postgres (LF)</p></div>
-              <div className="p-2 border border-white/10 rounded text-center"><p className="text-[9px] font-black">Valkey Cache</p></div>
+              <div className="p-2 border border-green-200 bg-white rounded text-center"><p className="text-[9px] font-black">LF Web</p></div>
+              <div className="p-2 border border-green-200 bg-white rounded text-center"><p className="text-[9px] font-black">LF Worker</p></div>
+              <div className="p-2 border border-green-200 bg-white rounded text-center"><p className="text-[9px] font-black">ClickHouse</p></div>
+              <div className="p-2 border border-green-200 bg-white rounded text-center"><p className="text-[9px] font-black">Postgres (LF)</p></div>
+              <div className="p-2 border border-green-200 bg-white rounded text-center"><p className="text-[9px] font-black">Valkey Cache</p></div>
             </div>
-            <p className="text-[9px] text-slate-400 mt-2 italic text-center">Monitorea costos, latencia y trazas de cada llamada a Gemini/Ollama.</p>
+            <p className="text-[9px] text-green-800 mt-2 italic text-center">Monitorea costos, latencia y trazas de cada llamada a Gemini/Ollama.</p>
           </section>
 
           {/* 06. APIS DE TERCEROS */}
