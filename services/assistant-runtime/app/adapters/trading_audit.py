@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 import httpx
 
-from app.domain.ports.trading import TradeAuditEvent, TradeAuditRepository
+from app.domain.ports.trading import TradeAuditEvent, TradeAuditRepository, TradingExposureRepository
 
 
 class SupabaseTradeAuditRepository(TradeAuditRepository):
@@ -31,9 +31,51 @@ class SupabaseTradeAuditRepository(TradeAuditRepository):
         }
         try:
             async with httpx.AsyncClient(timeout=5) as client:
-                await client.post(f"{self.url.rstrip('/')}/rest/v1/trading_audit_events", headers=headers, json=payload)
+                response = await client.post(
+                    f"{self.url.rstrip('/')}/rest/v1/trading_audit_events",
+                    headers=headers,
+                    json=payload,
+                )
+            if response.status_code >= 400:
+                raise RuntimeError(f"Trading audit HTTP {response.status_code}: {response.text[:240]}")
         except Exception as exc:
             print(f"[TRADING AUDIT ERROR] {exc}")
+            raise
+
+
+class SupabaseTradingExposureRepository(TradingExposureRepository):
+    def __init__(self) -> None:
+        self.url = os.getenv("SUPABASE_URL")
+        self.key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+
+    async def daily_notional(self, actor_id: str | None, environment: str) -> float:
+        if not self.url or not self.key:
+            return 0.0
+        start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+        params = {
+            "select": "payload",
+            "event_type": "eq.trade_submit_attempt",
+            "environment": f"eq.{environment}",
+            "created_at": f"gte.{start.isoformat()}",
+        }
+        if actor_id:
+            params["actor_id"] = f"eq.{actor_id}"
+        headers = {"apikey": self.key, "Authorization": f"Bearer {self.key}"}
+        async with httpx.AsyncClient(timeout=5) as client:
+            response = await client.get(
+                f"{self.url.rstrip('/')}/rest/v1/trading_audit_events",
+                headers=headers,
+                params=params,
+            )
+        if response.status_code >= 400:
+            raise RuntimeError(f"Trading exposure HTTP {response.status_code}: {response.text[:240]}")
+        total = 0.0
+        for row in response.json():
+            try:
+                total += float((row.get("payload") or {}).get("amount") or 0)
+            except (TypeError, ValueError):
+                continue
+        return total
 
 
 def _redact(payload: dict) -> dict:

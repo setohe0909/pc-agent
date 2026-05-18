@@ -126,6 +126,7 @@ class TradingWorkflow:
             amount=amount, 
             client_order_id=client_order_id
         )
+        order_status = order.get("status", "unknown")
         await self.audit.record(TradeAuditEvent(
             event_type="trade_submit_result",
             actor_id=user_id,
@@ -134,6 +135,14 @@ class TradingWorkflow:
             environment=risk.policy.environment,
             payload={"order": order},
         ))
+
+        if order_status not in {"executed", "submitted", "filled", "partially_filled"}:
+            return {
+                "status": order_status,
+                "message": order.get("message", "La orden no fue ejecutada."),
+                "order": order,
+                "critic_note": critic_opinion[:100] + "...",
+            }
         
         # 7. Guardar en memoria
         if self.memory and user_id:
@@ -145,7 +154,7 @@ class TradingWorkflow:
             })
             
         return {
-            "status": "executed",
+            "status": order_status,
             "message": f"Analisis dual completado. Confianza: {analysis.get('confidence', 'Alta')}.",
             "order": order,
             "critic_note": critic_opinion[:100] + "..."

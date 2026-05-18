@@ -419,9 +419,19 @@ python3 services/discord-bot/test_marketer_approval.py
 - [x] Memoria proactiva por contexto.
 - [x] UI administrativa para configuracion y estado.
 - [x] Worker de ingesta con pgvector y Ollama.
-- [ ] Adapter MentisDB real para read/write estable.
-- [ ] Adapter Kalshi live con limites de riesgo y auditoria.
-- [ ] Historial visual de consolidaciones en UI.
+- [x] Adapter MentisDB/Supabase Memory para read/write estable, healthcheck real y RLS service-role.
+- [x] Historial visual de consolidaciones en UI con contrato normalizado.
+- [x] Base Kalshi con limites de riesgo, auditoria durable y fail-closed para ordenes bloqueadas.
+- [ ] Adapter Kalshi live con autenticacion RSA-PSS, submit real de ordenes e idempotencia end-to-end.
+- [ ] Reconciliacion Kalshi de ordenes, fills, cancelaciones y drift de posicion.
+- [ ] Dashboard operativo de auditoria trading, rechazos de riesgo y exposicion diaria.
+- [ ] Tests de contrato Supabase/PostgREST para Mentis Memory y trading audit.
+- [ ] Observabilidad productiva: metricas, trazas y alertas para Mentis, consolidaciones y Kalshi.
+- [ ] Politicas multi-tenant para memoria, trading y runtime config.
+- [ ] Rotacion y validacion de secretos para Supabase, Kalshi, Discord y proveedores LLM.
+- [ ] Backups, retencion y redaccion selectiva de memoria sensible.
+- [ ] Runbooks de incidentes para trading live, perdida de auditoria y fallos de consolidacion.
+- [ ] E2E UI/API para flujos criticos: consolidaciones, memoria, config y trading preview.
 - [ ] CI completa por servicio.
 
 ## Estado Del Proyecto

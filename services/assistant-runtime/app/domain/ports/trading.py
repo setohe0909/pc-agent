@@ -50,3 +50,8 @@ class RiskPolicyPort(Protocol):
 class TradeAuditRepository(Protocol):
     async def record(self, event: TradeAuditEvent) -> None:
         ...
+
+
+class TradingExposureRepository(Protocol):
+    async def daily_notional(self, actor_id: str | None, environment: str) -> float:
+        ...

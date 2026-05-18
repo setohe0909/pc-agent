@@ -9,6 +9,14 @@ from app.domain.ports.trading import RiskPolicy
 from app.domain.trading_policies import ConfigurableRiskPolicy
 
 
+class FakeExposureRepository:
+    def __init__(self, used: float) -> None:
+        self.used = used
+
+    async def daily_notional(self, actor_id: str | None, environment: str) -> float:
+        return self.used
+
+
 class TradingRiskTests(unittest.TestCase):
     def test_rejects_amount_above_order_limit(self) -> None:
         async def scenario() -> None:
@@ -42,6 +50,18 @@ class TradingRiskTests(unittest.TestCase):
             policy = ConfigurableRiskPolicy(RiskPolicy(allowed_tickers=("KXOK",)))
             decision = await policy.evaluate("KXNO", "BUY YES", 1)
             self.assertFalse(decision.approved)
+
+        asyncio.run(scenario())
+
+    def test_daily_notional_limit_is_enforced(self) -> None:
+        async def scenario() -> None:
+            policy = ConfigurableRiskPolicy(
+                RiskPolicy(max_order_amount=10, max_daily_notional=15),
+                exposure_repository=FakeExposureRepository(used=10),
+            )
+            decision = await policy.evaluate("KXOK", "BUY YES", 6)
+            self.assertFalse(decision.approved)
+            self.assertIn("limite diario", decision.reason)
 
         asyncio.run(scenario())
 

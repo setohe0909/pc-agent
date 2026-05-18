@@ -10,8 +10,9 @@ from pydantic import BaseModel, Field
 from app.adapters.kalshi import KalshiHttpAdapter
 from app.adapters.open_claw import OpenClawLLMAdapter
 from app.adapters.memory import MentisMemoryAdapter
-from app.adapters.trading_audit import SupabaseTradeAuditRepository
+from app.adapters.trading_audit import SupabaseTradeAuditRepository, SupabaseTradingExposureRepository
 from app.adapters.zernio_adapter import ZernioAdapter
+from app.domain.trading_policies import ConfigurableRiskPolicy
 from app.use_cases.trading_workflow import TradingWorkflow
 from app.use_cases.marketing_graph import MarketingGraph
 from app.use_cases.writer_workflow import WriterWorkflow
@@ -158,6 +159,7 @@ async def assistant_request(request: AssistantRequest) -> dict:
         trading_port=trading_port,
         llm_port=llm_port,
         memory_port=memory_port,
+        risk_policy=ConfigurableRiskPolicy(exposure_repository=SupabaseTradingExposureRepository()),
         audit_repository=SupabaseTradeAuditRepository(),
     )
     marketing_workflow = MarketingGraph(llm=llm_port, memory=memory_port, marketing=ZernioAdapter())
