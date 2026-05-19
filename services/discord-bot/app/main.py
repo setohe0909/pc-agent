@@ -1039,6 +1039,7 @@ async def main() -> None:
 
         if content.startswith("!picture"):
             raw_query = content.removeprefix("!picture").strip()
+            raw_query, use_free_model = _extract_free_model_flag(raw_query)
             
             # Gestión de Memoria
             if "memory --clean" in raw_query:
@@ -1101,7 +1102,13 @@ async def main() -> None:
                     "source": {"platform": "discord", "channel_id": str(thread.id), "user_id": str(message.author.id)},
                     "images": images_b64,
                     "image_metadata": image_metadata,
-                    "payload": {}
+                    "payload": {
+                        **({
+                            "prefer_free_model": True,
+                            "image_generation_provider": "ollama",
+                            "image_edit_provider": "local",
+                        } if use_free_model else {})
+                    }
                 }
 
                 result = await _send_assistant_request(payload)

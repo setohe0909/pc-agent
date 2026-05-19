@@ -103,7 +103,13 @@ class PictureGraph:
         print(f"[PICTURE GRAPH] Ejecutando {plan.operation.value}: {prompt[:50]}...")
         try:
             if plan.operation == PictureOperation.GENERATE:
-                url = await self.llm.generate_image(prompt, context=_picture_context(state, plan))
+                picture_context = _picture_context(state, plan)
+                try:
+                    url = await self.llm.generate_image(prompt, context=picture_context)
+                except TypeError as exc:
+                    if "context" not in str(exc):
+                        raise
+                    url = await self.llm.generate_image(prompt)
             else:
                 images = state.get("images") or []
                 if not images:

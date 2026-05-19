@@ -295,7 +295,7 @@ class OpenClawLLMAdapter(LLMPort):
         from litellm import aimage_generation
         import os
 
-        generation_provider = (context or {}).get("image_generation_provider")
+        generation_provider = (context or {}).get("image_generation_provider") or os.getenv("PICTURE_IMAGE_GENERATION_PROVIDER")
         if (context or {}).get("prefer_free_model") and not generation_provider:
             generation_provider = "ollama"
         if str(generation_provider or "").strip().lower() == "ollama":

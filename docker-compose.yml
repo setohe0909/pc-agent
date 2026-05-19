@@ -77,7 +77,7 @@ services:
     command: python -m app.main
 
   ollama:
-    image: ollama/ollama:0.6.8
+    image: ollama/ollama:latest
     profiles: ["embeddings"]
     ports:
       - "11434:11434"
