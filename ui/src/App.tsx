@@ -235,12 +235,12 @@ export default function App() {
     <div className="min-h-screen bg-[#dff2fb] text-slate-950">
       <div className="min-h-screen bg-[#eaf6fc]">
         <Tabs value={activeTab} onValueChange={setActiveTab} orientation="vertical" className="min-h-screen w-full flex-row gap-0">
-          <aside className="fixed inset-y-0 left-0 z-20 flex w-[76px] flex-col items-center border-r border-[#d3e3ee] bg-[#f9fdff] px-2.5 py-4 shadow-[8px_0_24px_rgba(68,112,143,0.07)]">
-            <div className="mb-5 flex size-11 shrink-0 items-center justify-center rounded-[8px] bg-white shadow-sm ring-1 ring-[#d3e3ee]">
-              <img src="/pc-agent-logo.png" alt="PC Agent" className="size-7 object-contain" />
+          <aside className="fixed inset-y-0 left-0 z-20 flex w-[92px] flex-col items-center border-r border-[#cfe1ec] bg-[#f8fcff] px-3 py-5 shadow-[10px_0_28px_rgba(68,112,143,0.08)]">
+            <div className="mb-7 flex size-[58px] shrink-0 items-center justify-center rounded-[8px] bg-white shadow-[0_8px_18px_rgba(45,93,126,0.12)] ring-1 ring-[#d4e5ef]">
+              <img src="/pc-agent-logo.png" alt="PC Agent" className="size-[42px] object-contain" />
             </div>
 
-            <TabsList className="h-auto w-full flex-1 items-center justify-start gap-1.5 overflow-y-auto bg-transparent p-0 text-[#748394]">
+            <TabsList className="h-auto w-full flex-1 items-center justify-start gap-2 overflow-y-auto bg-transparent p-0 text-[#748394] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {navItems.map((item, index) => {
                 const Icon = item.icon;
                 const previous = navItems[index - 1];
@@ -248,32 +248,32 @@ export default function App() {
 
                 return (
                   <div key={item.value} className="w-full">
-                    {startsGroup ? <div className="mx-auto my-2.5 h-px w-7 bg-[#d3e3ee]" /> : null}
+                    {startsGroup ? <div className="mx-auto my-3 h-px w-8 bg-[#cfdeea]" /> : null}
                     <TabsTrigger
                       value={item.value}
                       title={item.label}
                       aria-label={item.label}
-                      className="relative mx-auto !flex !size-9 !flex-none !grow-0 !basis-auto items-center justify-center rounded-[8px] border border-transparent bg-transparent p-0 text-[#8293a3] shadow-none transition-colors before:absolute before:-left-2 before:top-1/2 before:h-5 before:w-1 before:-translate-y-1/2 before:rounded-full before:bg-transparent hover:border-[#d3e3ee] hover:bg-white hover:text-[#27384d] data-active:!border-[#cfe8f8] data-active:!bg-[#e8f5fd] data-active:!text-[#1688d8] data-active:shadow-none data-active:before:bg-[#1688d8] [&_svg]:!size-5"
+                      className="relative mx-auto !flex !size-11 !flex-none !grow-0 !basis-auto items-center justify-center rounded-[8px] border border-transparent bg-transparent p-0 text-[#8192a3] shadow-none transition-all before:absolute before:left-[-13px] before:top-1/2 before:h-6 before:w-[5px] before:-translate-y-1/2 before:rounded-full before:bg-transparent hover:border-[#d4e5ef] hover:bg-white hover:text-[#27384d] hover:shadow-[0_6px_14px_rgba(45,93,126,0.08)] data-active:!border-[#bee1f6] data-active:!bg-[#e8f6ff] data-active:!text-[#1688d8] data-active:shadow-[0_8px_18px_rgba(45,120,174,0.14)] data-active:before:bg-[#1688d8] [&_svg]:!size-[22px] [&_svg]:stroke-[2.2]"
                     >
-                      <Icon className="size-5" />
+                      <Icon className="size-[22px]" />
                     </TabsTrigger>
                   </div>
                 );
               })}
             </TabsList>
 
-            <div className="mt-3 flex flex-col items-center gap-2.5">
-              <div className="h-px w-7 bg-[#d3e3ee]" />
-              <Button variant="ghost" size="icon" onClick={refresh} title="Refrescar" aria-label="Refrescar" className="size-9 rounded-[8px] text-[#65778d] hover:bg-white hover:text-[#26394d]">
-                <RefreshCw className="size-5" />
+            <div className="mt-4 flex flex-col items-center gap-3">
+              <div className="h-px w-8 bg-[#cfdeea]" />
+              <Button variant="ghost" size="icon" onClick={refresh} title="Refrescar" aria-label="Refrescar" className="size-11 rounded-[8px] text-[#65778d] hover:bg-white hover:text-[#26394d] hover:shadow-[0_6px_14px_rgba(45,93,126,0.08)]">
+                <RefreshCw className="size-[22px]" />
               </Button>
-              <div className="flex size-9 items-center justify-center rounded-[8px] bg-white text-[#65778d] ring-1 ring-[#d3e3ee]" title="Perfil">
-                <UserCircle className="size-5" />
+              <div className="flex size-11 items-center justify-center rounded-[8px] bg-white text-[#65778d] shadow-sm ring-1 ring-[#d4e5ef]" title="Perfil">
+                <UserCircle className="size-[22px]" />
               </div>
             </div>
           </aside>
 
-          <main className="min-h-screen min-w-0 flex-1 pl-[76px]">
+          <main className="min-h-screen min-w-0 flex-1 pl-[92px]">
             <div className="min-h-screen bg-[#eaf6fc]">
               <header className="w-full border-b border-white/70 bg-[#dceffb]/80 px-5 py-6 backdrop-blur sm:px-8 lg:px-12">
                 <div className="flex w-full flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">

@@ -50,11 +50,18 @@ class FakeMarketing:
         self.scheduled_posts = []
         self.published_posts = []
         self.processed = set()
+        self.comment_calls = []
 
     async def get_connected_accounts(self):
         return {"instagram": "@brand_oficial", "tiktok": "@brand_tok"}
 
-    async def get_comments(self, platform: str, post_id: str):
+    async def get_comments(self, platform: str, post_id: str, data_source=None, account_id=None):
+        self.comment_calls.append({
+            "platform": platform,
+            "post_id": post_id,
+            "data_source": data_source,
+            "account_id": account_id,
+        })
         return [
             {"id": "c1", "user": "user1", "text": "Me encanta este diseño!"},
             {"id": "c2", "user": "user2", "text": "INFO por favor"},
@@ -287,7 +294,7 @@ class MarketingGraphRegressionTests(unittest.TestCase):
 
     def test_natural_negative_comments_prompt_filters_without_llm_tool_detection(self):
         class NegativeMarketing(FakeMarketing):
-            async def get_comments(self, platform: str, post_id: str):
+            async def get_comments(self, platform: str, post_id: str, data_source=None, account_id=None):
                 return [
                     {"id": "c1", "user": "user1", "text": "Me encanta este diseño!"},
                     {"id": "c2", "user": "user2", "text": "Tengo un problema con la demora"},
@@ -327,6 +334,28 @@ class MarketingGraphRegressionTests(unittest.TestCase):
             self.assertEqual(result["status"], "success")
             self.assertEqual(marketing.published_posts[0]["media_urls"], ["https://cdn.example.com/post.png"])
             self.assertEqual(marketing.published_posts[0]["account_id"], "acc_123")
+
+        asyncio.run(scenario())
+
+    def test_zernio_source_reaches_comment_tools_from_nested_request_payload(self):
+        async def scenario():
+            marketing = FakeMarketing()
+            graph = MarketingGraph(llm=FakeLLM(), memory=FakeMemory(), marketing=marketing)
+
+            result = await graph.run(
+                prompt="ver comentarios recientes",
+                payload={
+                    "payload": {
+                        "sub_command": "comments",
+                        "data_source": "zernio",
+                        "account_id": "acc_123",
+                    }
+                },
+            )
+
+            self.assertEqual(result["status"], "success")
+            self.assertEqual(marketing.comment_calls[0]["data_source"], "zernio")
+            self.assertEqual(marketing.comment_calls[0]["account_id"], "acc_123")
 
         asyncio.run(scenario())
 

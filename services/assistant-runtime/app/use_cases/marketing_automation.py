@@ -15,6 +15,13 @@ class MarketingAutomationService:
         self.marketing = marketing
         self.memory = memory
 
+    def _effective_payload(self, payload: dict | None) -> dict:
+        payload = payload or {}
+        inner = payload.get("payload")
+        if isinstance(inner, dict):
+            return {**payload, **inner}
+        return payload
+
     async def plan_campaign(self, topic: str, payload: dict | None = None, context: str = "") -> dict:
         payload = payload or {}
         policy = AutonomyPolicy.from_payload(payload)
@@ -125,11 +132,16 @@ class MarketingAutomationService:
         ).to_response()
 
     async def respond_to_comments(self, payload: dict | None = None) -> dict:
-        payload = payload or {}
+        payload = self._effective_payload(payload)
         policy = AutonomyPolicy.from_payload(payload)
         if not policy.automation_enabled:
             return {"status": "error", "message": "La automatización de marketing está desactivada por MARKETER_AUTOMATION_ENABLED=false."}
-        comments = await self.marketing.get_comments("instagram", "latest_post")
+        comments = await self.marketing.get_comments(
+            payload.get("platform", "instagram"),
+            payload.get("post_id", "latest_post"),
+            data_source=payload.get("data_source"),
+            account_id=payload.get("account_id"),
+        )
         drafts = []
         for comment in comments:
             prompt = (
@@ -150,7 +162,7 @@ class MarketingAutomationService:
         return {"status": "requires_approval", "message": self._format_reply_drafts(drafts, "Borradores listos. Requieren aprobación antes de publicar.")}
 
     async def process_lead_magnets(self, payload: dict | None = None) -> dict:
-        payload = payload or {}
+        payload = self._effective_payload(payload)
         policy = AutonomyPolicy.from_payload(payload)
         if not policy.automation_enabled:
             return {"status": "error", "message": "La automatización de marketing está desactivada por MARKETER_AUTOMATION_ENABLED=false."}
@@ -158,7 +170,12 @@ class MarketingAutomationService:
             "GUIA": {"link": "https://brand.com/free-guide", "name": "Guía de Estilo"},
             "INFO": {"link": "https://brand.com/catalog", "name": "Catálogo 2026"},
         }
-        comments = await self.marketing.get_comments("instagram", "latest_post")
+        comments = await self.marketing.get_comments(
+            payload.get("platform", "instagram"),
+            payload.get("post_id", "latest_post"),
+            data_source=payload.get("data_source"),
+            account_id=payload.get("account_id"),
+        )
         drafts = []
         for comment in comments:
             text_upper = comment.get("text", "").upper()
@@ -183,23 +200,37 @@ class MarketingAutomationService:
         return {"status": "requires_approval", "message": self._format_dm_drafts(drafts, "DMs en borrador. Requieren aprobación antes de enviar.")}
 
     async def qualify_leads(self, payload: dict | None = None) -> dict:
-        payload = payload or {}
+        payload = self._effective_payload(payload)
         policy = AutonomyPolicy.from_payload(payload)
         if not policy.automation_enabled:
             return {"status": "error", "message": "La automatización de marketing está desactivada por MARKETER_AUTOMATION_ENABLED=false."}
-        comments = await self.marketing.get_comments("instagram", "latest_post")
+        platform = payload.get("platform", "instagram")
+        post_id = payload.get("post_id", "latest_post")
+        comments = await self.marketing.get_comments(
+            platform,
+            post_id,
+            data_source=payload.get("data_source"),
+            account_id=payload.get("account_id"),
+        )
         leads = []
         for comment in comments:
             text = comment.get("text", "")
             hot_signal = any(word in text.upper() for word in ("INFO", "PRECIO", "COMPRAR", "QUIERO", "CATALOGO"))
             if hot_signal:
                 leads.append({
-                    "platform": "instagram",
+                    "platform": comment.get("platform") or platform,
                     "external_user": comment.get("user"),
                     "comment_text": text,
                     "intent_score": 8,
                     "category": "hot",
                     "reason": "Intención detectada por palabra clave",
+                    "metadata": {
+                        "source": comment.get("source") or payload.get("data_source") or "memory",
+                        "comment_id": comment.get("id"),
+                        "post_id": comment.get("post_id") or post_id,
+                        "account_id": comment.get("account_id") or payload.get("account_id"),
+                        "url": comment.get("url"),
+                    },
                 })
 
         if payload.get("is_approved"):

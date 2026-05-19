@@ -36,6 +36,13 @@ class MarketingGraph:
         self.automation = MarketingAutomationService(llm=llm, memory=memory, marketing=marketing)
         self._graph = self._build_graph()
 
+    def _effective_payload(self, payload: dict | None) -> dict:
+        payload = payload or {}
+        inner = payload.get("payload")
+        if isinstance(inner, dict):
+            return {**payload, **inner}
+        return payload
+
     def _get_marketing_tools(self) -> List[dict]:
         return [
             {
@@ -336,9 +343,9 @@ class MarketingGraph:
             elif tool_name == "get_growth_alerts":
                 result = await self._get_growth_alerts()
             elif tool_name == "review_recent_comments":
-                result = await self._review_recent_comments(action.get("arguments", {}).get("sentiment"))
+                result = await self._review_recent_comments(action.get("arguments", {}).get("sentiment"), state.get("payload", {}))
             elif tool_name == "draft_comment_replies":
-                result = await self._draft_comment_replies()
+                result = await self._draft_comment_replies(state.get("payload", {}))
             elif tool_name == "get_sales_leads":
                 result = await self._get_sales_leads()
             elif tool_name == "get_whatsapp_outreach":
@@ -381,7 +388,7 @@ class MarketingGraph:
             elif "trends" in tool_name:
                 result = await self._monitor_trends()
             elif "sentiment" in tool_name:
-                result = await self._analyze_sentiment()
+                result = await self._analyze_sentiment(state.get("payload", {}))
             elif "plan" in tool_name:
                 result = {"status": "success", "message": f"🚀 **Campaña Iniciada**: {state.get('refined_message', 'Procesada.')}"}
             elif "dashboard" in tool_name:
@@ -582,8 +589,14 @@ class MarketingGraph:
         report = f"### 🚀 Tendencias Detectadas\n\n{analysis}"
         return {"status": "success", "message": report}
 
-    async def _analyze_sentiment(self) -> dict:
-        comments = await self.marketing.get_comments("instagram", "latest_post")
+    async def _analyze_sentiment(self, payload: dict | None = None) -> dict:
+        payload = self._effective_payload(payload)
+        comments = await self.marketing.get_comments(
+            payload.get("platform", "instagram"),
+            payload.get("post_id", "latest_post"),
+            data_source=payload.get("data_source"),
+            account_id=payload.get("account_id"),
+        )
         if not comments:
             return {"status": "success", "message": "No encontré comentarios recientes para analizar sentimiento."}
 
@@ -678,8 +691,14 @@ class MarketingGraph:
             )
         return {"status": "success", "message": "\n\n".join(lines)}
 
-    async def _review_recent_comments(self, sentiment: str | None = None) -> dict:
-        comments = await self.marketing.get_comments("instagram", "latest_post")
+    async def _review_recent_comments(self, sentiment: str | None = None, payload: dict | None = None) -> dict:
+        payload = self._effective_payload(payload)
+        comments = await self.marketing.get_comments(
+            payload.get("platform", "instagram"),
+            payload.get("post_id", "latest_post"),
+            data_source=payload.get("data_source"),
+            account_id=payload.get("account_id"),
+        )
         if sentiment == "negative":
             negative_terms = ("malo", "caro", "problema", "no me gusta", "demora", "queja")
             comments = [comment for comment in comments if any(term in comment.get("text", "").lower() for term in negative_terms)]
@@ -695,8 +714,14 @@ class MarketingGraph:
             lines.append(f"- **{comment.get('user', 'usuario')}**: {text}\n  Señal: `{signal}`")
         return {"status": "success", "message": "\n".join(lines)}
 
-    async def _draft_comment_replies(self) -> dict:
-        comments = await self.marketing.get_comments("instagram", "latest_post")
+    async def _draft_comment_replies(self, payload: dict | None = None) -> dict:
+        payload = self._effective_payload(payload)
+        comments = await self.marketing.get_comments(
+            payload.get("platform", "instagram"),
+            payload.get("post_id", "latest_post"),
+            data_source=payload.get("data_source"),
+            account_id=payload.get("account_id"),
+        )
         if not comments:
             return {"status": "success", "message": "No encontré comentarios recientes para preparar respuestas."}
 

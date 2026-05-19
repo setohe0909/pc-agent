@@ -2,7 +2,13 @@ from abc import ABC, abstractmethod
 
 class MarketingPort(ABC):
     @abstractmethod
-    async def get_comments(self, platform: str, post_id: str) -> list[dict]:
+    async def get_comments(
+        self,
+        platform: str,
+        post_id: str,
+        data_source: str | None = None,
+        account_id: str | None = None,
+    ) -> list[dict]:
         pass
 
     @abstractmethod

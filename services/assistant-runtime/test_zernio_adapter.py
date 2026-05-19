@@ -90,6 +90,51 @@ class ZernioAdapterPostTests(unittest.TestCase):
 
         asyncio.run(scenario())
 
+    def test_get_comments_source_zernio_uses_inbox_comments_contract(self):
+        async def scenario():
+            adapter = ZernioAdapter()
+            calls = []
+
+            async def fake_get(path, params=None):
+                calls.append((path, params))
+                if path == "/inbox/comments":
+                    return {
+                        "data": [
+                            {
+                                "id": "post_1",
+                                "platform": "instagram",
+                                "accountId": "acc_1",
+                                "permalink": "https://instagram.com/p/1",
+                            }
+                        ]
+                    }
+                if path == "/inbox/comments/post_1":
+                    return {
+                        "comments": [
+                            {
+                                "id": "comment_1",
+                                "message": "INFO por favor",
+                                "createdTime": "2026-05-19T12:00:00Z",
+                                "from": {"username": "buyer_1"},
+                                "platform": "instagram",
+                            }
+                        ]
+                    }
+                return None
+
+            adapter._z_get = fake_get
+
+            comments = await adapter.get_comments("instagram", "latest_post", data_source="zernio")
+
+            self.assertEqual(calls[0][0], "/inbox/comments")
+            self.assertEqual(calls[0][1]["platform"], "instagram")
+            self.assertEqual(calls[1], ("/inbox/comments/post_1", {"accountId": "acc_1"}))
+            self.assertEqual(comments[0]["source"], "zernio")
+            self.assertEqual(comments[0]["user"], "buyer_1")
+            self.assertEqual(comments[0]["text"], "INFO por favor")
+
+        asyncio.run(scenario())
+
 
 if __name__ == "__main__":
     unittest.main()

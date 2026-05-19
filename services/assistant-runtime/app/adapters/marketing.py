@@ -8,7 +8,13 @@ class SocialMediaStubAdapter(MarketingPort):
         self.post_drafts: list[dict] = []
         self.automation_runs: list[dict] = []
 
-    async def get_comments(self, platform: str, post_id: str) -> list[dict]:
+    async def get_comments(
+        self,
+        platform: str,
+        post_id: str,
+        data_source: str | None = None,
+        account_id: str | None = None,
+    ) -> list[dict]:
         # En una implementación real, aquí se llamaría a la API de Instagram o TikTok
         print(f"[STUB] Obteniendo comentarios de {platform} para el post {post_id}")
         return [

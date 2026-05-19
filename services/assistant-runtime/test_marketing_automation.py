@@ -42,6 +42,7 @@ class FakeMarketing:
         self.published_posts = []
         self.processed = set()
         self.dashboard_calls = 0
+        self.comment_calls = []
 
     async def get_dashboard(self):
         self.dashboard_calls += 1
@@ -66,7 +67,13 @@ class FakeMarketing:
     async def get_best_posting_windows(self):
         return {"instagram": ["12:00-14:00", "19:00-21:00"], "tiktok": ["18:00-22:00", "07:00-09:00"]}
 
-    async def get_comments(self, platform, post_id):
+    async def get_comments(self, platform, post_id, data_source=None, account_id=None):
+        self.comment_calls.append({
+            "platform": platform,
+            "post_id": post_id,
+            "data_source": data_source,
+            "account_id": account_id,
+        })
         return [
             {"id": "c1", "user": "u1", "text": "INFO por favor"},
             {"id": "c2", "user": "u2", "text": "Me encanta"},
@@ -205,6 +212,23 @@ class MarketingAutomationTests(unittest.TestCase):
             self.assertTrue(marketing.published_posts)
             self.assertTrue(all(post.get("draft") for post in marketing.published_posts))
             self.assertIn("drafts en Zernio", result["message"])
+
+        asyncio.run(scenario())
+
+    def test_qualify_leads_can_force_zernio_source(self):
+        async def scenario():
+            marketing = FakeMarketing()
+            service = MarketingAutomationService(FakeLLM(), marketing, FakeMemory())
+
+            result = await service.qualify_leads({
+                "data_source": "zernio",
+                "platform": "instagram",
+                "account_id": "acc_1",
+            })
+
+            self.assertEqual(result["status"], "requires_approval")
+            self.assertEqual(marketing.comment_calls[0]["data_source"], "zernio")
+            self.assertEqual(marketing.comment_calls[0]["account_id"], "acc_1")
 
         asyncio.run(scenario())
 

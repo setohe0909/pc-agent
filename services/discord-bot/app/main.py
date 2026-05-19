@@ -77,6 +77,22 @@ def _extract_free_model_flag(raw_query: str) -> tuple[str, bool]:
     return cleaned, has_flag
 
 
+def _extract_source_flag(raw_query: str) -> tuple[str, str | None]:
+    match = re.search(r"(^|\s)--source\s+([a-zA-Z0-9_-]+)(?=\s|$)", raw_query)
+    source = match.group(2).strip().lower() if match else None
+    cleaned = re.sub(r"(^|\s)--source\s+[a-zA-Z0-9_-]+(?=\s|$)", " ", raw_query).strip()
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    return cleaned, source
+
+
+def _extract_account_flag(raw_query: str) -> tuple[str, str | None]:
+    match = re.search(r"(^|\s)--account\s+([a-zA-Z0-9_-]+)(?=\s|$)", raw_query)
+    account_id = match.group(2).strip() if match else None
+    cleaned = re.sub(r"(^|\s)--account\s+[a-zA-Z0-9_-]+(?=\s|$)", " ", raw_query).strip()
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    return cleaned, account_id
+
+
 async def main() -> None:
     token = None
     while not token:
@@ -482,7 +498,7 @@ async def main() -> None:
         if content == "!help":
             embed = discord.Embed(
                 title="🤖 PC Agent v0.6.1 - Guía de Operaciones", 
-                description="Guía actualizada con Picture, edición visual y `--free-model`:",
+                description="Guía actualizada con Picture, Zernio, `--source`, `--free-model` y estado de modelos:",
                 color=discord.Color.blue()
             )
             embed.add_field(
@@ -502,12 +518,17 @@ async def main() -> None:
             )
             embed.add_field(
                 name="📣 Marketing Datos",
-                value="`!marketer-status`: Estado del marketer.\n`!marketer dashboard`: Dashboard visual Zernio.\n`!marketer top-content`: Mejores contenidos.\n`!marketer audience`: Audiencia y segmentos.\n`!marketer alerts`: Alertas de crecimiento.\n`!marketer comments`: Comentarios recientes.\n`!marketer leads`: Leads detectados.\n`!marketer best-hours`: Mejores horarios.",
+                value="`!marketer-status`: Estado del marketer.\n`!marketer dashboard`: Dashboard visual Zernio.\n`!marketer top-content`: Mejores contenidos.\n`!marketer audience`: Audiencia y segmentos.\n`!marketer alerts`: Alertas de crecimiento.\n`!marketer comments`: Comentarios recientes desde memoria operativa.\n`!marketer leads`: Leads detectados.\n`!marketer best-hours`: Mejores horarios.",
                 inline=False
             )
             embed.add_field(
                 name="📣 Marketing Acciones",
                 value="`!marketer campaign <objetivo>`: Campaña asistida.\n`!marketer posts <tema>`: Borradores de posts.\n`!marketer reply-drafts`: Borradores para aprobación.\n`!marketer content-plan`: Calendario con métricas.\n`!marketer repurpose`: Reutilizar contenido ganador.\n`!marketer respond`: Borradores de respuesta.\n`!marketer qualify`: Detectar leads calientes.\n`!marketer magnet`: Lead Magnets (DM).\n`!marketer trends`: Buscar tendencias virales.\n`!marketer sentiment`: Análisis de sentimiento/crisis.\n`!marketer funnel <tema>`: Diseñar embudo.",
+                inline=False
+            )
+            embed.add_field(
+                name="📣 Marketing Fuente Zernio",
+                value="Usa `--source zernio` para leer comentarios reales desde Zernio en vez de memoria local.\n`!marketer --source zernio comments --account <id>`: Ver comentarios reales.\n`!marketer --source zernio negative-comments --account <id>`: Revisar comentarios de riesgo.\n`!marketer --source zernio qualify --account <id>`: Cualificar leads con trazabilidad.\n`!marketer --source zernio magnet --account <id>`: Preparar DMs por triggers.\n`!marketer --source zernio sentiment --account <id>`: Analizar sentimiento.",
                 inline=False
             )
             embed.add_field(
@@ -700,6 +721,8 @@ async def main() -> None:
         if content.startswith("!marketer "):
             raw_query = content.removeprefix("!marketer ").strip()
             raw_query, use_free_model = _extract_free_model_flag(raw_query)
+            raw_query, data_source = _extract_source_flag(raw_query)
+            raw_query, account_id = _extract_account_flag(raw_query)
 
             if raw_query == "--model-status":
                 await _send_model_status(message, "marketer")
@@ -741,6 +764,10 @@ async def main() -> None:
                         media_urls.append(att.url)
 
             extra = {}
+            if data_source:
+                extra["data_source"] = data_source
+            if account_id:
+                extra["account_id"] = account_id
             if use_free_model:
                 extra.update({
                     "prefer_free_model": True,

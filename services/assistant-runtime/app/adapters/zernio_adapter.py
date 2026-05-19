@@ -162,8 +162,17 @@ class ZernioAdapter(MarketingPort):
             return {"instagram": "no conectada", "tiktok": "no conectada"}
         return result
 
-    async def get_comments(self, platform: str, post_id: str) -> list[dict]:
-        print(f"[ZERNIO] Leyendo comentarios reales desde Zernio ({platform}/{post_id})")
+    async def get_comments(
+        self,
+        platform: str,
+        post_id: str,
+        data_source: str | None = None,
+        account_id: str | None = None,
+    ) -> list[dict]:
+        if (data_source or "").strip().lower() == "zernio":
+            return await self._get_comments_from_zernio(platform=platform, post_id=post_id, account_id=account_id)
+
+        print(f"[ZERNIO] Leyendo comentarios desde memoria operativa ({platform}/{post_id})")
         memories = await self._get_memory(f"marketing_comments_{platform}", limit=30)
         comments = []
         for mem in memories:
@@ -175,6 +184,61 @@ class ZernioAdapter(MarketingPort):
                 "created_at": mem.get("created_at", ""),
             })
         return comments
+
+    async def _get_comments_from_zernio(
+        self,
+        platform: str,
+        post_id: str,
+        account_id: str | None = None,
+    ) -> list[dict]:
+        print(f"[ZERNIO] Leyendo comentarios desde Zernio Comments API ({platform}/{post_id})")
+        post_rows = await self._zernio_commented_posts(platform=platform, account_id=account_id)
+        if post_id != "latest_post":
+            post_rows = [post for post in post_rows if post.get("id") == post_id or post.get("cid") == post_id]
+
+        comments: list[dict] = []
+        for post in post_rows[:5]:
+            resolved_post_id = post.get("id")
+            resolved_account_id = account_id or post.get("accountId")
+            if not resolved_post_id or not resolved_account_id:
+                continue
+            thread = await self._z_get(
+                f"/inbox/comments/{resolved_post_id}",
+                {"accountId": resolved_account_id},
+            )
+            if not isinstance(thread, dict):
+                continue
+            for comment in thread.get("comments", []) or []:
+                author = comment.get("from") or {}
+                comments.append({
+                    "id": comment.get("id", ""),
+                    "user": author.get("username") or author.get("name") or "desconocido",
+                    "text": comment.get("message", ""),
+                    "created_at": comment.get("createdTime", ""),
+                    "platform": comment.get("platform") or post.get("platform") or platform,
+                    "post_id": resolved_post_id,
+                    "account_id": resolved_account_id,
+                    "url": comment.get("url") or post.get("permalink"),
+                    "source": "zernio",
+                })
+        return comments
+
+    async def _zernio_commented_posts(self, platform: str, account_id: str | None = None) -> list[dict]:
+        params: dict[str, str | int] = {
+            "platform": platform,
+            "minComments": 1,
+            "sortBy": "comments",
+            "sortOrder": "desc",
+            "limit": 25,
+        }
+        if account_id:
+            params["accountId"] = account_id
+        data = await self._z_get("/inbox/comments", params)
+        if isinstance(data, dict):
+            return data.get("data", []) or []
+        if isinstance(data, list):
+            return data
+        return []
 
     async def reply_to_comment(self, platform: str, comment_id: str, text: str) -> bool:
         print(f"[ZERNIO] Respondiendo comentario {comment_id}")

@@ -6,15 +6,16 @@ Este módulo automatiza la entrega de recursos gratuitos (lead magnets) a los us
 El agente monitorea los comentarios en busca de disparadores (triggers) predefinidos y responde automáticamente enviando un mensaje directo (DM) con el recurso solicitado.
 
 - **Comando**: `!marketer magnet`
+- **Fuente Zernio**: `!marketer --source zernio magnet --account <id>`
 - **Disparadores (Triggers) Actuales**:
     - `GUIA`: Envía un enlace a la "Guía de Estilo".
     - `INFO`: Envía un enlace al "Catálogo 2026".
 - **Valor**: Aumenta la conversión de seguidores a leads y automatiza tareas repetitivas de atención al cliente.
 
 ## Implementación Técnica
-- **Workflow**: `MarketingWorkflow._process_lead_magnets()`
+- **Workflow**: `MarketingGraph._process_lead_magnets()` delega a `MarketingAutomationService.process_lead_magnets()`
 - **Puerto de Marketing**: 
-    - `get_comments()`: Para leer los comentarios.
+    - `get_comments(platform, post_id, data_source, account_id)`: Para leer comentarios desde memoria operativa o desde Zernio cuando `--source zernio` está presente.
     - `send_dm()`: Para enviar la respuesta privada.
 - **Lógica**: Comparación de texto (insensible a mayúsculas) para identificar los triggers.
 

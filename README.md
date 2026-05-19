@@ -168,6 +168,7 @@ secretos y solo indica si las claves existen.
 | LLM | `DEFAULT_LLM_PROVIDER`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `MINIMAX_API_KEY` |
 | Imagenes | `OPENAI_IMAGE_EDIT_MODEL`, `PICTURE_IMAGE_GENERATION_PROVIDER`, `PICTURE_IMAGE_EDIT_PROVIDER`, `TOGETHER_API_KEY`, `TOGETHER_IMAGE_MODEL`, `OLLAMA_IMAGE_BASE_URL`, `OLLAMA_IMAGE_MODEL` |
 | Supabase | `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `VECTOR_DATABASE_URL` |
+| Zernio | `ZERNIO_API_KEY` |
 | Embeddings | `EMBEDDING_PROVIDER`, `EMBEDDING_MODEL`, `EMBEDDING_DIMENSIONS`, `OLLAMA_BASE_URL` |
 | Memoria | `MENTIS_BASE_URL`, `MENTIS_ENABLED`, `MENTIS_API_KEY` |
 | Observabilidad | `LANGFUSE_HOST`, `LANGFUSE_ENABLED`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` |
@@ -222,6 +223,8 @@ bot infiere el agente desde el nombre del hilo.
 | `!marketer alerts` | Alertas de crecimiento. |
 | `!marketer comments` | Comentarios recientes. |
 | `!marketer negative-comments` | Comentarios negativos o de riesgo. |
+| `!marketer --source zernio comments --account <id>` | Lee comentarios recientes directamente desde Zernio Comments API para una cuenta concreta. |
+| `!marketer --source zernio negative-comments --account <id>` | Filtra comentarios de riesgo usando comentarios reales de Zernio. |
 | `!marketer leads` | Leads detectados. |
 | `!marketer whatsapp` | Contactos opt-in y campanas WhatsApp creadas para OpenWA. |
 | `!marketer best-hours` | Mejores horarios para publicar. |
@@ -243,6 +246,9 @@ bot infiere el agente desde el nombre del hilo.
 | `!marketer respond` | Responde comentarios. |
 | `!marketer qualify` | Cualifica leads calientes. |
 | `!marketer magnet` | Procesa lead magnets via DM. |
+| `!marketer --source zernio qualify --account <id>` | Cualifica leads desde comentarios reales de Zernio y conserva trazabilidad de comentario, post y cuenta. |
+| `!marketer --source zernio magnet --account <id>` | Detecta triggers de lead magnet desde Zernio antes de preparar DMs para aprobacion. |
+| `!marketer --source zernio sentiment --account <id>` | Analiza sentimiento usando comentarios actuales de Zernio. |
 | `!marketer trends` | Busca tendencias virales. |
 | `!marketer sentiment` | Analiza sentimiento y crisis. |
 | `!marketer funnel <tema>` | Disena un embudo. |
@@ -256,6 +262,10 @@ bot infiere el agente desde el nombre del hilo.
 Las acciones sensibles de marketing pueden devolver `requires_approval`. En ese
 caso el bot muestra botones para aprobar, denegar, guardar draft o personalizar el
 texto antes de ejecutar.
+
+`--source zernio` fuerza al Marketer a leer comentarios desde Zernio en lugar de
+la memoria operativa local. Para entornos con varias cuentas conectadas, usa
+`--account <id>` para evitar ambiguedad y mantener trazabilidad empresarial.
 
 ### Writer
 
@@ -302,6 +312,37 @@ Ejemplos rapidos:
 | `!coder-web --model-status` | Muestra modelos conectados para analisis UI/UX, plan tecnico y Pilot. |
 
 El comando acepta mockups o referencias visuales adjuntas.
+
+### Estado de modelos
+
+Los comandos `--model-status` no llaman a los proveedores externos ni consumen
+cuota. Solo leen la configuracion efectiva del runtime para mostrar que modelo
+usaria cada subagente y si falta alguna variable requerida.
+
+Ejemplos:
+
+```text
+!marketer --model-status
+!picture --model-status
+!claw --model-status
+!writer --model-status
+!coder-web --model-status
+```
+
+Si ves un error `422 Unprocessable Entity` al ejecutar uno de estos comandos,
+normalmente significa que `discord-bot` ya cargo el comando nuevo pero
+`assistant-runtime` sigue corriendo una version anterior que no reconoce
+`action_type=model_status`. Recarga ambos servicios:
+
+```bash
+docker compose up -d --build assistant-runtime discord-bot
+```
+
+Para una recarga rapida si la imagen ya esta construida:
+
+```bash
+docker compose restart assistant-runtime discord-bot
+```
 
 ## Memoria E Ingesta
 
