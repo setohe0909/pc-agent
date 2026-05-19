@@ -66,6 +66,13 @@ def _extract_post_suggestion(message: str) -> dict | None:
     }
 
 
+def _extract_free_model_flag(raw_query: str) -> tuple[str, bool]:
+    has_flag = bool(re.search(r"(^|\s)--free-model(?=\s|$)", raw_query))
+    cleaned = re.sub(r"(^|\s)--free-model(?=\s|$)", " ", raw_query).strip()
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    return cleaned, has_flag
+
+
 async def main() -> None:
     token = None
     while not token:
@@ -655,6 +662,7 @@ async def main() -> None:
 
         if content.startswith("!marketer "):
             raw_query = content.removeprefix("!marketer ").strip()
+            raw_query, use_free_model = _extract_free_model_flag(raw_query)
             
             if "memory --clean" in raw_query:
                 embed = discord.Embed(
@@ -692,6 +700,12 @@ async def main() -> None:
                         media_urls.append(att.url)
 
             extra = {}
+            if use_free_model:
+                extra.update({
+                    "prefer_free_model": True,
+                    "image_generation_provider": "ollama",
+                    "image_edit_provider": "local",
+                })
             if raw_query.startswith("post "):
                 sub_command = "publish"
                 rest = raw_query.removeprefix("post ").strip()
@@ -797,6 +811,44 @@ async def main() -> None:
                 thread = await _get_or_create_agent_thread(message, "Marketer", raw_query)
             except discord.Forbidden:
                 await message.reply("❌ Necesito permiso para 'Crear hilos públicos' para conversar con el Marketer Agent.")
+                return
+
+            if use_free_model and sub_command == "chat":
+                picture_payload = {
+                    "action_type": "picture",
+                    "prompt": prompt,
+                    "source": {"platform": "discord", "channel_id": str(thread.id), "user_id": str(message.author.id)},
+                    "images": images_b64,
+                    "payload": {
+                        "prefer_free_model": True,
+                        "image_generation_provider": "ollama",
+                        "image_edit_provider": "local",
+                        "requested_by": "marketer",
+                    }
+                }
+
+                await thread.send("📣 **Marketer usando modelo gratuito/local para crear visual...**")
+                try:
+                    result = await _send_assistant_request(picture_payload)
+                    msg = result.get("message", "No hubo respuesta.")
+                    if result.get("image_b64"):
+                        import io
+                        import base64
+
+                        await thread.send(msg)
+                        image_bytes = base64.b64decode(result["image_b64"])
+                        await thread.send(file=discord.File(io.BytesIO(image_bytes), filename="marketer-free-model.png"))
+                    elif result.get("image_url"):
+                        image_url = result["image_url"]
+                        text_msg = msg.removesuffix(f"\n\n{image_url}")
+                        await thread.send(text_msg)
+                        embed = discord.Embed(title="Resultado Free Model", color=discord.Color.purple())
+                        embed.set_image(url=image_url)
+                        await thread.send(embed=embed)
+                    else:
+                        await _send_long(thread, msg)
+                except Exception as e:
+                    await thread.send(f"❌ Error usando modelo gratuito/local: {e}")
                 return
 
             payload = {
@@ -1030,23 +1082,48 @@ async def main() -> None:
 
                 # Capturar imágenes adjuntas
                 images_b64 = []
+                image_metadata = []
                 if message.attachments:
                     import base64
                     for att in message.attachments:
                         if any(att.filename.lower().endswith(ext) for ext in [".png", ".jpg", ".jpeg", ".webp"]):
                             img_data = await att.read()
                             images_b64.append(base64.b64encode(img_data).decode("utf-8"))
+                            image_metadata.append({
+                                "filename": att.filename,
+                                "content_type": att.content_type,
+                                "size": att.size,
+                            })
 
                 payload = {
                     "action_type": "picture",
                     "prompt": raw_query,
                     "source": {"platform": "discord", "channel_id": str(thread.id), "user_id": str(message.author.id)},
                     "images": images_b64,
+                    "image_metadata": image_metadata,
                     "payload": {}
                 }
 
                 result = await _send_assistant_request(payload)
                 msg = result.get("message", "No hubo respuesta.")
+
+                if result.get("image_b64"):
+                    import io
+                    import base64
+
+                    await thread.send(msg)
+                    image_bytes = base64.b64decode(result["image_b64"])
+                    await thread.send(file=discord.File(io.BytesIO(image_bytes), filename="picture-result.png"))
+                    return
+
+                if result.get("image_url"):
+                    image_url = result["image_url"]
+                    text_msg = msg.removesuffix(f"\n\n{image_url}")
+                    await thread.send(text_msg)
+                    embed = discord.Embed(title="Resultado Final", color=discord.Color.brand_green())
+                    embed.set_image(url=image_url)
+                    await thread.send(embed=embed)
+                    return
                 
                 # Extraer URL de la imagen si está presente en el mensaje
                 # El formato del mensaje es: Prompt... \n\n URL

@@ -1,5 +1,7 @@
 import os
 import json
+import base64
+import binascii
 from pathlib import Path
 from enum import Enum
 
@@ -71,7 +73,12 @@ class AssistantRequest(BaseModel):
     source: Source
     approval: Approval | None = None
     images: list[str] = Field(default_factory=list) # Base64 images
+    image_metadata: list[dict] = Field(default_factory=list)
     payload: dict = Field(default_factory=dict)
+
+
+MAX_IMAGE_SIZE = 5 * 1024 * 1024
+MAX_IMAGE_COUNT = 4
 
 
 def _format_internal_error(exc: Exception, request: AssistantRequest, stage: str) -> dict:
@@ -130,6 +137,10 @@ def _assistant_response(result: dict, request: AssistantRequest) -> dict:
         "posts": result.get("posts"),
         "actions": result.get("actions", []),
         "suggestion": result.get("suggestion"),
+        "picture_plan": result.get("picture_plan"),
+        "verification": result.get("verification"),
+        "image_url": result.get("image_url"),
+        "image_b64": result.get("image_b64"),
         "requires_approval": result.get("requires_approval", result.get("status") == "requires_approval"),
         "input": request.model_dump(),
     }
@@ -179,16 +190,10 @@ async def assistant_request(request: AssistantRequest) -> dict:
         elif request.action_type == ActionType.marketing:
             stage = "preparando flujo de marketing"
             print(f"[DEBUG] Entrando a MarketingGraph con prompt: {request.prompt}")
-            import base64
-            
-            # Validación de tamaño (Límite 5MB por imagen)
-            MAX_IMG_SIZE = 5 * 1024 * 1024
-            image_data = []
-            for img_b64 in request.images:
-                # Estimación rápida de tamaño de base64 (3/4 del string)
-                if (len(img_b64) * 3 / 4) > MAX_IMG_SIZE:
-                    return {"status": "error", "message": "Una de las imágenes excede el límite de 5MB."}
-                image_data.append(base64.b64decode(img_b64))
+            decoded = _decode_request_images(request.images)
+            if decoded["status"] == "error":
+                return decoded
+            image_data = decoded["images"]
             
             stage = f"ejecutando marketer:{request.payload.get('sub_command', 'chat')}"
             result = await marketing_workflow.run(prompt=request.prompt, payload=request.payload, images=image_data)
@@ -199,9 +204,16 @@ async def assistant_request(request: AssistantRequest) -> dict:
         elif request.action_type == ActionType.picture:
             stage = "ejecutando picture"
             print(f"[DEBUG] Entrando a PictureGraph con prompt: {request.prompt}")
-            import base64
-            image_data = [base64.b64decode(img) for img in request.images]
-            result = await picture_workflow.run(prompt=request.prompt, payload=request.payload, images=image_data)
+            decoded = _decode_request_images(request.images)
+            if decoded["status"] == "error":
+                return decoded
+            image_data = decoded["images"]
+            result = await picture_workflow.run(
+                prompt=request.prompt,
+                payload=request.payload,
+                images=image_data,
+                image_metadata=request.image_metadata,
+            )
         elif request.action_type == ActionType.coder_web:
             stage = "ejecutando coder-web"
             print(f"[DEBUG] Entrando a CoderWebGraph con prompt: {request.prompt}")
@@ -251,6 +263,23 @@ def _discord_gate(request: AssistantRequest) -> dict:
     if approvers and request.approval.approver_user_id not in approvers:
         return {"allowed": False, "reason": "El aprobador no esta autorizado."}
     return {"allowed": True, "reason": "Aprobado por Discord."}
+
+
+def _decode_request_images(images_b64: list[str]) -> dict:
+    if len(images_b64) > MAX_IMAGE_COUNT:
+        return {"status": "error", "message": f"Máximo {MAX_IMAGE_COUNT} imágenes por solicitud."}
+
+    image_data = []
+    for img_b64 in images_b64:
+        if img_b64.startswith("data:image/") and "," in img_b64:
+            img_b64 = img_b64.split(",", 1)[1]
+        if (len(img_b64) * 3 / 4) > MAX_IMAGE_SIZE:
+            return {"status": "error", "message": "Una de las imágenes excede el límite de 5MB."}
+        try:
+            image_data.append(base64.b64decode(img_b64, validate=True))
+        except (binascii.Error, ValueError):
+            return {"status": "error", "message": "Una de las imágenes no es base64 válido."}
+    return {"status": "success", "images": image_data}
 
 
 if __name__ == "__main__":

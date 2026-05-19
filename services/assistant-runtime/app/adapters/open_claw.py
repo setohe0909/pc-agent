@@ -291,9 +291,15 @@ class OpenClawLLMAdapter(LLMPort):
                     f"Falló la detección de intención con {provider} usando el modelo {model}: {exc}"
                 ) from exc
 
-    async def generate_image(self, prompt: str) -> str:
+    async def generate_image(self, prompt: str, context: dict | None = None) -> str:
         from litellm import aimage_generation
         import os
+
+        generation_provider = (context or {}).get("image_generation_provider")
+        if (context or {}).get("prefer_free_model") and not generation_provider:
+            generation_provider = "ollama"
+        if str(generation_provider or "").strip().lower() == "ollama":
+            return await self._generate_image_with_ollama(prompt)
         
         provider, _ = self._get_provider_info(policy="smart")
         
@@ -351,3 +357,132 @@ class OpenClawLLMAdapter(LLMPort):
                 print(f"[OPEN CLAW ERROR] Falló backup DALL-E 3: {str(e)}", file=sys.stderr)
             
         raise Exception("No se pudo generar la imagen. Gemini Imagen falló y el backup de DALL-E 3 también (o no está configurado).")
+
+    async def _generate_image_with_ollama(self, prompt: str) -> str:
+        import httpx
+
+        base_url = (
+            os.getenv("OLLAMA_IMAGE_BASE_URL")
+            or os.getenv("OLLAMA_BASE_URL")
+            or "http://ollama:11434"
+        ).rstrip("/")
+        model = os.getenv("OLLAMA_IMAGE_MODEL", "x/z-image-turbo")
+        payload = {
+            "model": model,
+            "prompt": prompt,
+            "size": os.getenv("OLLAMA_IMAGE_SIZE", "1024x1024"),
+            "response_format": "b64_json",
+            "n": 1,
+        }
+        async with httpx.AsyncClient(timeout=300) as client:
+            response = await client.post(f"{base_url}/v1/images/generations", json=payload)
+        response.raise_for_status()
+        data = response.json()
+        try:
+            image_b64 = data["data"][0]["b64_json"]
+        except (KeyError, IndexError, TypeError) as exc:
+            raise Exception("Ollama no devolvió una imagen válida en b64_json.") from exc
+        return f"data:image/png;base64,{image_b64}"
+
+    async def edit_image(
+        self,
+        prompt: str,
+        image: bytes,
+        mask: bytes | None = None,
+        context: dict | None = None,
+        image_mime: str | None = None,
+        image_filename: str | None = None,
+    ) -> str:
+        from io import BytesIO
+        from litellm import aimage_edit
+
+        provider = str((context or {}).get("image_edit_provider") or os.getenv("PICTURE_IMAGE_EDIT_PROVIDER", "openai")).strip().lower()
+        if (context or {}).get("prefer_free_model") and provider == "openai":
+            provider = "local"
+        if provider == "local":
+            return await self._edit_image_with_local_provider(prompt, image, mask, context, image_mime, image_filename)
+        if provider != "openai":
+            raise Exception(f"Proveedor de edición de imagen no soportado: {provider}")
+
+        openai_key = os.getenv("OPENAI_API_KEY")
+        if not openai_key:
+            raise Exception(
+                "La edición fiel de imágenes requiere OPENAI_API_KEY con un modelo de edición configurado. "
+                "La generación simple puede seguir usando Gemini, pero editar un diseño existente necesita un proveedor de image-edit."
+            )
+
+        image_file = BytesIO(image)
+        image_file.name = image_filename or _filename_for_mime(image_mime)
+        mask_file = None
+        if mask:
+            mask_file = BytesIO(mask)
+            mask_file.name = "mask.png"
+
+        edit_prompt = prompt
+        if context:
+            preserve = ", ".join(context.get("preserve") or [])
+            checks = ", ".join(context.get("quality_checks") or [])
+            edit_prompt = (
+                f"{prompt}\n\nPreserve: {preserve or 'all non-requested visual elements'}."
+                f"\nQuality checks: {checks or 'requested edit is visible and layout remains stable'}."
+            )
+
+        response = await aimage_edit(
+            model=os.getenv("OPENAI_IMAGE_EDIT_MODEL", "openai/gpt-image-1"),
+            image=image_file,
+            mask=mask_file,
+            prompt=edit_prompt,
+            api_key=openai_key,
+        )
+        if response.data and len(response.data) > 0:
+            first = response.data[0]
+            if getattr(first, "url", None):
+                return first.url
+            if getattr(first, "b64_json", None):
+                return f"data:image/png;base64,{first.b64_json}"
+        raise Exception("El proveedor de edición no devolvió una imagen válida.")
+
+    async def _edit_image_with_local_provider(
+        self,
+        prompt: str,
+        image: bytes,
+        mask: bytes | None,
+        context: dict | None,
+        image_mime: str | None,
+        image_filename: str | None,
+    ) -> str:
+        import base64
+        import httpx
+
+        endpoint = os.getenv("PICTURE_LOCAL_IMAGE_EDIT_URL")
+        if not endpoint:
+            raise Exception("PICTURE_IMAGE_EDIT_PROVIDER=local requiere PICTURE_LOCAL_IMAGE_EDIT_URL.")
+
+        payload = {
+            "prompt": prompt,
+            "image_b64": base64.b64encode(image).decode("ascii"),
+            "image_mime": image_mime or "image/png",
+            "image_filename": image_filename or _filename_for_mime(image_mime),
+            "mask_b64": base64.b64encode(mask).decode("ascii") if mask else None,
+            "context": context or {},
+        }
+        async with httpx.AsyncClient(timeout=300) as client:
+            response = await client.post(endpoint, json=payload)
+        response.raise_for_status()
+        data = response.json()
+        if data.get("image_url"):
+            return data["image_url"]
+        if data.get("image_b64"):
+            mime = data.get("image_mime", "image/png")
+            return f"data:{mime};base64,{data['image_b64']}"
+        raise Exception("El proveedor local no devolvió image_url ni image_b64.")
+
+
+def _filename_for_mime(mime: str | None) -> str:
+    mapping = {
+        "image/jpeg": "design.jpg",
+        "image/jpg": "design.jpg",
+        "image/webp": "design.webp",
+        "image/png": "design.png",
+    }
+    return mapping.get((mime or "").lower(), "design.png")
