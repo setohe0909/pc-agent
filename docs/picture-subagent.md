@@ -24,7 +24,7 @@ Genera una imagen o edita una imagen adjunta según la intención detectada.
 
 ### `!marketer --free-model <petición visual>`
 Atajo desde Marketing para crear o editar una pieza visual usando el proveedor gratuito/local preferido.
-*   Sin imagen adjunta, usa generación local/Ollama (`OLLAMA_IMAGE_MODEL`, por defecto `x/z-image-turbo`).
+*   Sin imagen adjunta, usa Together `black-forest-labs/FLUX.1-schnell-Free` por defecto.
 *   Con imagen adjunta, intenta edición local vía `PICTURE_LOCAL_IMAGE_EDIT_URL`.
 *   Ejemplo: `!marketer --free-model visual para campaña de lanzamiento con texto "Nuevo Drop"`
 
@@ -41,7 +41,7 @@ Limpia la memoria operativa del agente de imágenes. Útil si quieres cambiar ra
 *   **LLM Provider**: Generación vía Gemini Imagen/OpenAI; edición fiel vía `edit_image` en el puerto LLM.
 *   **Configuración de edición**: `OPENAI_IMAGE_EDIT_MODEL` permite elegir el modelo de edición; por defecto usa `openai/gpt-image-1`.
 *   **Proveedor local/self-hosted**: `PICTURE_IMAGE_EDIT_PROVIDER=local` envía la edición a `PICTURE_LOCAL_IMAGE_EDIT_URL` con `prompt`, `image_b64`, `image_mime`, `image_filename`, `mask_b64` y `context`. Esto permite montar un wrapper propio con InstructPix2Pix, FLUX Kontext, ComfyUI u otro backend sin tocar el core.
-*   **Generación gratuita/local**: `!marketer --free-model ...` envía generación a Ollama con `OLLAMA_IMAGE_MODEL` y `OLLAMA_IMAGE_SIZE`.
+*   **Generación gratuita/de prueba**: `!marketer --free-model ...` envía generación a Together con `TOGETHER_IMAGE_MODEL=black-forest-labs/FLUX.1-schnell-Free`. Mantuvimos Ollama como fallback configurable, pero no es el default para imágenes; el servicio Docker de Ollama queda versionado para proteger embeddings locales.
 *   **Validación**: máximo 4 imágenes por solicitud y 5MB por imagen. El runtime rechaza base64 inválido antes de llamar al modelo.
 *   **Verificación**: si el proveedor devuelve base64, el grafo hace una revisión visual del resultado y puede marcar `needs_review`.
 *   **Storage**: Las referencias de estilo se guardan en la tabla `mentis_memory` de Supabase bajo la categoría `picture_style`.

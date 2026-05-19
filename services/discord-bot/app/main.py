@@ -233,6 +233,23 @@ async def main() -> None:
             header = f"**Parte {index}/{len(chunks)}**\n" if len(chunks) > 1 else ""
             await destination.send(f"{header}{chunk}")
 
+    async def _send_model_status(message, agent: str):
+        payload = {
+            "action_type": "model_status",
+            "prompt": agent,
+            "source": {"platform": "discord", "channel_id": str(message.channel.id), "user_id": str(message.author.id)},
+            "payload": {"agent": agent},
+        }
+        try:
+            result = await _send_assistant_request(payload)
+            text = result.get("message", "No pude obtener el estado de modelos.")
+            if len(text) <= 1900:
+                await message.reply(text)
+            else:
+                await _send_long(message.channel, text)
+        except Exception as exc:
+            await message.reply(f"❌ Error consultando modelos de `{agent}`: {exc}")
+
     def _metric_number(value) -> float:
         if value is None:
             return 0.0
@@ -457,9 +474,19 @@ async def main() -> None:
         # --- COMANDO HELP ---
         if content == "!help":
             embed = discord.Embed(
-                title="🤖 PC Agent v0.6.0 - Guía de Operaciones", 
-                description="Aquí tienes todo lo que puedo hacer por ti:",
+                title="🤖 PC Agent v0.6.1 - Guía de Operaciones", 
+                description="Guía actualizada con Picture, edición visual y `--free-model`:",
                 color=discord.Color.blue()
+            )
+            embed.add_field(
+                name="🎨 Imagenes y Free Model",
+                value="`!marketer --free-model poster cuadrado para Instagram de café artesanal, texto \"Sabor de Origen\"`: Crear pieza visual de marketing con Together.\n`!picture --free-model portada editorial futurista para una marca de skincare`: Crear imagen de prueba con Together.\n`!picture <descripción>`: Crear una imagen con memoria visual.\nAdjunta una imagen + `!picture cambia el texto \"A\" por \"B\"`: Editar texto conservando estilo.",
+                inline=False
+            )
+            embed.add_field(
+                name="🔌 Model Status",
+                value="`!marketer --model-status`: Modelos de marketing y visuales.\n`!picture --model-status`: Modelos de generación/edición.\n`!claw --model-status`: Modelo de chat/research.\n`!writer --model-status`: Modelo de redacción.\n`!coder-web --model-status`: Modelos de análisis y adapter Pilot.",
+                inline=False
             )
             embed.add_field(
                 name="🤖 Inteligencia Proactiva", 
@@ -498,7 +525,7 @@ async def main() -> None:
             )
             embed.add_field(
                 name="🎨 Picture Sub-Agent", 
-                value="`!picture <descripción>`: Generar imágenes con DALL-E 3 y memoria proactiva.\n`!picture memory`: Ver estilo y aprendizajes visuales.\n`!picture memory --clean`: Limpiar memoria de imágenes.", 
+                value="`!picture memory`: Ver estilo y aprendizajes visuales.\n`!picture memory --clean`: Limpiar memoria de imágenes.\nEl bloque de arriba contiene los comandos creativos principales.", 
                 inline=False
             )
             embed.add_field(
@@ -506,12 +533,15 @@ async def main() -> None:
                 value="`!coder-web <descripción>`: Crear/ajustar e-commerce (Repositorio).\n`!coder-web memory`: Ver aprendizajes del desarrollador web.\n`!coder-web memory --clean`: Borrar memoria del día.", 
                 inline=False
             )
-            embed.set_footer(text="PC Agent v0.6.0 - Autonomía y Análisis")
+            embed.set_footer(text="PC Agent v0.6.1 - Help actualizado")
             await message.reply(embed=embed)
             return
 
         if content.startswith("!claw"):
             query = content.removeprefix("!claw").strip()
+            if query == "--model-status":
+                await _send_model_status(message, "claw")
+                return
             if not query:
                 await message.reply("⚠️ Por favor, añade una pregunta después de `!claw`.")
                 return
@@ -663,6 +693,10 @@ async def main() -> None:
         if content.startswith("!marketer "):
             raw_query = content.removeprefix("!marketer ").strip()
             raw_query, use_free_model = _extract_free_model_flag(raw_query)
+
+            if raw_query == "--model-status":
+                await _send_model_status(message, "marketer")
+                return
             
             if "memory --clean" in raw_query:
                 embed = discord.Embed(
@@ -703,7 +737,7 @@ async def main() -> None:
             if use_free_model:
                 extra.update({
                     "prefer_free_model": True,
-                    "image_generation_provider": "ollama",
+                    "image_generation_provider": "together",
                     "image_edit_provider": "local",
                 })
             if raw_query.startswith("post "):
@@ -821,7 +855,7 @@ async def main() -> None:
                     "images": images_b64,
                     "payload": {
                         "prefer_free_model": True,
-                        "image_generation_provider": "ollama",
+                        "image_generation_provider": "together",
                         "image_edit_provider": "local",
                         "requested_by": "marketer",
                     }
@@ -994,6 +1028,10 @@ async def main() -> None:
 
         if content.startswith("!writer "):
             raw_query = content.removeprefix("!writer ").strip()
+            if raw_query == "--model-status":
+                await _send_model_status(message, "writer")
+                return
+
             sub_command = "chat"
             language = "es"
             prompt = raw_query
@@ -1040,6 +1078,10 @@ async def main() -> None:
         if content.startswith("!picture"):
             raw_query = content.removeprefix("!picture").strip()
             raw_query, use_free_model = _extract_free_model_flag(raw_query)
+
+            if raw_query == "--model-status":
+                await _send_model_status(message, "picture")
+                return
             
             # Gestión de Memoria
             if "memory --clean" in raw_query:
@@ -1105,7 +1147,7 @@ async def main() -> None:
                     "payload": {
                         **({
                             "prefer_free_model": True,
-                            "image_generation_provider": "ollama",
+                            "image_generation_provider": "together",
                             "image_edit_provider": "local",
                         } if use_free_model else {})
                     }
@@ -1155,6 +1197,10 @@ async def main() -> None:
         
         if content.startswith("!coder-web"):
             raw_query = content.removeprefix("!coder-web").strip()
+
+            if raw_query == "--model-status":
+                await _send_model_status(message, "coder-web")
+                return
             
             # Gestión de Memoria
             if "memory --clean" in raw_query:

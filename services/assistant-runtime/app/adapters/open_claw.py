@@ -40,6 +40,16 @@ class OpenClawLLMAdapter(LLMPort):
         
         return "openai", "gpt-4o-mini"
 
+    def model_inventory(self) -> dict:
+        cheap_provider, cheap_model = self._get_provider_info(policy="cheap")
+        smart_provider, smart_model = self._get_provider_info(policy="smart")
+        return {
+            "text_cheap": _text_connection(cheap_provider, cheap_model),
+            "text_smart": _text_connection(smart_provider, smart_model),
+            "image_generation": _image_generation_connection(),
+            "image_edit": _image_edit_connection(),
+        }
+
     async def _generate_with_fallback(self, prompt: str, system_instruction: str | None = None, response_mime_type: str = "text/plain", **kwargs) -> str:
         # Enfocamos en los modelos más estables y probables de tener cuota
         model_candidates = [
@@ -297,9 +307,12 @@ class OpenClawLLMAdapter(LLMPort):
 
         generation_provider = (context or {}).get("image_generation_provider") or os.getenv("PICTURE_IMAGE_GENERATION_PROVIDER")
         if (context or {}).get("prefer_free_model") and not generation_provider:
-            generation_provider = "ollama"
-        if str(generation_provider or "").strip().lower() == "ollama":
+            generation_provider = "together"
+        generation_provider = str(generation_provider or "").strip().lower()
+        if generation_provider == "ollama":
             return await self._generate_image_with_ollama(prompt)
+        if generation_provider == "together":
+            return await self._generate_image_with_together(prompt)
         
         provider, _ = self._get_provider_info(policy="smart")
         
@@ -376,13 +389,61 @@ class OpenClawLLMAdapter(LLMPort):
         }
         async with httpx.AsyncClient(timeout=300) as client:
             response = await client.post(f"{base_url}/v1/images/generations", json=payload)
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            detail = response.text[:800] if response.text else str(exc)
+            raise Exception(
+                f"Ollama image generation falló con HTTP {response.status_code}: {detail}"
+            ) from exc
         data = response.json()
         try:
             image_b64 = data["data"][0]["b64_json"]
         except (KeyError, IndexError, TypeError) as exc:
             raise Exception("Ollama no devolvió una imagen válida en b64_json.") from exc
         return f"data:image/png;base64,{image_b64}"
+
+    async def _generate_image_with_together(self, prompt: str) -> str:
+        import httpx
+
+        api_key = os.getenv("TOGETHER_API_KEY")
+        if not api_key:
+            raise Exception("TOGETHER_API_KEY es requerido para PICTURE_IMAGE_GENERATION_PROVIDER=together.")
+
+        model = os.getenv("TOGETHER_IMAGE_MODEL", "black-forest-labs/FLUX.1-schnell-Free")
+        payload = {
+            "model": model,
+            "prompt": prompt,
+            "width": int(os.getenv("TOGETHER_IMAGE_WIDTH", "1024")),
+            "height": int(os.getenv("TOGETHER_IMAGE_HEIGHT", "1024")),
+            "steps": int(os.getenv("TOGETHER_IMAGE_STEPS", "4")),
+            "n": 1,
+            "response_format": "b64_json",
+        }
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
+        async with httpx.AsyncClient(timeout=300) as client:
+            response = await client.post("https://api.together.xyz/v1/images/generations", headers=headers, json=payload)
+        try:
+            response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            detail = response.text[:800] if response.text else str(exc)
+            raise Exception(
+                f"Together image generation falló con HTTP {response.status_code}: {detail}"
+            ) from exc
+        data = response.json()
+        try:
+            image_b64 = data["data"][0].get("b64_json")
+            image_url = data["data"][0].get("url")
+        except (KeyError, IndexError, TypeError) as exc:
+            raise Exception("Together no devolvió una imagen válida.") from exc
+        if image_b64:
+            return f"data:image/png;base64,{image_b64}"
+        if image_url:
+            return image_url
+        raise Exception("Together no devolvió b64_json ni url.")
 
     async def edit_image(
         self,
@@ -486,3 +547,126 @@ def _filename_for_mime(mime: str | None) -> str:
         "image/png": "design.png",
     }
     return mapping.get((mime or "").lower(), "design.png")
+
+
+def _text_connection(provider: str, model: str) -> dict:
+    key_status = _provider_key_status(provider)
+    return {
+        "provider": provider,
+        "model": model,
+        "status": key_status["status"],
+        "detail": key_status["detail"],
+    }
+
+
+def _provider_key_status(provider: str) -> dict:
+    provider = (provider or "").lower()
+    if provider == "gemini":
+        return _key_status("GEMINI_API_KEY", bool(os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")))
+    if provider == "openai":
+        return _key_status("OPENAI_API_KEY", bool(os.getenv("OPENAI_API_KEY")))
+    if provider == "ollama":
+        return {
+            "status": "configured",
+            "detail": f"Usa Ollama en `{_safe_url_label(os.getenv('OLLAMA_BASE_URL', 'http://ollama:11434'))}`.",
+        }
+    return {"status": "unknown", "detail": "Proveedor no reconocido por el adapter."}
+
+
+def _key_status(name: str, configured: bool) -> dict:
+    if configured:
+        return {"status": "configured", "detail": f"`{name}` está configurada."}
+    return {"status": "missing_config", "detail": f"Falta `{name}` para usar este proveedor."}
+
+
+def _image_generation_connection() -> dict:
+    provider = (os.getenv("PICTURE_IMAGE_GENERATION_PROVIDER") or "").strip().lower()
+    if provider == "together":
+        return {
+            "provider": "together",
+            "model": os.getenv("TOGETHER_IMAGE_MODEL", "black-forest-labs/FLUX.1-schnell-Free"),
+            **_key_status("TOGETHER_API_KEY", bool(os.getenv("TOGETHER_API_KEY"))),
+        }
+    if provider == "ollama":
+        return {
+            "provider": "ollama",
+            "model": os.getenv("OLLAMA_IMAGE_MODEL", "x/z-image-turbo"),
+            "status": "configured",
+            "detail": f"Usa `{_safe_url_label(os.getenv('OLLAMA_IMAGE_BASE_URL') or os.getenv('OLLAMA_BASE_URL', 'http://ollama:11434'))}`.",
+        }
+
+    default_provider = _runtime_default_provider()
+    if default_provider == "gemini":
+        gemini_ready = bool(os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"))
+        openai_ready = bool(os.getenv("OPENAI_API_KEY"))
+        status = "configured" if gemini_ready or openai_ready else "missing_config"
+        detail = "Gemini Imagen con fallback DALL-E 3." if status == "configured" else "Falta `GEMINI_API_KEY` o `OPENAI_API_KEY`."
+        return {
+            "provider": "gemini/openai-fallback",
+            "model": "imagen-3.0-generate-001 -> openai/dall-e-3",
+            "status": status,
+            "detail": detail,
+        }
+    if default_provider == "openai":
+        return {
+            "provider": "openai",
+            "model": "openai/dall-e-3",
+            **_key_status("OPENAI_API_KEY", bool(os.getenv("OPENAI_API_KEY"))),
+        }
+    return {
+        "provider": default_provider,
+        "model": "image generation fallback",
+        "status": "unknown",
+        "detail": "No hay proveedor de generación visual dedicado configurado.",
+    }
+
+
+def _image_edit_connection() -> dict:
+    provider = (os.getenv("PICTURE_IMAGE_EDIT_PROVIDER", "openai") or "openai").strip().lower()
+    if provider == "local":
+        endpoint = os.getenv("PICTURE_LOCAL_IMAGE_EDIT_URL")
+        return {
+            "provider": "local",
+            "model": "custom local image edit endpoint" if endpoint else "PICTURE_LOCAL_IMAGE_EDIT_URL",
+            "status": "configured" if endpoint else "missing_config",
+            "detail": "Endpoint local configurado." if endpoint else "Falta `PICTURE_LOCAL_IMAGE_EDIT_URL`.",
+        }
+    if provider == "openai":
+        return {
+            "provider": "openai",
+            "model": os.getenv("OPENAI_IMAGE_EDIT_MODEL", "openai/gpt-image-1"),
+            **_key_status("OPENAI_API_KEY", bool(os.getenv("OPENAI_API_KEY"))),
+        }
+    return {
+        "provider": provider,
+        "model": "unknown",
+        "status": "unsupported",
+        "detail": "Proveedor de edición no soportado por el adapter.",
+    }
+
+
+def _runtime_default_provider() -> str:
+    config_path = os.getenv("RUNTIME_CONFIG_PATH", "/config/runtime-config.json")
+    try:
+        if Path(config_path).exists():
+            runtime_config = json.loads(Path(config_path).read_text(encoding="utf-8"))
+            provider = runtime_config.get("default_llm_provider")
+            if provider:
+                return str(provider)
+    except Exception:
+        pass
+    return os.getenv("DEFAULT_LLM_PROVIDER", "openai")
+
+
+def _safe_url_label(url: str) -> str:
+    from urllib.parse import urlsplit
+
+    try:
+        parts = urlsplit(url)
+        if not parts.scheme or not parts.netloc:
+            return url
+        hostname = parts.hostname or parts.netloc
+        port = f":{parts.port}" if parts.port else ""
+        return f"{parts.scheme}://{hostname}{port}"
+    except Exception:
+        return "configured endpoint"

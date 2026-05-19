@@ -17,6 +17,7 @@ from app.adapters.zernio_adapter import ZernioAdapter
 from app.domain.trading_policies import ConfigurableRiskPolicy
 from app.use_cases.trading_workflow import TradingWorkflow
 from app.use_cases.marketing_graph import MarketingGraph
+from app.use_cases.model_status import ModelStatusService
 from app.use_cases.writer_workflow import WriterWorkflow
 from app.adapters.pilot_web import PilotWebAdapter
 
@@ -52,6 +53,7 @@ class ActionType(str, Enum):
     writer = "writer"
     picture = "picture"
     coder_web = "coder-web"
+    model_status = "model_status"
 
 
 class Source(BaseModel):
@@ -141,6 +143,7 @@ def _assistant_response(result: dict, request: AssistantRequest) -> dict:
         "verification": result.get("verification"),
         "image_url": result.get("image_url"),
         "image_b64": result.get("image_b64"),
+        "model_status": result.get("model_status"),
         "requires_approval": result.get("requires_approval", result.get("status") == "requires_approval"),
         "input": request.model_dump(),
     }
@@ -175,6 +178,7 @@ async def assistant_request(request: AssistantRequest) -> dict:
     )
     marketing_workflow = MarketingGraph(llm=llm_port, memory=memory_port, marketing=ZernioAdapter())
     writer_workflow = WriterWorkflow(llm_port=llm_port, memory_port=memory_port)
+    model_status_service = ModelStatusService(llm=llm_port)
     from app.use_cases.picture_graph import PictureGraph
     from app.use_cases.coder_web_graph import CoderWebGraph
     picture_workflow = PictureGraph(llm=llm_port, memory=memory_port)
@@ -220,6 +224,9 @@ async def assistant_request(request: AssistantRequest) -> dict:
             import base64
             image_data = [base64.b64decode(img) for img in request.images]
             result = await coder_web_workflow.run(prompt=request.prompt, payload=request.payload, images=image_data)
+        elif request.action_type == ActionType.model_status:
+            stage = "consultando modelos conectados"
+            result = model_status_service.get_status(agent=request.payload.get("agent", request.prompt))
         else:
             stage = "ejecutando chat"
             result_text = await workflow.execute_chat(prompt=request.prompt, user_id=request.source.user_id)

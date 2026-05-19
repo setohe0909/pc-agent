@@ -2,6 +2,10 @@ from typing import Protocol
 
 
 class LLMPort(Protocol):
+    def model_inventory(self) -> dict:
+        """Returns configured model/provider metadata without calling external providers."""
+        ...
+
     async def chat(self, prompt: str, context: dict | None = None, images: list[bytes] | None = None, system_instruction: str | None = None) -> str:
         ...
 

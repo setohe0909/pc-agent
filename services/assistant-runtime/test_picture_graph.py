@@ -1,12 +1,15 @@
 import asyncio
 import json
+import os
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from app.domain.picture.models import PictureEditPlan, PictureOperation
+from app.adapters.open_claw import OpenClawLLMAdapter
 from app.main import _decode_request_images
 from app.use_cases.picture_graph import PictureGraph
 
@@ -130,6 +133,43 @@ class PictureGraphTests(unittest.TestCase):
             self.assertIn("Cyber Week", llm.edit_calls[0]["prompt"])
             self.assertIn("replace_text", result["message"])
             self.assertEqual(memory.saved[0][0], "picture_style")
+
+        asyncio.run(scenario())
+
+    def test_together_generation_adapter_returns_base64_data_url(self):
+        class FakeResponse:
+            status_code = 200
+            text = ""
+
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return {"data": [{"b64_json": "abc123"}]}
+
+        class FakeClient:
+            def __init__(self, *args, **kwargs):
+                self.kwargs = kwargs
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return None
+
+            async def post(self, url, headers=None, json=None):
+                self.url = url
+                self.headers = headers
+                self.payload = json
+                return FakeResponse()
+
+        async def scenario():
+            adapter = OpenClawLLMAdapter()
+            with patch.dict(os.environ, {"TOGETHER_API_KEY": "test-key"}, clear=False):
+                with patch("httpx.AsyncClient", FakeClient):
+                    result = await adapter._generate_image_with_together("poster test")
+
+            self.assertEqual(result, "data:image/png;base64,abc123")
 
         asyncio.run(scenario())
 

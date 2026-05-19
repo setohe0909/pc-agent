@@ -166,6 +166,7 @@ secretos y solo indica si las claves existen.
 | Runtime | `ENVIRONMENT`, `ADMIN_API_TOKEN`, `RUNTIME_CONFIG_PATH`, `CORS_ALLOW_ORIGINS` |
 | Discord | `DISCORD_BOT_TOKEN`, `DISCORD_REQUESTS_CHANNEL_ID`, `DISCORD_NOTIFICATIONS_CHANNEL_ID`, `DISCORD_STATUS_CHANNEL_ID`, `DISCORD_APPROVER_USER_IDS` |
 | LLM | `DEFAULT_LLM_PROVIDER`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `MINIMAX_API_KEY` |
+| Imagenes | `OPENAI_IMAGE_EDIT_MODEL`, `PICTURE_IMAGE_GENERATION_PROVIDER`, `PICTURE_IMAGE_EDIT_PROVIDER`, `TOGETHER_API_KEY`, `TOGETHER_IMAGE_MODEL`, `OLLAMA_IMAGE_BASE_URL`, `OLLAMA_IMAGE_MODEL` |
 | Supabase | `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `VECTOR_DATABASE_URL` |
 | Embeddings | `EMBEDDING_PROVIDER`, `EMBEDDING_MODEL`, `EMBEDDING_DIMENSIONS`, `OLLAMA_BASE_URL` |
 | Memoria | `MENTIS_BASE_URL`, `MENTIS_ENABLED`, `MENTIS_API_KEY` |
@@ -207,6 +208,7 @@ bot infiere el agente desde el nombre del hilo.
 | `!memory` | Reporte de memoria/inteligencia reciente. |
 | `!memory --clean` | Solicita confirmacion para borrar memoria general del dia. |
 | `!approve_trade <id o instruccion>` | Abre confirmacion de operacion con botones. |
+| `!claw --model-status` | Muestra proveedor/modelo de chat e investigacion del asistente general. |
 
 ### Marketing: datos
 
@@ -225,6 +227,7 @@ bot infiere el agente desde el nombre del hilo.
 | `!marketer best-hours` | Mejores horarios para publicar. |
 | `!marketer memory` | Memoria de marketing. |
 | `!marketer memory --clean` | Confirmacion para borrar memoria de marketing. |
+| `!marketer --model-status` | Muestra modelos conectados para estrategia, copys, visuales y edicion. |
 
 ### Marketing: acciones
 
@@ -248,6 +251,7 @@ bot infiere el agente desde el nombre del hilo.
 | `!marketer collab <tema>` | Encuentra colaboraciones. |
 | `!marketer content-plan [rango]` | Calendario de contenido, por defecto 7 dias. |
 | `!marketer repurpose` | Reutiliza contenido ganador. |
+| `!marketer --free-model <peticion visual>` | Genera una imagen de prueba usando el proveedor gratuito configurado, por defecto Together. |
 
 Las acciones sensibles de marketing pueden devolver `requires_approval`. En ese
 caso el bot muestra botones para aprobar, denegar, guardar draft o personalizar el
@@ -261,16 +265,32 @@ texto antes de ejecutar.
 | `!writer story <es\|en> <tema>` | Crea storytelling y lo guarda en Obsidian. |
 | `!writer storytelling <es\|en> <tema>` | Alias de `story`. |
 | `!writer <mensaje>` | Chat directo con el redactor. |
+| `!writer --model-status` | Muestra modelos conectados para redaccion y keywords visuales. |
 
 ### Picture
 
 | Comando | Uso |
 | --- | --- |
 | `!picture <descripcion>` | Genera una imagen con memoria proactiva. |
+| `!picture --free-model <descripcion>` | Genera una imagen de prueba usando el proveedor gratuito configurado. |
+| `!picture <edicion>` con imagen adjunta | Edita una pieza existente, por ejemplo cambiar texto conservando composicion y estilo. |
 | `!picture memory` | Muestra aprendizajes visuales. |
 | `!picture memory --clean` | Solicita confirmacion para limpiar memoria visual. |
+| `!picture --model-status` | Muestra modelos conectados para plan creativo, generacion y edicion. |
 
-El comando acepta imagenes adjuntas como referencia.
+El comando acepta imagenes adjuntas como referencia o como pieza a editar. Para
+pruebas sin consumir Gemini/OpenAI, `--free-model` usa Together con
+`TOGETHER_IMAGE_MODEL=black-forest-labs/FLUX.1-schnell-Free` cuando
+`TOGETHER_API_KEY` esta configurado. Ollama queda como fallback configurable para
+imagenes, pero el servicio Docker de Ollama se mantiene versionado para proteger
+los embeddings locales.
+
+Ejemplos rapidos:
+
+```text
+!marketer --free-model poster cuadrado para Instagram de cafe artesanal, texto "Sabor de Origen"
+!picture --free-model portada editorial futurista para una marca de skincare
+```
 
 ### Coder Web
 
@@ -279,6 +299,7 @@ El comando acepta imagenes adjuntas como referencia.
 | `!coder-web <descripcion>` | Crea o ajusta una experiencia web/e-commerce. |
 | `!coder-web memory` | Muestra aprendizajes del desarrollador web. |
 | `!coder-web memory --clean` | Solicita confirmacion para borrar memoria coder-web. |
+| `!coder-web --model-status` | Muestra modelos conectados para analisis UI/UX, plan tecnico y Pilot. |
 
 El comando acepta mockups o referencias visuales adjuntas.
 
