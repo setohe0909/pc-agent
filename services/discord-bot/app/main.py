@@ -13,7 +13,11 @@ async def _send_assistant_request(payload: dict) -> dict:
     base_url = _get_env("OPEN_CLAW_BASE_URL", "http://assistant-runtime:8100").rstrip("/")
     async with httpx.AsyncClient(timeout=300) as client:
         response = await client.post(f"{base_url}/assistant/request", json=payload)
-    response.raise_for_status()
+    try:
+        response.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        detail = response.text[:1200] if response.text else str(exc)
+        raise RuntimeError(f"Assistant Runtime HTTP {response.status_code}: {detail}") from exc
     return response.json()
 
 
@@ -248,7 +252,10 @@ async def main() -> None:
             else:
                 await _send_long(message.channel, text)
         except Exception as exc:
-            await message.reply(f"❌ Error consultando modelos de `{agent}`: {exc}")
+            hint = ""
+            if "422" in str(exc) and "model_status" in str(exc):
+                hint = "\n\nPista: `assistant-runtime` parece estar corriendo una versión anterior. Reinicia `assistant-runtime` y luego `discord-bot`."
+            await message.reply(f"❌ Error consultando modelos de `{agent}`: {exc}{hint}")
 
     def _metric_number(value) -> float:
         if value is None:
