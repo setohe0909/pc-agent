@@ -495,6 +495,35 @@ async def main() -> None:
                 content = f"!ask {content}"
 
         # --- COMANDO HELP ---
+        if content in ("!help marketer", "!help marketing", "!help !marketer"):
+            embed = discord.Embed(
+                title="📣 Ayuda de Marketer Agent",
+                description="Comandos de marketing, fuentes de datos y modelos conectados.",
+                color=discord.Color.purple()
+            )
+            embed.add_field(
+                name="Datos",
+                value="`!marketer-status`: Estado del agente.\n`!marketer dashboard`: Dashboard visual Zernio.\n`!marketer comments`: Comentarios desde memoria operativa.\n`!marketer leads`: Leads guardados.\n`!marketer top-content`: Mejores contenidos.\n`!marketer audience`: Audiencia y segmentos.\n`!marketer alerts`: Alertas.\n`!marketer best-hours`: Horarios recomendados.",
+                inline=False
+            )
+            embed.add_field(
+                name="Acciones",
+                value="`!marketer campaign <objetivo>`: Plan de campaña.\n`!marketer posts <tema>`: Cola de posts.\n`!marketer respond`: Borradores de respuesta.\n`!marketer qualify`: Cualificar leads.\n`!marketer magnet`: Lead magnets por DM.\n`!marketer sentiment`: Sentimiento y crisis.\n`!marketer funnel <tema>`: Embudo.\n`!marketer --free-model <descripción>`: Visual con proveedor gratuito.",
+                inline=False
+            )
+            embed.add_field(
+                name="Usar Zernio con --source",
+                value="`--source zernio` fuerza lectura de comentarios reales desde Zernio.\n`--account <id>` selecciona la cuenta cuando hay varias marcas.\n`!marketer --source zernio comments --account <id>`\n`!marketer --source zernio qualify --account <id>`\n`!marketer --source zernio magnet --account <id>`\n`!marketer --source zernio sentiment --account <id>`",
+                inline=False
+            )
+            embed.add_field(
+                name="Modelos",
+                value="`!marketer --model-status`: Ver proveedores/modelos que usa este sub-agent.",
+                inline=False
+            )
+            await message.reply(embed=embed)
+            return
+
         if content == "!help":
             embed = discord.Embed(
                 title="🤖 PC Agent v0.6.1 - Guía de Operaciones", 

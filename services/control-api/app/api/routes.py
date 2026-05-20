@@ -135,7 +135,9 @@ async def config() -> dict:
             },
             "ollama": settings.effective("ollama_base_url"),
             "openai_api_key_configured": bool(runtime.get("openai_api_key") or os.getenv("OPENAI_API_KEY")),
+            "openai_admin_api_key_configured": bool(runtime.get("openai_admin_api_key") or os.getenv("OPENAI_ADMIN_API_KEY")),
             "gemini_api_key_configured": bool(runtime.get("gemini_api_key") or os.getenv("GEMINI_API_KEY")),
+            "together_api_key_configured": bool(runtime.get("together_api_key") or os.getenv("TOGETHER_API_KEY")),
             "langfuse_public_key_configured": bool(runtime.get("langfuse_public_key") or settings.langfuse_public_key),
             "langfuse_secret_key_configured": bool(runtime.get("langfuse_secret_key") or settings.langfuse_secret_key),
             "kalshi_configured": bool(
@@ -160,6 +162,42 @@ async def get_runtime_config() -> dict:
     return {"runtime": runtime_config_store.public_view()}
 
 
+@router.get("/models/usage")
+async def model_usage() -> dict:
+    runtime = runtime_config_store.read()
+    start = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    end = datetime.utcnow()
+    providers = [
+        await _openai_usage(runtime, start),
+        _static_provider_usage(
+            provider="gemini",
+            configured=bool(runtime.get("gemini_api_key") or os.getenv("GEMINI_API_KEY")),
+            budget=runtime.get("gemini_monthly_budget_usd"),
+            detail=(
+                "Gemini expone límites por proyecto en AI Studio/Google Cloud. "
+                "Para consumo live se debe conectar Cloud Monitoring o exportar billing del proyecto."
+            ),
+        ),
+        _static_provider_usage(
+            provider="together",
+            configured=bool(runtime.get("together_api_key") or os.getenv("TOGETHER_API_KEY")),
+            budget=runtime.get("together_monthly_budget_usd"),
+            detail=(
+                "Together entrega rate limits en respuestas y gasto en su dashboard. "
+                "Podemos volverlo live registrando usage por request en Langfuse/Supabase."
+            ),
+        ),
+    ]
+    return {
+        "period": {
+            "start": start.date().isoformat(),
+            "end": end.date().isoformat(),
+            "label": "Mes actual",
+        },
+        "providers": providers,
+    }
+
+
 @router.put("/config/runtime", dependencies=[Depends(require_admin)])
 async def update_runtime_config(request: RuntimeConfigUpdate) -> dict:
     updated = runtime_config_store.update(request)
@@ -171,6 +209,74 @@ async def update_runtime_config(request: RuntimeConfigUpdate) -> dict:
         await runtime_config_store.sync_to_supabase(s_url, s_key)
         
     return {"runtime": updated}
+
+
+async def _openai_usage(runtime: dict, start: datetime) -> dict:
+    budget = runtime.get("openai_monthly_budget_usd")
+    admin_key = runtime.get("openai_admin_api_key") or os.getenv("OPENAI_ADMIN_API_KEY")
+    configured = bool(runtime.get("openai_api_key") or os.getenv("OPENAI_API_KEY"))
+    base = {
+        "provider": "openai",
+        "configured": configured,
+        "unit": "USD",
+        "used": None,
+        "limit": budget,
+        "source": "OpenAI Costs API",
+    }
+    if not configured:
+        return {**base, "status": "not_configured", "detail": "Falta OPENAI_API_KEY."}
+    if not admin_key:
+        return {
+            **base,
+            "status": "needs_admin_key",
+            "detail": "Configura OPENAI_ADMIN_API_KEY para consultar consumo real de la organización.",
+        }
+
+    try:
+        params = {
+            "start_time": int(start.timestamp()),
+            "bucket_width": "1d",
+            "limit": 31,
+        }
+        headers = {"Authorization": f"Bearer {admin_key}"}
+        async with httpx.AsyncClient(timeout=12) as client:
+            resp = await client.get("https://api.openai.com/v1/organization/costs", headers=headers, params=params)
+        if resp.status_code >= 400:
+            return {
+                **base,
+                "status": "error",
+                "detail": f"OpenAI Costs API respondió HTTP {resp.status_code}.",
+            }
+        total = 0.0
+        for bucket in resp.json().get("data", []):
+            for result in bucket.get("results", []):
+                amount = result.get("amount", {})
+                total += float(amount.get("value") or 0)
+        return {
+            **base,
+            "status": "live",
+            "used": round(total, 4),
+            "detail": "Consumo real del mes actual consultado desde OpenAI.",
+        }
+    except Exception as exc:
+        return {
+            **base,
+            "status": "error",
+            "detail": f"No se pudo consultar OpenAI Costs API: {exc}",
+        }
+
+
+def _static_provider_usage(provider: str, configured: bool, budget: float | None, detail: str) -> dict:
+    return {
+        "provider": provider,
+        "configured": configured,
+        "status": "manual_limit" if configured else "not_configured",
+        "used": None,
+        "limit": budget,
+        "unit": "USD",
+        "source": "Configuración local",
+        "detail": detail if configured else f"Falta configurar la API key de {provider}.",
+    }
 
 
 @router.get("/knowledge-sources")

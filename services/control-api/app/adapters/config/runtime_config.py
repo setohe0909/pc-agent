@@ -36,6 +36,9 @@ PUBLIC_KEYS = {
     "kalshi_denied_tickers",
     "openwa_base_url",
     "openwa_session_id",
+    "openai_monthly_budget_usd",
+    "gemini_monthly_budget_usd",
+    "together_monthly_budget_usd",
 }
 
 SECRET_KEYS = {
@@ -45,8 +48,10 @@ SECRET_KEYS = {
     "langfuse_public_key",
     "langfuse_secret_key",
     "openai_api_key",
+    "openai_admin_api_key",
     "gemini_api_key",
     "minimax_api_key",
+    "together_api_key",
     "discord_bot_token",
     "instagram_access_token",
     "tiktok_api_key",
@@ -84,8 +89,13 @@ class RuntimeConfigUpdate(BaseModel):
     langfuse_public_key: str | None = Field(default=None, max_length=4096)
     langfuse_secret_key: str | None = Field(default=None, max_length=4096)
     openai_api_key: str | None = Field(default=None, max_length=4096)
+    openai_admin_api_key: str | None = Field(default=None, max_length=4096)
     gemini_api_key: str | None = Field(default=None, max_length=4096)
     minimax_api_key: str | None = Field(default=None, max_length=4096)
+    together_api_key: str | None = Field(default=None, max_length=4096)
+    openai_monthly_budget_usd: float | None = Field(default=None, ge=0, le=1000000)
+    gemini_monthly_budget_usd: float | None = Field(default=None, ge=0, le=1000000)
+    together_monthly_budget_usd: float | None = Field(default=None, ge=0, le=1000000)
     instagram_access_token: str | None = Field(default=None, max_length=4096)
     instagram_account_id: str | None = Field(default=None, max_length=4096)
     tiktok_api_key: str | None = Field(default=None, max_length=4096)

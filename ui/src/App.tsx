@@ -151,6 +151,19 @@ type DashboardData = {
     };
   } | null;
   ingestion?: unknown;
+  modelUsage?: {
+    period?: { label?: string; start?: string; end?: string };
+    providers?: Array<{
+      provider: string;
+      status: string;
+      configured?: boolean;
+      used?: number | null;
+      limit?: number | null;
+      unit?: string;
+      source?: string;
+      detail?: string;
+    }>;
+  } | null;
 };
 
 export default function App() {
@@ -166,9 +179,10 @@ export default function App() {
       getJson("/knowledge-sources").catch(() => null),
       getJson("/supabase/verify").catch(() => null),
       getJson("/mentis/verify").catch(() => null),
-      getJson("/ingestion").catch(() => null)
-    ]).then(([status, config, runtime, sources, supabase, mentis, ingestion]) => {
-      setData({ status, config, runtime, sources, supabase, mentis, ingestion });
+      getJson("/ingestion").catch(() => null),
+      getJson("/models/usage").catch(() => null)
+    ]).then(([status, config, runtime, sources, supabase, mentis, ingestion, modelUsage]) => {
+      setData({ status, config, runtime, sources, supabase, mentis, ingestion, modelUsage });
     }).catch(err => console.error("Error cargando status", err));
   };
 
