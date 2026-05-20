@@ -158,6 +158,26 @@ async def config() -> dict:
             "coder_web": {
                 "has_github_auth": bool(runtime.get("github_token")),
                 "stack": runtime.get("coder_web_stack", "react-ts")
+            },
+            "email": {
+                "provider": settings.effective("email_provider") or "not_configured",
+                "account_id": settings.effective("email_account_id"),
+                "send_enabled": bool(settings.effective("email_send_enabled")),
+                "bulk_rate_limit": settings.effective("email_bulk_rate_limit") or 30,
+                "outlook_tenant_id": settings.effective("email_outlook_tenant_id"),
+                "imap_host": settings.effective("email_imap_host"),
+                "smtp_host": settings.effective("email_smtp_host"),
+                "username": settings.effective("email_username"),
+                "pc_client_bridge_url": settings.effective("email_pc_client_bridge_url"),
+                "has_google_oauth": bool(runtime.get("email_google_client_id") and runtime.get("email_google_client_secret")),
+                "has_outlook_oauth": bool(
+                    runtime.get("email_outlook_client_id")
+                    and runtime.get("email_outlook_client_secret")
+                    and runtime.get("email_outlook_tenant_id")
+                ),
+                "has_imap_smtp": bool(runtime.get("email_imap_host") and runtime.get("email_smtp_host") and runtime.get("email_username") and runtime.get("email_password")),
+                "has_pc_client_bridge": bool(runtime.get("email_pc_client_bridge_url")),
+                "template_count": len(runtime.get("email_templates") or []),
             }
         },
     }

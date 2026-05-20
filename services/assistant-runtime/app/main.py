@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from app.adapters.kalshi import KalshiHttpAdapter
 from app.adapters.open_claw import OpenClawLLMAdapter
 from app.adapters.memory import MentisMemoryAdapter
+from app.adapters.email import ConfiguredEmailProvider, RuntimeEmailConfig
 from app.adapters.trading_audit import SupabaseTradeAuditRepository, SupabaseTradingExposureRepository
 from app.adapters.zernio_adapter import ZernioAdapter
 from app.domain.trading_policies import ConfigurableRiskPolicy
@@ -19,6 +20,7 @@ from app.use_cases.trading_workflow import TradingWorkflow
 from app.use_cases.marketing_graph import MarketingGraph
 from app.use_cases.model_status import ModelStatusService
 from app.use_cases.writer_workflow import WriterWorkflow
+from app.use_cases.email_workflow import EmailWorkflow
 from app.adapters.pilot_web import PilotWebAdapter
 
 def load_runtime_config():
@@ -53,6 +55,7 @@ class ActionType(str, Enum):
     writer = "writer"
     picture = "picture"
     coder_web = "coder-web"
+    email = "email"
     model_status = "model_status"
 
 
@@ -144,6 +147,8 @@ def _assistant_response(result: dict, request: AssistantRequest) -> dict:
         "image_url": result.get("image_url"),
         "image_b64": result.get("image_b64"),
         "model_status": result.get("model_status"),
+        "email_status": result.get("email_status"),
+        "email_bulk_reply": result.get("email_bulk_reply"),
         "requires_approval": result.get("requires_approval", result.get("status") == "requires_approval"),
         "input": request.model_dump(),
     }
@@ -178,6 +183,12 @@ async def assistant_request(request: AssistantRequest) -> dict:
     )
     marketing_workflow = MarketingGraph(llm=llm_port, memory=memory_port, marketing=ZernioAdapter())
     writer_workflow = WriterWorkflow(llm_port=llm_port, memory_port=memory_port)
+    email_config = RuntimeEmailConfig()
+    email_workflow = EmailWorkflow(
+        email_provider=ConfiguredEmailProvider(email_config),
+        email_config=email_config,
+        llm=llm_port,
+    )
     model_status_service = ModelStatusService(llm=llm_port)
     from app.use_cases.picture_graph import PictureGraph
     from app.use_cases.coder_web_graph import CoderWebGraph
@@ -205,6 +216,10 @@ async def assistant_request(request: AssistantRequest) -> dict:
             stage = "ejecutando writer"
             print(f"[DEBUG] Entrando a WriterWorkflow con prompt: {request.prompt}")
             result = await writer_workflow.execute_writer_action(prompt=request.prompt, payload=request.payload)
+        elif request.action_type == ActionType.email:
+            stage = f"ejecutando email:{request.payload.get('sub_command', 'status')}"
+            print(f"[DEBUG] Entrando a EmailWorkflow con prompt: {request.prompt}")
+            result = await email_workflow.run(prompt=request.prompt, payload=request.payload)
         elif request.action_type == ActionType.picture:
             stage = "ejecutando picture"
             print(f"[DEBUG] Entrando a PictureGraph con prompt: {request.prompt}")

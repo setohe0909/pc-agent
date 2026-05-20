@@ -36,6 +36,16 @@ PUBLIC_KEYS = {
     "kalshi_denied_tickers",
     "openwa_base_url",
     "openwa_session_id",
+    "email_provider",
+    "email_account_id",
+    "email_send_enabled",
+    "email_bulk_rate_limit",
+    "email_imap_host",
+    "email_smtp_host",
+    "email_username",
+    "email_pc_client_bridge_url",
+    "email_outlook_tenant_id",
+    "email_templates",
 }
 
 SECRET_KEYS = {
@@ -60,6 +70,11 @@ SECRET_KEYS = {
     "kalshi_password",
     "kalshi_key_id",
     "openwa_api_key",
+    "email_google_client_id",
+    "email_google_client_secret",
+    "email_outlook_client_id",
+    "email_outlook_client_secret",
+    "email_password",
 }
 
 
@@ -112,6 +127,21 @@ class RuntimeConfigUpdate(BaseModel):
     openwa_base_url: str | None = Field(default=None, max_length=2048)
     openwa_api_key: str | None = Field(default=None, max_length=4096)
     openwa_session_id: str | None = Field(default=None, max_length=120)
+    email_provider: str | None = Field(default=None, pattern="^(google|outlook|imap_smtp|pc_client|not_configured)$")
+    email_account_id: str | None = Field(default=None, max_length=320)
+    email_send_enabled: bool | None = None
+    email_bulk_rate_limit: int | None = Field(default=None, ge=1, le=500)
+    email_google_client_id: str | None = Field(default=None, max_length=4096)
+    email_google_client_secret: str | None = Field(default=None, max_length=4096)
+    email_outlook_client_id: str | None = Field(default=None, max_length=4096)
+    email_outlook_client_secret: str | None = Field(default=None, max_length=4096)
+    email_outlook_tenant_id: str | None = Field(default=None, max_length=256)
+    email_imap_host: str | None = Field(default=None, max_length=2048)
+    email_smtp_host: str | None = Field(default=None, max_length=2048)
+    email_username: str | None = Field(default=None, max_length=320)
+    email_password: str | None = Field(default=None, max_length=4096)
+    email_pc_client_bridge_url: str | None = Field(default=None, max_length=2048)
+    email_templates: list[dict[str, Any]] | str | None = None
     coder_web_stack: str | None = Field(default=None, max_length=80)
     coder_web_autonomy: str | None = Field(default=None, max_length=80)
     coder_web_perf: str | None = Field(default=None, max_length=80)
@@ -124,6 +154,7 @@ class RuntimeConfigUpdate(BaseModel):
         "ollama_base_url",
         "kalshi_api_base_url",
         "openwa_base_url",
+        "email_pc_client_bridge_url",
     )
     @classmethod
     def validate_url(cls, value: str | None) -> str | None:
@@ -154,7 +185,7 @@ class RuntimeConfigStore:
         current = self.read()
         incoming = update.model_dump(exclude_unset=True)
         for key, value in incoming.items():
-            if value in {None, ""}:
+            if value is None or value == "":
                 continue
             current[key] = value
         self.path.parent.mkdir(parents=True, exist_ok=True)

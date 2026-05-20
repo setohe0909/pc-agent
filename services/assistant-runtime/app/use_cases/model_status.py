@@ -27,6 +27,8 @@ def _normalize_agent(agent: str) -> str:
         "claw": "claw",
         "open-claw": "claw",
         "writer": "writer",
+        "email": "email",
+        "mail": "email",
         "coder": "coder-web",
         "coder-web": "coder-web",
         "pilot": "coder-web",
@@ -89,6 +91,25 @@ def _build_agent_status(agent: str, inventory: dict) -> AgentModelStatus:
                 ),
             ],
             warnings=[],
+        )
+    if agent == "email":
+        return AgentModelStatus(
+            agent="email",
+            display_name="Email Agent",
+            connections=[
+                _with_purpose(text_smart, "Clasificacion, filtros y seleccion de template"),
+                _with_purpose(text_cheap, "Resumenes de bandeja y borradores"),
+                ModelConnection(
+                    purpose="Proveedor de email",
+                    provider="google/outlook/imap_smtp/pc_client",
+                    model="adapter port",
+                    status="configured",
+                    detail="La UI administra proveedor, credenciales, permisos de envio, templates y rate limits.",
+                ),
+            ],
+            warnings=[
+                "Bulk replies requieren aprobacion humana, idempotencia, auditoria y limites por proveedor antes de enviar."
+            ],
         )
     return AgentModelStatus(
         agent="claw",

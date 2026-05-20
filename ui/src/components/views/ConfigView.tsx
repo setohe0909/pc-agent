@@ -8,6 +8,7 @@ import {
   DollarSign,
   Globe,
   LayoutGrid,
+  Mail,
   Save,
   Server,
   SlidersHorizontal,
@@ -34,6 +35,9 @@ export function ConfigView({ data, onSave }: { data: any, adminToken: string, on
     if (payload.mentis_enabled === "false") payload.mentis_enabled = false;
     if (payload.langfuse_enabled === "true") payload.langfuse_enabled = true;
     if (payload.langfuse_enabled === "false") payload.langfuse_enabled = false;
+    if (payload.email_send_enabled === "true") payload.email_send_enabled = true;
+    if (payload.email_send_enabled === "false") payload.email_send_enabled = false;
+    if (payload.email_bulk_rate_limit) payload.email_bulk_rate_limit = Number(payload.email_bulk_rate_limit);
 
     Object.keys(payload).forEach(key => {
       if (payload[key] === "") delete payload[key];
@@ -67,6 +71,7 @@ export function ConfigView({ data, onSave }: { data: any, adminToken: string, on
           <ConfigTab value="core" icon={Server} title="Infraestructura" description="Servicios, trazas y endpoints" />
           <ConfigTab value="ai" icon={Brain} title="Modelos e IA" description="Keys, proveedores y costos" />
           <ConfigTab value="data" icon={Database} title="Datos y RAG" description="Supabase, memoria y embeddings" />
+          <ConfigTab value="email" icon={Mail} title="Email" description="Proveedores, templates y envíos" />
           <ConfigTab value="trading" icon={Activity} title="Trading" description="Credenciales de ejecución" />
         </TabsList>
 
@@ -160,6 +165,93 @@ export function ConfigView({ data, onSave }: { data: any, adminToken: string, on
               </Field>
               <Field label="Mentis URL">
                 <Input name="mentis_base_url" defaultValue={integrations.mentis} placeholder="http://mentisdb:80" className="config-input" />
+              </Field>
+            </SettingsSection>
+          </TabsContent>
+
+          <TabsContent value="email" className="mt-0 space-y-4 outline-none">
+            <SettingsSection
+              icon={Mail}
+              title="Email Sub-Agent"
+              description="Configura el proveedor que usará !email para leer, categorizar y preparar respuestas masivas."
+              action={
+                <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${integrations.email?.provider !== "not_configured" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-700"}`}>
+                  {integrations.email?.provider !== "not_configured" ? "Proveedor seleccionado" : "Pendiente"}
+                </span>
+              }
+            >
+              <Field label="Proveedor">
+                <Select name="email_provider" defaultValue={integrations.email?.provider || "not_configured"}>
+                  <SelectTrigger className="config-select"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="not_configured">Sin configurar</SelectItem>
+                    <SelectItem value="google">Google Gmail</SelectItem>
+                    <SelectItem value="outlook">Microsoft Outlook</SelectItem>
+                    <SelectItem value="imap_smtp">IMAP / SMTP</SelectItem>
+                    <SelectItem value="pc_client">Cliente local del PC</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Cuenta principal">
+                <Input name="email_account_id" defaultValue={integrations.email?.account_id || ""} placeholder="equipo@empresa.com" className="config-input" />
+              </Field>
+              <Field label="Permitir envío">
+                <Select name="email_send_enabled" defaultValue={String(integrations.email?.send_enabled || false)}>
+                  <SelectTrigger className="config-select"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="false">Solo lectura y drafts</SelectItem>
+                    <SelectItem value="true">Envío con aprobación</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Límite bulk por minuto">
+                <Input name="email_bulk_rate_limit" type="number" defaultValue={integrations.email?.bulk_rate_limit || 30} min={1} max={500} className="config-input" />
+              </Field>
+            </SettingsSection>
+
+            <SettingsSection icon={Mail} title="Credenciales por proveedor" description="Los campos vacíos conservan los valores guardados.">
+              <SecretField label="Google Client ID" active={integrations.email?.has_google_oauth}>
+                <Input name="email_google_client_id" type="password" placeholder="client-id.apps.googleusercontent.com" className="config-input" />
+              </SecretField>
+              <SecretField label="Google Client Secret" active={integrations.email?.has_google_oauth}>
+                <Input name="email_google_client_secret" type="password" placeholder="GOCSPX-..." className="config-input" />
+              </SecretField>
+              <SecretField label="Outlook Client ID" active={integrations.email?.has_outlook_oauth}>
+                <Input name="email_outlook_client_id" type="password" placeholder="Azure application client id" className="config-input" />
+              </SecretField>
+              <SecretField label="Outlook Client Secret" active={integrations.email?.has_outlook_oauth}>
+                <Input name="email_outlook_client_secret" type="password" placeholder="Azure client secret" className="config-input" />
+              </SecretField>
+              <Field label="Outlook Tenant ID">
+                <Input name="email_outlook_tenant_id" defaultValue={integrations.email?.outlook_tenant_id || ""} placeholder="common / organizations / tenant id" className="config-input" />
+              </Field>
+              <Field label="Cliente local bridge URL">
+                <Input name="email_pc_client_bridge_url" defaultValue={integrations.email?.pc_client_bridge_url || ""} placeholder="http://host.docker.internal:8765" className="config-input" />
+              </Field>
+            </SettingsSection>
+
+            <SettingsSection icon={Mail} title="IMAP / SMTP" description="Útil para proveedores genéricos o cuentas corporativas sin OAuth dedicado.">
+              <Field label="IMAP Host">
+                <Input name="email_imap_host" defaultValue={integrations.email?.imap_host || ""} placeholder="imap.empresa.com:993" className="config-input" />
+              </Field>
+              <Field label="SMTP Host">
+                <Input name="email_smtp_host" defaultValue={integrations.email?.smtp_host || ""} placeholder="smtp.empresa.com:587" className="config-input" />
+              </Field>
+              <Field label="Usuario">
+                <Input name="email_username" defaultValue={integrations.email?.username || ""} placeholder="equipo@empresa.com" className="config-input" />
+              </Field>
+              <SecretField label="Password / App Password" active={integrations.email?.has_imap_smtp}>
+                <Input name="email_password" type="password" placeholder="••••••••" className="config-input" />
+              </SecretField>
+            </SettingsSection>
+
+            <SettingsSection icon={Mail} title="Templates de respuesta" description="JSON administrado para !email --template-nombre categoria." columns={1}>
+              <Field label="Templates JSON" hint='Ejemplo: [{"name":"seguimiento","subject":"Re: {{subject}}","body":"Hola {{name}}, gracias por escribirnos...","category":"lead","requires_approval":true}]'>
+                <textarea
+                  name="email_templates"
+                  defaultValue={JSON.stringify(data.runtime?.runtime?.email_templates || [], null, 2)}
+                  className="min-h-[180px] w-full rounded-[8px] border border-neutral-200 bg-white px-3 py-2 font-mono text-xs shadow-sm outline-none focus:border-neutral-400"
+                />
               </Field>
             </SettingsSection>
           </TabsContent>

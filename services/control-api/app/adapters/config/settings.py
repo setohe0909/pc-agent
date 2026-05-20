@@ -35,6 +35,20 @@ class Settings(BaseSettings):
     openwa_base_url: str = "http://openwa:2785"
     openwa_api_key: str | None = None
     openwa_session_id: str = "default"
+    email_provider: str = "not_configured"
+    email_account_id: str | None = None
+    email_send_enabled: bool = False
+    email_bulk_rate_limit: int = 30
+    email_google_client_id: str | None = None
+    email_google_client_secret: str | None = None
+    email_outlook_client_id: str | None = None
+    email_outlook_client_secret: str | None = None
+    email_outlook_tenant_id: str | None = None
+    email_imap_host: str | None = None
+    email_smtp_host: str | None = None
+    email_username: str | None = None
+    email_password: str | None = None
+    email_pc_client_bridge_url: str | None = None
     default_llm_provider: str = "openai"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
