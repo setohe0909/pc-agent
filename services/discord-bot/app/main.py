@@ -618,7 +618,7 @@ async def main() -> None:
             )
             embed.add_field(
                 name="📣 Marketing Acciones",
-                value="`!marketer campaign <objetivo>`: Campaña asistida.\n`!marketer posts <tema>`: Borradores de posts.\n`!marketer whatsapp send <campaign_id>`: Pedir aprobación por botones para una campaña WhatsApp.\n`!marketer reply-drafts`: Borradores para aprobación.\n`!marketer content-plan`: Calendario con métricas.\n`!marketer repurpose`: Reutilizar contenido ganador.\n`!marketer respond`: Borradores de respuesta.\n`!marketer qualify`: Detectar leads calientes.\n`!marketer magnet`: Lead Magnets (DM).\n`!marketer trends`: Buscar tendencias virales.\n`!marketer sentiment`: Análisis de sentimiento/crisis.\n`!marketer funnel <tema>`: Diseñar embudo.",
+                value="`!marketer campaign <objetivo>`: Campaña asistida.\n`!marketer posts <tema>`: Borradores de posts.\n`!marketer whatsapp send <campaign_id>`: Pedir aprobación por botones para una campaña WhatsApp.\n`!marketer whatsapp approve <campaign_id>` / `deny <campaign_id>`: Fallback textual.\n`!marketer reply-drafts`: Borradores para aprobación.\n`!marketer content-plan`: Calendario con métricas.\n`!marketer repurpose`: Reutilizar contenido ganador.\n`!marketer respond`: Borradores de respuesta.\n`!marketer qualify`: Detectar leads calientes.\n`!marketer magnet`: Lead Magnets (DM).\n`!marketer trends`: Buscar tendencias virales.\n`!marketer sentiment`: Análisis de sentimiento/crisis.\n`!marketer funnel <tema>`: Diseñar embudo.",
                 inline=False
             )
             embed.add_field(
@@ -960,6 +960,41 @@ async def main() -> None:
             elif raw_query.startswith("leads"):
                 sub_command = "leads"
                 prompt = "ver leads"
+            elif raw_query.startswith("whatsapp approve "):
+                campaign_id = raw_query.removeprefix("whatsapp approve ").strip()
+                if not campaign_id:
+                    await message.reply("⚠️ Usa `!marketer whatsapp approve <campaign_id>`.")
+                    return
+                approvers = _approvers()
+                if approvers and str(message.author.id) not in approvers:
+                    await message.reply("No estás autorizado como aprobador.")
+                    return
+                try:
+                    result = await _decide_whatsapp_campaign(campaign_id, True, str(message.author.id))
+                    campaign = result.get("campaign", {})
+                    await message.reply(
+                        f"✅ Campaña WhatsApp `{campaign.get('name', campaign_id)}` aprobada "
+                        f"y marcada como `{campaign.get('status', 'queued')}`."
+                    )
+                except Exception as exc:
+                    await message.reply(f"❌ No pude aprobar la campaña: {exc}")
+                return
+            elif raw_query.startswith("whatsapp deny "):
+                campaign_id = raw_query.removeprefix("whatsapp deny ").strip()
+                if not campaign_id:
+                    await message.reply("⚠️ Usa `!marketer whatsapp deny <campaign_id>`.")
+                    return
+                approvers = _approvers()
+                if approvers and str(message.author.id) not in approvers:
+                    await message.reply("No estás autorizado como aprobador.")
+                    return
+                try:
+                    result = await _decide_whatsapp_campaign(campaign_id, False, str(message.author.id))
+                    campaign = result.get("campaign", {})
+                    await message.reply(f"🚫 Campaña WhatsApp `{campaign.get('name', campaign_id)}` denegada.")
+                except Exception as exc:
+                    await message.reply(f"❌ No pude denegar la campaña: {exc}")
+                return
             elif raw_query.startswith("whatsapp send "):
                 campaign_id = raw_query.removeprefix("whatsapp send ").strip()
                 if not campaign_id:
@@ -975,11 +1010,12 @@ async def main() -> None:
                     color=discord.Color.orange(),
                 )
                 try:
-                    await message.reply(embed=embed, view=WhatsAppCampaignApprovalView(campaign_id, message.author))
+                    thread = await _get_or_create_agent_thread(message, "Marketer", f"whatsapp {campaign_id}")
+                    await thread.send(embed=embed, view=WhatsAppCampaignApprovalView(campaign_id, message.author))
                 except discord.Forbidden:
                     await message.reply(
-                        "❌ No tengo permisos para enviar botones en este canal. "
-                        "Revisa permisos de `Send Messages`, `Use Application Commands`, `Embed Links` y `Create Public Threads`."
+                        "❌ No pude enviar botones en este contexto. Como fallback usa "
+                        f"`!marketer whatsapp approve {campaign_id}` o `!marketer whatsapp deny {campaign_id}`."
                     )
                 return
             elif raw_query.startswith("whatsapp"):
