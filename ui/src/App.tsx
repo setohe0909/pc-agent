@@ -256,12 +256,12 @@ export default function App() {
     <div className="min-h-screen bg-[#101010] text-neutral-950">
       <div className="min-h-screen bg-[#f7f7f6]">
         <Tabs value={activeTab} onValueChange={setActiveTab} orientation="vertical" className="min-h-screen w-full flex-row gap-0">
-          <aside className="fixed inset-y-0 left-0 z-20 flex w-[72px] flex-col border-r border-white/10 bg-[#171717] px-2 py-3 text-neutral-300 shadow-[14px_0_32px_rgba(0,0,0,0.18)] md:w-[248px] md:px-3">
-            <div className="mb-3 flex h-11 items-center justify-center gap-3 rounded-[8px] px-0 md:justify-start md:px-2">
+          <aside className="app-sidebar fixed inset-y-0 left-0 z-20 flex w-[72px] flex-col border-r border-white/10 bg-[#171717] px-2 py-3 text-neutral-300 shadow-[14px_0_32px_rgba(0,0,0,0.18)] md:w-[248px] md:px-3">
+            <div className="app-sidebar-brand mb-3 flex h-11 items-center justify-center gap-3 rounded-[8px] px-0 md:justify-start md:px-2">
               <div className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-[6px] bg-black ring-1 ring-white/10">
                 <img src="/pc-agent-logo.png" alt="PC Agent" className="size-7 object-contain" />
               </div>
-              <div className="hidden min-w-0 md:block">
+              <div className="app-sidebar-brand-copy hidden min-w-0 md:block">
                 <p className="truncate text-sm font-semibold leading-5 text-white">PC Agent</p>
                 <p className="truncate text-xs leading-4 text-neutral-500">Control Plane</p>
               </div>
@@ -276,7 +276,7 @@ export default function App() {
                 return (
                   <div key={item.value} className="w-full">
                     {startsGroup ? (
-                      <div className={index === 0 ? "hidden px-2 pb-1 pt-2 md:block" : "hidden px-2 pb-1 pt-5 md:block"}>
+                      <div className={index === 0 ? "app-sidebar-group-label hidden px-2 pb-1 pt-2 md:block" : "app-sidebar-group-label hidden px-2 pb-1 pt-5 md:block"}>
                         <p className="text-[11px] font-medium uppercase leading-4 tracking-[0.08em] text-neutral-600">
                           {navGroups[item.group]}
                         </p>
@@ -286,10 +286,10 @@ export default function App() {
                       value={item.value}
                       title={item.label}
                       aria-label={item.label}
-                      className="relative mb-0.5 !flex h-9 w-full !flex-none !grow-0 !basis-auto items-center justify-center gap-2.5 rounded-[6px] border border-transparent bg-transparent px-0 py-0 text-sm font-medium text-neutral-400 shadow-none transition-colors before:absolute before:left-0 before:top-1/2 before:h-4 before:w-[2px] before:-translate-y-1/2 before:rounded-full before:bg-transparent hover:bg-white/[0.06] hover:text-neutral-100 data-active:!border-white/10 data-active:!bg-white/[0.08] data-active:!text-white data-active:before:bg-[#3ecf8e] md:justify-start md:px-2.5 [&_svg]:!size-4 [&_svg]:shrink-0 [&_svg]:stroke-[2]"
+                      className="app-sidebar-nav-trigger relative mb-0.5 !flex h-9 w-full !flex-none !grow-0 !basis-auto items-center justify-center gap-2.5 rounded-[6px] border border-transparent bg-transparent px-0 py-0 text-sm font-medium text-neutral-400 shadow-none transition-colors before:absolute before:left-0 before:top-1/2 before:h-4 before:w-[2px] before:-translate-y-1/2 before:rounded-full before:bg-transparent hover:bg-white/[0.06] hover:text-neutral-100 data-active:!border-white/10 data-active:!bg-white/[0.08] data-active:!text-white data-active:before:bg-[#3ecf8e] md:justify-start md:px-2.5 [&_svg]:!size-4 [&_svg]:shrink-0 [&_svg]:stroke-[2]"
                     >
                       <Icon className="size-4" />
-                      <span className="hidden truncate md:inline">{item.label}</span>
+                      <span className="app-sidebar-item-label hidden truncate md:inline">{item.label}</span>
                     </TabsTrigger>
                   </div>
                 );
@@ -297,15 +297,15 @@ export default function App() {
             </TabsList>
 
             <div className="mt-3 border-t border-white/10 pt-3">
-              <Button variant="ghost" onClick={refresh} title="Refrescar" aria-label="Refrescar" className="h-9 w-full justify-center gap-2 rounded-[6px] px-0 text-sm font-medium text-neutral-400 hover:bg-white/[0.06] hover:text-neutral-100 md:justify-start md:px-2.5">
+              <Button variant="ghost" onClick={refresh} title="Refrescar" aria-label="Refrescar" className="app-sidebar-footer-row h-9 w-full justify-center gap-2 rounded-[6px] px-0 text-sm font-medium text-neutral-400 hover:bg-white/[0.06] hover:text-neutral-100 md:justify-start md:px-2.5">
                 <RefreshCw className="size-4" />
-                <span className="hidden md:inline">Refrescar</span>
+                <span className="app-sidebar-footer-label hidden md:inline">Refrescar</span>
               </Button>
-              <div className="mt-2 flex h-10 items-center justify-center gap-2 rounded-[6px] px-0 text-neutral-300 md:justify-start md:px-2" title="Perfil">
+              <div className="app-sidebar-footer-row mt-2 flex h-10 items-center justify-center gap-2 rounded-[6px] px-0 text-neutral-300 md:justify-start md:px-2" title="Perfil">
                 <div className="flex size-7 items-center justify-center rounded-full bg-neutral-800 ring-1 ring-white/10">
                   <UserCircle className="size-4" />
                 </div>
-                <div className="hidden min-w-0 md:block">
+                <div className="app-sidebar-footer-label hidden min-w-0 md:block">
                   <p className="truncate text-sm font-medium leading-4 text-neutral-200">Admin</p>
                   <p className="truncate text-xs leading-4 text-neutral-500">Local session</p>
                 </div>
@@ -313,7 +313,7 @@ export default function App() {
             </div>
           </aside>
 
-          <main className="min-h-screen min-w-0 flex-1 pl-[72px] md:pl-[248px]">
+          <main className="app-shell-main min-h-screen min-w-0 flex-1 pl-[72px] md:pl-[248px]">
             <div className="min-h-screen bg-[#f7f7f6]">
               <header className="w-full border-b border-neutral-200 bg-white/90 px-5 py-5 backdrop-blur sm:px-8 lg:px-10">
                 <div className="flex w-full flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">

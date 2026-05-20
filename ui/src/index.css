@@ -226,3 +226,30 @@
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
 }
+
+@media (max-width: 767px) {
+  .app-sidebar {
+    width: 72px !important;
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+  }
+
+  .app-shell-main {
+    padding-left: 72px !important;
+  }
+
+  .app-sidebar-brand,
+  .app-sidebar-footer-row,
+  .app-sidebar-nav-trigger {
+    justify-content: center !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  .app-sidebar-brand-copy,
+  .app-sidebar-footer-label,
+  .app-sidebar-group-label,
+  .app-sidebar-item-label {
+    display: none !important;
+  }
+}
