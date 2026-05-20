@@ -1,217 +1,202 @@
+import type { LucideIcon } from "lucide-react";
+import { Activity, BookOpen, Brain, CheckCircle2, Database, Globe, Megaphone, PenTool, ShieldCheck, Terminal } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, Globe, Megaphone, PenTool, Brain, ShieldCheck } from "lucide-react";
+
+const quickStart = [
+  {
+    title: "Arranque",
+    description: "Levanta el ecosistema de agentes autónomos con Docker Compose.",
+    command: "docker compose up -d --build",
+  },
+  {
+    title: "Puertos base",
+    description: "Servicios principales expuestos para operación local y contenedores.",
+    command: "Runtime 8100 · Control API 8000 · Obsidian 3010 · Langfuse 3000",
+  },
+  {
+    title: "Modelos",
+    description: "El runtime prioriza proveedores configurados y cae a Ollama cuando aplica.",
+    command: "gemini | openai | ollama | together",
+  },
+];
+
+const commandGroups: Array<{
+  title: string;
+  icon: LucideIcon;
+  tone: string;
+  commands: Array<{ command: string; title: string; description: string; note?: string }>;
+}> = [
+  {
+    title: "Sistema",
+    icon: Activity,
+    tone: "text-emerald-700 bg-emerald-50",
+    commands: [
+      { command: "!status", title: "Salud del sistema", description: "Muestra conectividad de Ollama, API, Runtime, Supabase y Mentis." },
+      { command: "!memory", title: "Memoria operativa", description: "Lista tendencias y aprendizajes recientes guardados en MentisDB." },
+      { command: "!run consolidation", title: "Consolidación diaria", description: "Fuerza la síntesis de memoria de largo plazo." },
+    ],
+  },
+  {
+    title: "Inteligencia",
+    icon: Globe,
+    tone: "text-blue-700 bg-blue-50",
+    commands: [
+      { command: "!ask [pregunta]", title: "Consulta RAG", description: "Responde usando fuentes vectorizadas y memoria disponible." },
+      { command: "!research [tema]", title: "Investigación profunda", description: "Busca fuentes externas y sintetiza oportunidades o riesgos." },
+    ],
+  },
+  {
+    title: "Marketing",
+    icon: Megaphone,
+    tone: "text-pink-700 bg-pink-50",
+    commands: [
+      { command: "!marketer [petición]", title: "Campaña asistida", description: "Planifica campañas con contexto, memoria y análisis visual." },
+      { command: "!marketer qualify", title: "Lead auto-pilot", description: "Detecta leads y los persiste en CRM." },
+      { command: "!marketer plan [tema]", title: "Plan editorial", description: "Genera estrategia con crítica y voz de marca." },
+    ],
+  },
+  {
+    title: "Sub-agentes",
+    icon: PenTool,
+    tone: "text-indigo-700 bg-indigo-50",
+    commands: [
+      { command: "!writer blog [es/en] [tema]", title: "Blog en Obsidian", description: "Crea contenido optimizado y lo guarda en el vault." },
+      { command: "!picture memory", title: "Memoria visual", description: "Consulta aprendizajes de estilo del agente de imágenes." },
+      { command: "!coder-web memory", title: "Memoria web", description: "Revisa aprendizajes del subagente de desarrollo web." },
+    ],
+  },
+  {
+    title: "Trading",
+    icon: ShieldCheck,
+    tone: "text-amber-700 bg-amber-50",
+    commands: [
+      {
+        command: "!approve_trade [instrucción]",
+        title: "Ejecución controlada",
+        description: "Inicia flujo de Kalshi con límites, auditoría y aprobación humana.",
+        note: "Límite operativo: $10 USD por operación.",
+      },
+    ],
+  },
+];
+
+const dataNotes = [
+  { label: "Vector store", value: "Supabase pgvector · mxbai-embed-large · 1024 dims" },
+  { label: "Memoria", value: "mentis_memory · memoria por agente y consolidaciones" },
+  { label: "CRM", value: "marketing_leads · señales calificadas por IA" },
+  { label: "Seguridad", value: "Canal Discord autorizado + aprobación para trading" },
+];
 
 export function WikiView() {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">1. Arranque v0.5.0</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <CardDescription className="mb-4">Levanta el ecosistema de agentes autónomos con Docker Compose.</CardDescription>
-          <code className="bg-secondary text-secondary-foreground text-xs p-2 rounded block break-words font-mono">
-            docker compose up --build
-          </code>
-        </CardContent>
-      </Card>
-      
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">2. Configuración</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <CardDescription className="mb-4">Define URLs de servicios. Para Obsidian usa el puerto 3010 y el volumen compartido /vault.</CardDescription>
-          <code className="bg-secondary text-secondary-foreground text-xs p-2 rounded block break-words font-mono">
-            RT: 8100 · Obsidian: 3010 · LF: 3000
-          </code>
-        </CardContent>
-      </Card>
-
-      <Card className="md:col-span-2 lg:col-span-3 border-blue-500/30 bg-blue-500/5">
-        <CardHeader>
-          <CardTitle className="text-xl flex items-center gap-2">
-            <Activity className="w-5 h-5 text-blue-500" />
-            Guía de Comandos de Discord
-          </CardTitle>
-          <CardDescription>Usa estos comandos en el canal de solicitudes autorizado para interactuar con el agente.</CardDescription>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <code className="bg-blue-500/20 text-blue-400 px-2 py-1 rounded font-bold">!status</code>
-              <span className="text-sm font-medium">Salud del Sistema</span>
+    <div className="space-y-5 pb-10">
+      <section className="rounded-[10px] border border-neutral-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 gap-3">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-[8px] bg-neutral-950 text-white">
+              <BookOpen className="size-5" />
+            </span>
+            <div>
+              <h2 className="text-2xl font-semibold tracking-tight text-neutral-950">Manual Operativo</h2>
+              <p className="mt-1 text-sm text-neutral-500">Arranque, comandos de Discord y referencias rápidas para operar PC Agent.</p>
             </div>
-            <p className="text-xs text-muted-foreground">Consulta el estado proactivo de todos los servicios (Ollama, Gemini, Supabase, Mentis). Úsalo para verificar conectividad.</p>
           </div>
-          
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <code className="bg-blue-500/20 text-blue-400 px-2 py-1 rounded font-bold">!ask [texto]</code>
-              <span className="text-sm font-medium">Consulta de Conocimiento</span>
-            </div>
-            <p className="text-xs text-muted-foreground">Pregunta sobre cualquier tema. El agente buscará en las fuentes vectorizadas en Supabase y MentisDB para responder.</p>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:min-w-[520px]">
+            {dataNotes.map((item) => (
+              <div key={item.label} className="rounded-[8px] border border-neutral-200 bg-neutral-50 px-3 py-2">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-400">{item.label}</p>
+                <p className="mt-1 line-clamp-2 text-xs font-medium leading-5 text-neutral-700">{item.value}</p>
+              </div>
+            ))}
           </div>
+        </div>
+      </section>
 
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <code className="bg-blue-500/20 text-blue-400 px-2 py-1 rounded font-bold">!research [tema]</code>
-              <span className="text-sm font-medium">Análisis de Tendencias</span>
-            </div>
-            <p className="text-xs text-muted-foreground">Inicia una investigación profunda sobre mercados o tendencias burstátiles. Útil para identificar oportunidades en Kalshi.</p>
-          </div>
+      <section className="grid gap-4 lg:grid-cols-3">
+        {quickStart.map((item, index) => (
+          <Card key={item.title} className="rounded-[10px] border-neutral-200 bg-white shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base font-semibold text-neutral-950">
+                <span className="flex size-6 items-center justify-center rounded-full bg-neutral-100 text-xs text-neutral-500">{index + 1}</span>
+                {item.title}
+              </CardTitle>
+              <CardDescription className="text-sm leading-6 text-neutral-500">{item.description}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <code className="block rounded-[8px] bg-neutral-950 px-3 py-2 text-xs font-medium leading-5 text-neutral-100">
+                {item.command}
+              </code>
+            </CardContent>
+          </Card>
+        ))}
+      </section>
 
-          <section className="space-y-4">
-            <h3 className="text-xl font-semibold text-primary">Diccionario de Comandos (Discord)</h3>
-            <div className="grid gap-4 md:grid-cols-2">
-              <Card className="bg-muted/30">
-                <CardHeader>
-                  <CardTitle className="text-sm flex items-center gap-2">
-                    <Activity className="h-4 w-4" /> Sistemas
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="text-xs space-y-2">
-                  <p><strong>!status</strong></p>
-                  <p className="text-muted-foreground">Muestra el estado de salud de todos los microservicios (Ollama, API, Runtime, DB).</p>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-muted/30">
-                <CardHeader>
-                  <CardTitle className="text-sm flex items-center gap-2">
-                    <Globe className="h-4 w-4" /> Inteligencia
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="text-xs space-y-2">
-                  <p><strong>!ask [pregunta]</strong></p>
-                  <p className="text-muted-foreground">Consulta rápida al asistente usando el contexto actual.</p>
-                  <p><strong>!research [tema]</strong></p>
-                  <p className="text-muted-foreground">Búsqueda profunda en fuentes externas y memoria vectorial (RAG).</p>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-muted/30 border-primary/20">
-                <CardHeader>
-                  <CardTitle className="text-sm flex items-center gap-2 text-primary">
-                    <ShieldCheck className="h-4 w-4" /> Trading Live (Demo)
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="text-xs space-y-2">
-                  <p><strong>!approve_trade [instrucción]</strong></p>
-                  <p className="text-muted-foreground">Inicia el flujo de ejecución en Kalshi Live (Modo Demo).</p>
-                  <div className="bg-background/50 p-2 rounded mt-2 font-mono text-[10px]">
-                    Límite de seguridad: $10.00 USD por operación.
+      <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <Card className="rounded-[10px] border-neutral-200 bg-white shadow-sm">
+          <CardHeader className="border-b border-neutral-200 px-5 py-4">
+            <CardTitle className="flex items-center gap-2 text-base font-semibold text-neutral-950">
+              <Terminal className="size-4 text-[#3ecf8e]" />
+              Diccionario de comandos
+            </CardTitle>
+            <CardDescription className="text-sm text-neutral-500">Comandos agrupados por workflow para encontrarlos rápido durante operación.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4 p-5 lg:grid-cols-2">
+            {commandGroups.map((group) => {
+              const Icon = group.icon;
+              return (
+                <div key={group.title} className="rounded-[10px] border border-neutral-200 bg-neutral-50 p-4">
+                  <div className="mb-4 flex items-center gap-2">
+                    <span className={`flex size-8 items-center justify-center rounded-[8px] ${group.tone}`}>
+                      <Icon className="size-4" />
+                    </span>
+                    <h3 className="text-sm font-semibold text-neutral-950">{group.title}</h3>
                   </div>
-                  <ul className="list-disc pl-4 mt-2 text-muted-foreground">
-                    <li>Validación de balance en tiempo real.</li>
-                    <li>Requiere aprobación dual (Humano + Crítico).</li>
-                    <li>Registro de auditoría en Supabase.</li>
-                  </ul>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-muted/30 border-pink-500/20">
-                <CardHeader>
-                  <CardTitle className="text-sm flex items-center gap-2 text-pink-500">
-                    <Megaphone className="h-4 w-4" /> Marketing (LangGraph + Vision)
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="text-xs space-y-2">
-                  <p><strong>!marketer [petición con imagen]</strong></p>
-                  <p className="text-muted-foreground">Analiza imágenes con <strong>Gemini Vision</strong> y planifica campañas autónomas.</p>
-                  <p><strong>!marketer qualify</strong></p>
-                  <p className="text-muted-foreground"><strong>Lead Auto-Pilot:</strong> Detecta y guarda leads automáticamente en el CRM.</p>
-                  <p><strong>!marketer plan [tema]</strong></p>
-                  <p className="text-muted-foreground">Flujo con <strong>Agente Crítico</strong> y refinamiento de voz de marca.</p>
-                  <div className="bg-pink-500/10 p-2 rounded text-[10px] text-pink-400">
-                    Nodos: Intent → Vision → Critic → Voice → Execution
+                  <div className="space-y-3">
+                    {group.commands.map((item) => (
+                      <div key={item.command} className="rounded-[8px] border border-neutral-200 bg-white p-3">
+                        <code className="rounded-[6px] bg-neutral-100 px-2 py-1 text-xs font-semibold text-neutral-900">{item.command}</code>
+                        <p className="mt-2 text-sm font-semibold text-neutral-950">{item.title}</p>
+                        <p className="mt-1 text-xs leading-5 text-neutral-500">{item.description}</p>
+                        {item.note ? <p className="mt-2 rounded-[6px] bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800">{item.note}</p> : null}
+                      </div>
+                    ))}
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
 
-              <Card className="bg-muted/30 border-indigo-500/20">
-                <CardHeader>
-                  <CardTitle className="text-sm flex items-center gap-2 text-indigo-500">
-                    <PenTool className="h-4 w-4" /> Writer Sub-Agent (Obsidian)
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="text-xs space-y-2">
-                  <p><strong>!writer blog [es/en] [tema]</strong></p>
-                  <p className="text-muted-foreground">Genera un blog optimizado y lo guarda en la carpeta /Blog de Obsidian.</p>
-                  <p><strong>!writer story [es/en] [tema]</strong></p>
-                  <p className="text-muted-foreground">Genera una narrativa de marca y la guarda en /Story-telling.</p>
-                  <p><strong>!writer [mensaje]</strong></p>
-                  <p className="text-muted-foreground">Chat directo con el redactor para lluvia de ideas creativa.</p>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-muted/30 border-amber-500/20">
-                <CardHeader>
-                  <CardTitle className="text-sm flex items-center gap-2 text-amber-500">
-                    <Brain className="h-4 w-4" /> Inteligencia Proactiva
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="text-xs space-y-2">
-                  <p><strong>!memory</strong></p>
-                  <p className="text-muted-foreground">Ver tendencias y memorias operativas del día.</p>
-                  <p><strong>!run consolidation</strong></p>
-                  <p className="text-muted-foreground">Fuerza la <strong>Consolidación Diaria</strong> de aprendizajes.</p>
-                  <p><strong>!memory --clean</strong></p>
-                  <p className="text-muted-foreground">Limpia la memoria operativa (MentisDB).</p>
-                </CardContent>
-              </Card>
-            </div>
-          </section>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Configuración de Modelos</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <CardDescription className="mb-4">Switch dinámico entre proveedores. Si no hay API Key de OpenAI, el sistema busca Ollama.</CardDescription>
-          <code className="bg-secondary text-secondary-foreground text-xs p-2 rounded block break-words font-mono">
-            DEFAULT_LLM_PROVIDER: gemini | openai | ollama
-          </code>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">4. Conocimiento</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <CardDescription className="mb-4">Agrega fuentes RSS o website. El worker descarga contenido, genera embeddings con Ollama y guarda en Supabase.</CardDescription>
-          <code className="bg-secondary text-secondary-foreground text-xs p-2 rounded block break-words font-mono">
-            mxbai-embed-large · 1024 dimensiones
-          </code>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">5. Supabase & CRM</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <CardDescription className="mb-4">Almacenamiento vectorial y base de datos de leads calificados por la IA.</CardDescription>
-          <code className="bg-secondary text-secondary-foreground text-xs p-2 rounded block break-words font-mono">
-            knowledge · mentis_memory · marketing_leads
-          </code>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">6. Seguridad de trading</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <CardDescription className="mb-4">El runtime rechaza decisiones de trading si no vienen del canal Discord autorizado con aprobación.</CardDescription>
-          <code className="bg-secondary text-secondary-foreground text-xs p-2 rounded block break-words font-mono">
-            DISCORD_REQUESTS_CHANNEL_ID
-          </code>
-        </CardContent>
-      </Card>
+        <div className="space-y-4">
+          <Card className="rounded-[10px] border-neutral-200 bg-white shadow-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                <Brain className="size-4 text-[#3ecf8e]" />
+                Memoria y conocimiento
+              </CardTitle>
+              <CardDescription className="text-sm leading-6">
+                El worker descarga fuentes, genera embeddings y guarda señales en Supabase. MentisDB sostiene memoria operativa y consolidaciones.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+          <Card className="rounded-[10px] border-neutral-200 bg-white shadow-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                <Database className="size-4 text-[#3ecf8e]" />
+                Tablas clave
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              {["knowledge_documents", "mentis_memory", "marketing_leads", "whatsapp_campaigns"].map((table) => (
+                <div key={table} className="flex items-center gap-2 rounded-[8px] bg-neutral-50 px-3 py-2">
+                  <CheckCircle2 className="size-4 text-emerald-600" />
+                  <code className="text-xs font-semibold text-neutral-800">{table}</code>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+      </section>
     </div>
   );
 }
