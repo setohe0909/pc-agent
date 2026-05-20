@@ -36,9 +36,6 @@ PUBLIC_KEYS = {
     "kalshi_denied_tickers",
     "openwa_base_url",
     "openwa_session_id",
-    "openai_monthly_budget_usd",
-    "gemini_monthly_budget_usd",
-    "together_monthly_budget_usd",
 }
 
 SECRET_KEYS = {
@@ -93,9 +90,6 @@ class RuntimeConfigUpdate(BaseModel):
     gemini_api_key: str | None = Field(default=None, max_length=4096)
     minimax_api_key: str | None = Field(default=None, max_length=4096)
     together_api_key: str | None = Field(default=None, max_length=4096)
-    openai_monthly_budget_usd: float | None = Field(default=None, ge=0, le=1000000)
-    gemini_monthly_budget_usd: float | None = Field(default=None, ge=0, le=1000000)
-    together_monthly_budget_usd: float | None = Field(default=None, ge=0, le=1000000)
     instagram_access_token: str | None = Field(default=None, max_length=4096)
     instagram_account_id: str | None = Field(default=None, max_length=4096)
     tiktok_api_key: str | None = Field(default=None, max_length=4096)

@@ -1,5 +1,5 @@
 import type { FormEvent } from "react";
-import { Activity, Brain, Database, Globe, LayoutGrid, Save, Server } from "lucide-react";
+import { Activity, Brain, Database, DollarSign, Globe, LayoutGrid, Save, Server } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 export function ConfigView({ data, onSave }: { data: any, adminToken: string, onSave: (payload: any) => Promise<void> }) {
   const { config } = data;
   const integrations = config?.integrations || {};
+  const currentRuntime = data.runtime?.runtime || {};
+  const modelUsage = data.modelUsage;
 
   const handleSave = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -18,6 +20,9 @@ export function ConfigView({ data, onSave }: { data: any, adminToken: string, on
     
     // Type coercions
     if (payload.embedding_dimensions) payload.embedding_dimensions = Number(payload.embedding_dimensions);
+    if (payload.openai_monthly_budget_usd) payload.openai_monthly_budget_usd = Number(payload.openai_monthly_budget_usd);
+    if (payload.gemini_monthly_budget_usd) payload.gemini_monthly_budget_usd = Number(payload.gemini_monthly_budget_usd);
+    if (payload.together_monthly_budget_usd) payload.together_monthly_budget_usd = Number(payload.together_monthly_budget_usd);
     if (payload.mentis_enabled === "true") payload.mentis_enabled = true;
     if (payload.mentis_enabled === "false") payload.mentis_enabled = false;
     if (payload.langfuse_enabled === "true") payload.langfuse_enabled = true;
@@ -131,7 +136,39 @@ export function ConfigView({ data, onSave }: { data: any, adminToken: string, on
                     </div>
                     <Input name="openai_api_key" type="password" placeholder="sk-..." />
                   </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <Label>OpenAI Admin API Key</Label>
+                      <StatusBadge active={integrations.openai_admin_api_key_configured} />
+                    </div>
+                    <Input name="openai_admin_api_key" type="password" placeholder="sk-admin-..." />
+                    <p className="text-[10px] text-muted-foreground">Necesaria para consultar consumo real en OpenAI Costs API.</p>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <Label>Together API Key</Label>
+                      <StatusBadge active={integrations.together_api_key_configured} />
+                    </div>
+                    <Input name="together_api_key" type="password" placeholder="tgp_..." />
+                  </div>
                 </div>
+
+                <div className="pt-4 border-t grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="space-y-2">
+                    <Label>Presupuesto OpenAI mensual (USD)</Label>
+                    <Input name="openai_monthly_budget_usd" type="number" min="0" step="0.01" defaultValue={currentRuntime.openai_monthly_budget_usd} placeholder="50" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Presupuesto Gemini mensual (USD)</Label>
+                    <Input name="gemini_monthly_budget_usd" type="number" min="0" step="0.01" defaultValue={currentRuntime.gemini_monthly_budget_usd} placeholder="25" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Presupuesto Together mensual (USD)</Label>
+                    <Input name="together_monthly_budget_usd" type="number" min="0" step="0.01" defaultValue={currentRuntime.together_monthly_budget_usd} placeholder="10" />
+                  </div>
+                </div>
+
+                <ModelUsagePanel usage={modelUsage} />
 
                 <div className="pt-4 border-t grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
@@ -253,5 +290,55 @@ function StatusBadge({ active }: { active: boolean }) {
     <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${active ? "bg-green-500/10 text-green-500" : "bg-amber-500/10 text-amber-500"}`}>
       {active ? "✓ CONFIGURADO" : "⚠ PENDIENTE"}
     </span>
+  );
+}
+
+function ModelUsagePanel({ usage }: { usage: any }) {
+  const providers = usage?.providers || [];
+  if (!providers.length) {
+    return null;
+  }
+
+  return (
+    <div className="rounded-[8px] border bg-muted/20 p-4">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div>
+          <h3 className="flex items-center gap-2 text-sm font-semibold">
+            <DollarSign className="h-4 w-4 text-emerald-600" />
+            Consumo y límites de modelos
+          </h3>
+          <p className="text-xs text-muted-foreground">
+            {usage.period?.label || "Periodo actual"} · {usage.period?.start} a {usage.period?.end}
+          </p>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        {providers.map((provider: any) => {
+          const used = typeof provider.used === "number" ? provider.used : null;
+          const limit = typeof provider.limit === "number" ? provider.limit : null;
+          const pct = used !== null && limit ? Math.min(100, Math.round((used / limit) * 100)) : null;
+          return (
+            <div key={provider.provider} className="rounded-[8px] border bg-card p-3">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <span className="text-sm font-semibold capitalize">{provider.provider}</span>
+                <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${provider.status === "live" ? "bg-green-500/10 text-green-600" : "bg-amber-500/10 text-amber-600"}`}>
+                  {provider.status}
+                </span>
+              </div>
+              <div className="text-2xl font-semibold">
+                {used !== null ? `$${used.toFixed(2)}` : "N/D"}
+                <span className="ml-1 text-xs font-normal text-muted-foreground">
+                  {limit ? `/ $${limit.toFixed(2)}` : ""}
+                </span>
+              </div>
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
+                <div className="h-full bg-emerald-500" style={{ width: `${pct ?? 0}%` }} />
+              </div>
+              <p className="mt-3 text-xs leading-relaxed text-muted-foreground">{provider.detail}</p>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }

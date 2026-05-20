@@ -172,7 +172,7 @@ async def model_usage() -> dict:
         _static_provider_usage(
             provider="gemini",
             configured=bool(runtime.get("gemini_api_key") or os.getenv("GEMINI_API_KEY")),
-            budget=runtime.get("gemini_monthly_budget_usd"),
+            budget=_numeric_budget(runtime.get("gemini_monthly_budget_usd"), os.getenv("GEMINI_MONTHLY_BUDGET_USD")),
             detail=(
                 "Gemini expone límites por proyecto en AI Studio/Google Cloud. "
                 "Para consumo live se debe conectar Cloud Monitoring o exportar billing del proyecto."
@@ -181,7 +181,7 @@ async def model_usage() -> dict:
         _static_provider_usage(
             provider="together",
             configured=bool(runtime.get("together_api_key") or os.getenv("TOGETHER_API_KEY")),
-            budget=runtime.get("together_monthly_budget_usd"),
+            budget=_numeric_budget(runtime.get("together_monthly_budget_usd"), os.getenv("TOGETHER_MONTHLY_BUDGET_USD")),
             detail=(
                 "Together entrega rate limits en respuestas y gasto en su dashboard. "
                 "Podemos volverlo live registrando usage por request en Langfuse/Supabase."
@@ -212,7 +212,7 @@ async def update_runtime_config(request: RuntimeConfigUpdate) -> dict:
 
 
 async def _openai_usage(runtime: dict, start: datetime) -> dict:
-    budget = runtime.get("openai_monthly_budget_usd")
+    budget = _numeric_budget(runtime.get("openai_monthly_budget_usd"), os.getenv("OPENAI_MONTHLY_BUDGET_USD"))
     admin_key = runtime.get("openai_admin_api_key") or os.getenv("OPENAI_ADMIN_API_KEY")
     configured = bool(runtime.get("openai_api_key") or os.getenv("OPENAI_API_KEY"))
     base = {
@@ -277,6 +277,17 @@ def _static_provider_usage(provider: str, configured: bool, budget: float | None
         "source": "Configuración local",
         "detail": detail if configured else f"Falta configurar la API key de {provider}.",
     }
+
+
+def _numeric_budget(*values) -> float | None:
+    for value in values:
+        if value in (None, ""):
+            continue
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            continue
+    return None
 
 
 @router.get("/knowledge-sources")
