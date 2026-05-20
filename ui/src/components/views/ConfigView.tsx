@@ -10,7 +10,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 export function ConfigView({ data, onSave }: { data: any, adminToken: string, onSave: (payload: any) => Promise<void> }) {
   const { config } = data;
   const integrations = config?.integrations || {};
-  const currentRuntime = data.runtime?.runtime || {};
   const modelUsage = data.modelUsage;
 
   const handleSave = async (e: FormEvent<HTMLFormElement>) => {
@@ -20,9 +19,6 @@ export function ConfigView({ data, onSave }: { data: any, adminToken: string, on
     
     // Type coercions
     if (payload.embedding_dimensions) payload.embedding_dimensions = Number(payload.embedding_dimensions);
-    if (payload.openai_monthly_budget_usd) payload.openai_monthly_budget_usd = Number(payload.openai_monthly_budget_usd);
-    if (payload.gemini_monthly_budget_usd) payload.gemini_monthly_budget_usd = Number(payload.gemini_monthly_budget_usd);
-    if (payload.together_monthly_budget_usd) payload.together_monthly_budget_usd = Number(payload.together_monthly_budget_usd);
     if (payload.mentis_enabled === "true") payload.mentis_enabled = true;
     if (payload.mentis_enabled === "false") payload.mentis_enabled = false;
     if (payload.langfuse_enabled === "true") payload.langfuse_enabled = true;
@@ -150,21 +146,6 @@ export function ConfigView({ data, onSave }: { data: any, adminToken: string, on
                       <StatusBadge active={integrations.together_api_key_configured} />
                     </div>
                     <Input name="together_api_key" type="password" placeholder="tgp_..." />
-                  </div>
-                </div>
-
-                <div className="pt-4 border-t grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="space-y-2">
-                    <Label>Presupuesto OpenAI mensual (USD)</Label>
-                    <Input name="openai_monthly_budget_usd" type="number" min="0" step="0.01" defaultValue={currentRuntime.openai_monthly_budget_usd} placeholder="50" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Presupuesto Gemini mensual (USD)</Label>
-                    <Input name="gemini_monthly_budget_usd" type="number" min="0" step="0.01" defaultValue={currentRuntime.gemini_monthly_budget_usd} placeholder="25" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Presupuesto Together mensual (USD)</Label>
-                    <Input name="together_monthly_budget_usd" type="number" min="0" step="0.01" defaultValue={currentRuntime.together_monthly_budget_usd} placeholder="10" />
                   </div>
                 </div>
 
@@ -315,8 +296,6 @@ function ModelUsagePanel({ usage }: { usage: any }) {
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         {providers.map((provider: any) => {
           const used = typeof provider.used === "number" ? provider.used : null;
-          const limit = typeof provider.limit === "number" ? provider.limit : null;
-          const pct = used !== null && limit ? Math.min(100, Math.round((used / limit) * 100)) : null;
           return (
             <div key={provider.provider} className="rounded-[8px] border bg-card p-3">
               <div className="mb-2 flex items-center justify-between gap-2">
@@ -327,13 +306,13 @@ function ModelUsagePanel({ usage }: { usage: any }) {
               </div>
               <div className="text-2xl font-semibold">
                 {used !== null ? `$${used.toFixed(2)}` : "N/D"}
-                <span className="ml-1 text-xs font-normal text-muted-foreground">
-                  {limit ? `/ $${limit.toFixed(2)}` : ""}
-                </span>
               </div>
               <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
-                <div className="h-full bg-emerald-500" style={{ width: `${pct ?? 0}%` }} />
+                <div className={`h-full ${provider.status === "live" ? "w-full bg-emerald-500" : "w-0 bg-emerald-500"}`} />
               </div>
+              <p className="mt-2 text-[11px] font-medium text-muted-foreground">
+                Límite: {provider.limit !== null && provider.limit !== undefined ? provider.limit : "No disponible desde endpoint oficial conectado"}
+              </p>
               <p className="mt-3 text-xs leading-relaxed text-muted-foreground">{provider.detail}</p>
             </div>
           );
