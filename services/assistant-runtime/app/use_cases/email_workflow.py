@@ -50,7 +50,15 @@ class EmailWorkflow:
         }
 
     async def _sent_today(self) -> dict:
-        messages = await self.email_provider.list_sent_on(date.today())
+        try:
+            messages = await self.email_provider.list_sent_on(date.today())
+        except RuntimeError as exc:
+            return {"status": "needs_configuration", "message": f"No puedo listar enviados todavia: {exc}"}
+        except NotImplementedError as exc:
+            return {
+                "status": "adapter_required",
+                "message": f"El proveedor esta configurado, pero falta conectar el adapter real de lectura: {exc}",
+            }
         if not messages:
             return {"status": "success", "message": "No hay emails enviados hoy desde el proveedor configurado."}
         lines = ["**Emails enviados hoy**"]
@@ -85,10 +93,26 @@ class EmailWorkflow:
                 "status": "error",
                 "message": f"No existe el template `{template_name}`. Crealo primero en el administrador.",
             }
-        matches = await self.email_provider.search_by_category(category, limit=int(payload.get("limit", 100)))
+        try:
+            matches = await self.email_provider.search_by_category(category, limit=int(payload.get("limit", 100)))
+        except RuntimeError as exc:
+            return {"status": "needs_configuration", "message": f"No puedo preparar bulk reply todavia: {exc}"}
+        except NotImplementedError as exc:
+            return {
+                "status": "adapter_required",
+                "message": f"El proveedor esta configurado, pero falta conectar el adapter real de categorizacion/envio: {exc}",
+            }
         email_ids = [message.id for message in matches]
         dry_run = not bool(payload.get("is_approved", False))
-        result = await self.email_provider.send_bulk_replies(email_ids, template, dry_run=dry_run)
+        try:
+            result = await self.email_provider.send_bulk_replies(email_ids, template, dry_run=dry_run)
+        except RuntimeError as exc:
+            return {"status": "needs_configuration", "message": f"No puedo encolar respuestas todavia: {exc}"}
+        except NotImplementedError as exc:
+            return {
+                "status": "adapter_required",
+                "message": f"El proveedor esta configurado, pero falta conectar el adapter real de envio: {exc}",
+            }
         return {
             "status": "requires_approval" if dry_run else "accepted",
             "requires_approval": dry_run,

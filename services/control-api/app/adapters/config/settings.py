@@ -49,6 +49,7 @@ class Settings(BaseSettings):
     email_username: str | None = None
     email_password: str | None = None
     email_pc_client_bridge_url: str | None = None
+    email_pc_client_bridge_token: str | None = None
     default_llm_provider: str = "openai"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")

@@ -8,6 +8,7 @@ import {
   FolderKanban,
   History,
   Home,
+  Mail,
   Megaphone,
   MessageCircle,
   PenTool,
@@ -37,6 +38,7 @@ import { LeadsView } from "@/components/views/LeadsView";
 import { CoderWebView } from "@/components/views/CoderWebView";
 import { ConsolidationView } from "@/components/views/ConsolidationView";
 import { WhatsAppView } from "@/components/views/WhatsAppView";
+import { EmailView } from "@/components/views/EmailView";
 
 const navItems = [
   { value: "overview", label: "Resumen", icon: Home, group: "main" },
@@ -45,6 +47,7 @@ const navItems = [
   { value: "marketing", label: "Marketing", icon: Megaphone, group: "main" },
   { value: "leads", label: "Leads", icon: Users, group: "main" },
   { value: "whatsapp", label: "WhatsApp", icon: MessageCircle, group: "main" },
+  { value: "email", label: "Email", icon: Mail, group: "agents" },
   { value: "writer", label: "Redactor", icon: PenTool, group: "agents" },
   { value: "picture", label: "Imágenes", icon: Camera, group: "agents" },
   { value: "coder", label: "Coder Web", icon: Code, group: "agents" },
@@ -89,6 +92,10 @@ const tabTitles: Record<string, { title: string; subtitle: string }> = {
   whatsapp: {
     title: "WhatsApp Outreach",
     subtitle: "Mensajería, plantillas y seguimiento de contactos.",
+  },
+  email: {
+    title: "Email Agent",
+    subtitle: "Proveedores, categorias y respuestas bulk con aprobacion.",
   },
   writer: {
     title: "Writer Workspace",
@@ -239,6 +246,7 @@ export default function App() {
       case "marketing": return <MarketerView data={data} adminToken={adminToken} onSave={handleSaveConfig} />;
       case "leads": return <LeadsView />;
       case "whatsapp": return <WhatsAppView adminToken={adminToken} />;
+      case "email": return <EmailView data={data} />;
       case "writer": return <WriterView data={data} adminToken={adminToken} onSave={handleSaveConfig} />;
       case "picture": return <PictureView data={data} adminToken={adminToken} onSave={handleSaveConfig} />;
       case "coder": return <CoderWebView data={data} adminToken={adminToken} onSave={handleSaveConfig} />;

@@ -93,6 +93,14 @@ def _extract_account_flag(raw_query: str) -> tuple[str, str | None]:
     return cleaned, account_id
 
 
+def _extract_email_template_flag(raw_query: str) -> tuple[str, str | None]:
+    match = re.search(r"(^|\s)--template-([a-zA-Z0-9_-]+)(?=\s|$)", raw_query)
+    template = match.group(2).strip() if match else None
+    cleaned = re.sub(r"(^|\s)--template-[a-zA-Z0-9_-]+(?=\s|$)", " ", raw_query).strip()
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    return cleaned, template
+
+
 async def _decide_whatsapp_campaign(campaign_id: str, approved: bool, decided_by: str) -> dict:
     base_url = _get_env("CONTROL_API_URL", "http://control-api:8000").rstrip("/")
     token = _get_env("ADMIN_API_TOKEN", "")
@@ -538,7 +546,7 @@ async def main() -> None:
             return
 
         content = message.content.strip()
-        command_list = ("!ask ", "!research ", "!approve_trade ", "!status", "!memory", "!run ", "!claw ", "!marketer ", "!marketer-status", "!writer ", "!picture ", "!coder-web ", "!help")
+        command_list = ("!ask ", "!research ", "!approve_trade ", "!status", "!memory", "!run ", "!claw ", "!marketer ", "!marketer-status", "!writer ", "!picture ", "!coder-web ", "!email", "!help")
         
         # Si NO es un comando Y NO estamos en un hilo nuestro, ignorar
         if not content.startswith(command_list) and not content in ("!picture", "!coder-web") and not is_thread:
@@ -555,6 +563,8 @@ async def main() -> None:
                 content = f"!picture {content}"
             elif "pilot" in thread_name or "coder" in thread_name:
                 content = f"!coder-web {content}"
+            elif "email" in thread_name or "correo" in thread_name:
+                content = f"!email {content}"
             elif "claw" in thread_name:
                 content = f"!claw {content}"
             else:
@@ -590,6 +600,31 @@ async def main() -> None:
             await message.reply(embed=embed)
             return
 
+        if content in ("!help email", "!help mail", "!help !email"):
+            embed = discord.Embed(
+                title="📬 Ayuda de Email Agent",
+                description="Comandos para correo con proveedores configurables desde el administrador.",
+                color=discord.Color.teal(),
+            )
+            embed.add_field(
+                name="Operación",
+                value=(
+                    "`!email status`: Estado del proveedor, lectura, envio y templates.\n"
+                    "`!email sent-today`: Lista emails enviados el dia actual.\n"
+                    "`!email categorize <categoria>`: Prepara clasificacion por filtros/categoria.\n"
+                    "`!email --template-<nombre> <categoria>`: Prepara respuestas bulk con template del administrador.\n"
+                    "`!email --model-status`: Estado de modelos del sub-agent."
+                ),
+                inline=False,
+            )
+            embed.add_field(
+                name="Seguridad",
+                value="Los envios bulk nacen como plan de aprobacion. El envio real requiere proveedor configurado, envio activado, rate limits y auditoria.",
+                inline=False,
+            )
+            await message.reply(embed=embed)
+            return
+
         if content == "!help":
             embed = discord.Embed(
                 title="🤖 PC Agent v0.6.1 - Guía de Operaciones", 
@@ -603,7 +638,7 @@ async def main() -> None:
             )
             embed.add_field(
                 name="🔌 Model Status",
-                value="`!marketer --model-status`: Modelos de marketing y visuales.\n`!picture --model-status`: Modelos de generación/edición.\n`!claw --model-status`: Modelo de chat/research.\n`!writer --model-status`: Modelo de redacción.\n`!coder-web --model-status`: Modelos de análisis y adapter Pilot.",
+                value="`!marketer --model-status`: Modelos de marketing y visuales.\n`!picture --model-status`: Modelos de generación/edición.\n`!claw --model-status`: Modelo de chat/research.\n`!writer --model-status`: Modelo de redacción.\n`!coder-web --model-status`: Modelos de análisis y adapter Pilot.\n`!email --model-status`: Modelos de clasificación, resumen y templates.",
                 inline=False
             )
             embed.add_field(
@@ -656,8 +691,67 @@ async def main() -> None:
                 value="`!coder-web <descripción>`: Crear/ajustar e-commerce (Repositorio).\n`!coder-web memory`: Ver aprendizajes del desarrollador web.\n`!coder-web memory --clean`: Borrar memoria del día.", 
                 inline=False
             )
+            embed.add_field(
+                name="📬 Email Sub-Agent",
+                value="`!email status`: Estado del proveedor.\n`!email sent-today`: Emails enviados hoy.\n`!email categorize <categoria>`: Categorizar por filtros.\n`!email --template-seguimiento lead`: Preparar respuestas bulk con template.",
+                inline=False,
+            )
             embed.set_footer(text="PC Agent v0.6.1 - Help actualizado")
             await message.reply(embed=embed)
+            return
+
+        if content == "!email" or content.startswith("!email "):
+            raw_query = content.removeprefix("!email").strip()
+            raw_query, template_name = _extract_email_template_flag(raw_query)
+
+            if raw_query == "--model-status":
+                await _send_model_status(message, "email")
+                return
+
+            sub_command = "status"
+            prompt = raw_query or "estado de email"
+            payload_extra = {}
+
+            if template_name:
+                sub_command = "bulk-reply"
+                payload_extra["template_name"] = template_name
+                payload_extra["category"] = raw_query.strip()
+                prompt = f"prepara respuesta bulk para {raw_query.strip()}"
+            elif raw_query in {"status", "estado", ""}:
+                sub_command = "status"
+                prompt = "estado de email"
+            elif raw_query in {"sent-today", "enviados-hoy", "sent today"}:
+                sub_command = "sent-today"
+                prompt = "lista emails enviados hoy"
+            elif raw_query.startswith("categorize "):
+                sub_command = "categorize"
+                category = raw_query.removeprefix("categorize ").strip()
+                payload_extra["category"] = category
+                prompt = category
+            elif raw_query.startswith("categorizar "):
+                sub_command = "categorize"
+                category = raw_query.removeprefix("categorizar ").strip()
+                payload_extra["category"] = category
+                prompt = category
+
+            try:
+                thread = await _get_or_create_agent_thread(message, "Email", raw_query or "status")
+            except discord.Forbidden:
+                await message.reply("❌ Necesito permiso para 'Crear hilos públicos' para conversar con el Email Agent.")
+                return
+
+            request_payload = {
+                "action_type": "email",
+                "prompt": prompt,
+                "source": {"platform": "discord", "channel_id": str(thread.id), "user_id": str(message.author.id)},
+                "payload": {"sub_command": sub_command, "autonomy_level": "assisted", **payload_extra},
+            }
+            await thread.send(f"📬 **Email Agent procesando `{sub_command}`...**")
+            try:
+                result = await _send_assistant_request(request_payload)
+                await _send_long(thread, result.get("message", "No hubo respuesta."))
+            except Exception as exc:
+                await thread.send(f"❌ Error al contactar al Email Agent: {exc}")
             return
 
         if content.startswith("!claw"):

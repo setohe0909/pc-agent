@@ -75,6 +75,7 @@ SECRET_KEYS = {
     "email_outlook_client_id",
     "email_outlook_client_secret",
     "email_password",
+    "email_pc_client_bridge_token",
 }
 
 
@@ -141,6 +142,7 @@ class RuntimeConfigUpdate(BaseModel):
     email_username: str | None = Field(default=None, max_length=320)
     email_password: str | None = Field(default=None, max_length=4096)
     email_pc_client_bridge_url: str | None = Field(default=None, max_length=2048)
+    email_pc_client_bridge_token: str | None = Field(default=None, max_length=4096)
     email_templates: list[dict[str, Any]] | str | None = None
     coder_web_stack: str | None = Field(default=None, max_length=80)
     coder_web_autonomy: str | None = Field(default=None, max_length=80)

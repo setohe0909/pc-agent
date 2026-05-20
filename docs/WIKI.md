@@ -53,18 +53,38 @@ El sub-agente de desarrollo web permite automatizar la creación y ajuste de pla
 - `!coder-web memory`: Muestra contextos de proyectos previos.
 - `!coder-web memory --clean`: Borra la memoria operativa de desarrollo.
 
-## 5. Inteligencia Proactiva
+## 5. Email (!email)
+
+El sub-agente de email opera correo con enfoque Clean/Hexagonal para que el dominio no dependa de Gmail, Outlook, IMAP/SMTP ni clientes locales.
+
+### Capacidades
+- Configuracion de proveedores desde el administrador UI.
+- Categorizacion por filtros, categorias y clasificacion asistida.
+- Listado de emails enviados el mismo dia.
+- Respuestas bulk mediante templates administrados.
+- Estado operacional con `!email status` y `!email --model-status`.
+
+### Comandos
+- `!email` o `!email status`: revisa proveedor, lectura, envio y templates.
+- `!email sent-today`: lista enviados de hoy.
+- `!email categorize <categoria>`: prepara reglas/categorizacion.
+- `!email --template-<nombre> <categoria>`: prepara respuesta bulk para aprobacion.
+
+### Seguridad
+Los envios masivos requieren proveedor configurado, permiso explicito de envio, aprobacion humana, rate limits, idempotencia y auditoria. Por defecto el agente genera un plan antes de encolar envios reales.
+
+## 6. Inteligencia Proactiva
 
 El sistema aprende mientras duermes:
 *   **Consolidación Diaria**: Cada medianoche (UTC), el `ingestion-worker` toma todas las memorias del día y genera un resumen ejecutivo.
 *   **Ejecución Manual**: Puedes forzar este proceso con `!run consolidation`.
 
-## 6. Observabilidad
+## 7. Observabilidad
 
 Para desarrolladores y administradores:
 *   **Langfuse**: Rastrea cada llamada al LLM. Útil para depurar por qué el agente tomó una decisión.
 *   **Control API**: `http://localhost:8000/status` para ver la salud del sistema.
 
-## 7. Mejores Prácticas
+## 8. Mejores Prácticas
 *   **Contexto**: Cuanto más uses el sistema, mejor te conocerá gracias a la consolidación de memoria.
 *   **Seguridad**: Nunca desactives las compuertas de aprobación para acciones que involucren APIs externas de escritura.

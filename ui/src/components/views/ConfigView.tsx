@@ -228,6 +228,9 @@ export function ConfigView({ data, onSave }: { data: any, adminToken: string, on
               <Field label="Cliente local bridge URL">
                 <Input name="email_pc_client_bridge_url" defaultValue={integrations.email?.pc_client_bridge_url || ""} placeholder="http://host.docker.internal:8765" className="config-input" />
               </Field>
+              <SecretField label="Cliente local bridge token" active={integrations.email?.has_pc_client_bridge}>
+                <Input name="email_pc_client_bridge_token" type="password" placeholder="Token opcional del bridge local" className="config-input" />
+              </SecretField>
             </SettingsSection>
 
             <SettingsSection icon={Mail} title="IMAP / SMTP" description="Útil para proveedores genéricos o cuentas corporativas sin OAuth dedicado.">
@@ -249,7 +252,7 @@ export function ConfigView({ data, onSave }: { data: any, adminToken: string, on
               <Field label="Templates JSON" hint='Ejemplo: [{"name":"seguimiento","subject":"Re: {{subject}}","body":"Hola {{name}}, gracias por escribirnos...","category":"lead","requires_approval":true}]'>
                 <textarea
                   name="email_templates"
-                  defaultValue={JSON.stringify(data.runtime?.runtime?.email_templates || [], null, 2)}
+                  defaultValue={formatTemplates(data.runtime?.runtime?.email_templates)}
                   className="min-h-[180px] w-full rounded-[8px] border border-neutral-200 bg-white px-3 py-2 font-mono text-xs shadow-sm outline-none focus:border-neutral-400"
                 />
               </Field>
@@ -412,4 +415,10 @@ function ModelUsagePanel({ usage }: { usage: any }) {
       </CardContent>
     </Card>
   );
+}
+
+function formatTemplates(value: any) {
+  if (!value) return "[]";
+  if (typeof value === "string") return value;
+  return JSON.stringify(value, null, 2);
 }

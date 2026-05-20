@@ -3,6 +3,8 @@ import os
 from datetime import date
 from pathlib import Path
 
+import httpx
+
 from app.domain.email.models import EmailMessage, EmailProviderHealth, EmailTemplate
 from app.domain.ports.email import EmailConfigPort, EmailProviderPort
 
@@ -68,6 +70,10 @@ class ConfiguredEmailProvider(EmailProviderPort):
         health = await self.check_health()
         if not health.configured:
             raise RuntimeError(health.detail)
+        runtime = self.config.read()
+        if health.provider == "pc_client":
+            rows = await _pc_client_get(runtime, "/sent", params={"date": day.isoformat()})
+            return [_message_from_dict(row, health.provider, health.account_id) for row in rows]
         raise NotImplementedError(
             "El adapter de proveedor real debe implementar list_sent_on con paginacion, scopes read-only y trazabilidad."
         )
@@ -76,6 +82,10 @@ class ConfiguredEmailProvider(EmailProviderPort):
         health = await self.check_health()
         if not health.configured:
             raise RuntimeError(health.detail)
+        runtime = self.config.read()
+        if health.provider == "pc_client":
+            rows = await _pc_client_get(runtime, "/search", params={"category": category, "limit": str(limit)})
+            return [_message_from_dict(row, health.provider, health.account_id) for row in rows]
         raise NotImplementedError(
             "El adapter de proveedor real debe implementar busqueda por categoria usando reglas guardadas y metadata."
         )
@@ -86,6 +96,24 @@ class ConfiguredEmailProvider(EmailProviderPort):
             raise RuntimeError(health.detail)
         if not health.send_enabled:
             raise RuntimeError("Envio de email desactivado. Activalo en el administrador y usa aprobacion humana.")
+        runtime = self.config.read()
+        if health.provider == "pc_client":
+            return await _pc_client_post(
+                runtime,
+                "/bulk-replies",
+                {
+                    "email_ids": email_ids,
+                    "template": {
+                        "name": template.name,
+                        "subject": template.subject,
+                        "body": template.body,
+                        "category": template.category,
+                        "requires_approval": template.requires_approval,
+                        "rate_limit_per_minute": template.rate_limit_per_minute,
+                    },
+                    "dry_run": dry_run,
+                },
+            )
         return {
             "status": "planned" if dry_run else "queued",
             "email_ids": email_ids,
@@ -115,3 +143,76 @@ def _template_from_dict(data: dict) -> EmailTemplate:
         requires_approval=bool(data.get("requires_approval", True)),
         rate_limit_per_minute=int(data.get("rate_limit_per_minute") or 30),
     )
+
+
+async def _pc_client_get(runtime: dict, path: str, params: dict[str, str]) -> list[dict]:
+    base_url = str(runtime.get("email_pc_client_bridge_url", "")).rstrip("/")
+    headers = _pc_client_headers(runtime)
+    try:
+        async with httpx.AsyncClient(timeout=20) as client:
+            response = await client.get(f"{base_url}{path}", headers=headers, params=params)
+        response.raise_for_status()
+    except httpx.HTTPError as exc:
+        raise RuntimeError(f"Bridge local de email no disponible o respondio error: {exc}") from exc
+    data = response.json()
+    if isinstance(data, dict):
+        return data.get("emails") or data.get("messages") or []
+    return data if isinstance(data, list) else []
+
+
+async def _pc_client_post(runtime: dict, path: str, payload: dict) -> dict:
+    base_url = str(runtime.get("email_pc_client_bridge_url", "")).rstrip("/")
+    headers = _pc_client_headers(runtime)
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.post(f"{base_url}{path}", headers=headers, json=payload)
+        response.raise_for_status()
+    except httpx.HTTPError as exc:
+        raise RuntimeError(f"Bridge local de email no disponible o respondio error: {exc}") from exc
+    data = response.json()
+    return data if isinstance(data, dict) else {"status": "accepted", "result": data}
+
+
+def _pc_client_headers(runtime: dict) -> dict[str, str]:
+    token = runtime.get("email_pc_client_bridge_token")
+    headers = {"Content-Type": "application/json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    return headers
+
+
+def _message_from_dict(row: dict, provider: str, account_id: str | None) -> EmailMessage:
+    sent_at = row.get("sent_at") or row.get("date") or row.get("created_at")
+    return EmailMessage(
+        id=str(row.get("id") or row.get("message_id")),
+        provider=str(row.get("provider") or provider),
+        account_id=str(row.get("account_id") or account_id or ""),
+        subject=str(row.get("subject") or ""),
+        sender=str(row.get("sender") or row.get("from") or ""),
+        recipients=_as_list(row.get("recipients") or row.get("to")),
+        sent_at=_parse_datetime(sent_at),
+        snippet=str(row.get("snippet") or ""),
+        labels=_as_list(row.get("labels")),
+        metadata=dict(row.get("metadata") or {}),
+    )
+
+
+def _parse_datetime(value: str | None):
+    from datetime import datetime, timezone
+
+    if not value:
+        return datetime.now(timezone.utc)
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return datetime.now(timezone.utc)
+
+
+def _as_list(value) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return [str(item) for item in value]
+    if isinstance(value, str):
+        return [item.strip() for item in value.split(",") if item.strip()]
+    return [str(value)]

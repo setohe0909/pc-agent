@@ -36,14 +36,15 @@ humano sobre decisiones de alto impacto.
 ## Capacidades
 
 - Bot de Discord con comandos, hilos por subagente, embeds, botones y flujos de aprobacion.
-- Runtime de IA en FastAPI con acciones `chat`, `research`, `trade_decision`, `marketing`, `writer`, `picture` y `coder-web`.
+- Runtime de IA en FastAPI con acciones `chat`, `research`, `trade_decision`, `marketing`, `writer`, `picture`, `coder-web` y `email`.
 - Grafo de marketing con LangGraph: contexto, vision, deteccion de intencion, critica, refinamiento de voz y aprobacion humana.
 - Subagente Writer con salida a Obsidian para blogs y storytelling.
 - Subagente Picture con memoria visual y soporte de imagenes adjuntas.
 - Subagente Coder Web para crear o ajustar e-commerce y experiencias React/TS.
+- Subagente Email para proveedores Google, Outlook, IMAP/SMTP, clientes locales y respuestas bulk aprobadas.
 - Control API para estado del sistema, configuracion runtime, fuentes de conocimiento, ingestas y memoria diaria.
 - Ingestion worker con scheduler, embeddings locales via Ollama y persistencia en Supabase/pgvector.
-- Memoria proactiva por contexto: general, marketing, picture y coder-web.
+- Memoria proactiva por contexto: general, marketing, picture, coder-web y email.
 - Observabilidad opcional con Langfuse.
 - Stack local completo con Docker Compose.
 
@@ -89,7 +90,7 @@ flowchart TD
 | Servicio | Puerto | Descripcion |
 | --- | ---: | --- |
 | `control-api` | `8000` | Plano de control: health checks, configuracion, fuentes, ingestas y memoria. |
-| `assistant-runtime` | `8100` | Cerebro multiagente: trading, marketing, writer, picture y coder-web. |
+| `assistant-runtime` | `8100` | Cerebro multiagente: trading, marketing, writer, picture, coder-web y email. |
 | `discord-bot` | `-` | Interfaz principal de operaciones, aprobaciones y conversaciones en hilos. |
 | `ingestion-worker` | interno `8000` | Scheduler y ejecuciones manuales de ingesta, tendencias y consolidacion. |
 | `ui` | `8080` | Consola administrativa React servida por Nginx. |
@@ -202,6 +203,7 @@ bot infiere el agente desde el nombre del hilo.
 | --- | --- |
 | `!help` | Muestra la guia operativa del bot. |
 | `!help marketer` | Muestra solo comandos de `!marketer`, incluyendo `--source zernio` y `--account`. |
+| `!help email` | Muestra comandos y reglas de seguridad de `!email`. |
 | `!status` | Estado de servicios desde Control API. |
 | `!ask <duda>` | Pregunta rapida al asistente. |
 | `!research <tema>` | Investigacion profunda. |
@@ -316,6 +318,23 @@ Ejemplos rapidos:
 
 El comando acepta mockups o referencias visuales adjuntas.
 
+### Email
+
+| Comando | Uso |
+| --- | --- |
+| `!email` / `!email status` | Estado del proveedor, lectura, envio y templates configurados. |
+| `!email sent-today` | Lista emails enviados el mismo dia desde el proveedor configurado. |
+| `!email categorize <categoria>` | Prepara categorizacion por filtros/categoria. |
+| `!email --template-<nombre> <categoria>` | Prepara respuestas bulk usando un template del administrador. |
+| `!email --model-status` | Muestra modelos conectados para clasificacion, resumen y templates. |
+
+El sub-agente `!email` usa arquitectura hexagonal: el nucleo solo conoce
+casos de uso y puertos; Google, Outlook, IMAP/SMTP, cliente local de PC u otros
+proveedores viven como adaptadores. Los envios bulk requieren configuracion en
+Admin UI, permiso explicito de envio, limites por minuto, auditoria e
+idempotencia. Por defecto se genera un plan de aprobacion antes de encolar
+envios.
+
 ### Estado de modelos
 
 Los comandos `--model-status` no llaman a los proveedores externos ni consumen
@@ -330,6 +349,7 @@ Ejemplos:
 !claw --model-status
 !writer --model-status
 !coder-web --model-status
+!email --model-status
 ```
 
 Si ves un error `422 Unprocessable Entity` al ejecutar uno de estos comandos,
@@ -476,6 +496,7 @@ python3 services/discord-bot/test_marketer_approval.py
 - [Picture subagent](docs/picture-subagent.md)
 - [Writer subagent](docs/writer-subagent.md)
 - [Coder web subagent](docs/coder-web-subagent.md)
+- [Email subagent](docs/email-subagent.md)
 - [Docker commands](docker-commands.md)
 
 ## Roadmap
