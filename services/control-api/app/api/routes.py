@@ -17,6 +17,7 @@ from app.adapters.whatsapp.repository import SupabaseWhatsAppOutreachRepository
 from app.application.use_cases import (
     CheckSystemStatus,
     CreateWhatsAppCampaign,
+    DecideWhatsAppCampaign,
     GetIngestionSchedule,
     ListWhatsAppCampaigns,
     ListWhatsAppContacts,
@@ -91,6 +92,11 @@ class WhatsAppCampaignRequest(BaseModel):
     target_tag: str | None = Field(default=None, max_length=80)
     scheduled_for: datetime | None = None
     metadata: dict = Field(default_factory=dict)
+
+
+class WhatsAppCampaignDecisionRequest(BaseModel):
+    approved: bool
+    decided_by: str = Field(min_length=1, max_length=120)
 
 
 @router.get("/health")
@@ -422,6 +428,22 @@ async def create_whatsapp_campaign(request: WhatsAppCampaignRequest) -> dict:
     try:
         saved = await CreateWhatsAppCampaign(repository).execute(campaign)
         return {"campaign": saved}
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+
+
+@router.post("/marketing/whatsapp/campaigns/{campaign_id}/decision", dependencies=[Depends(require_admin)])
+async def decide_whatsapp_campaign(campaign_id: str, request: WhatsAppCampaignDecisionRequest) -> dict:
+    repository = _whatsapp_outreach_repository()
+    try:
+        campaign = await DecideWhatsAppCampaign(repository).execute(
+            campaign_id=campaign_id,
+            approved=request.approved,
+            decided_by=request.decided_by,
+        )
+        return {"campaign": campaign}
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except Exception as exc:

@@ -12,6 +12,7 @@ OpenWA es viable como adapter externo porque ofrece REST API, multi-session, web
 - Supabase: tablas `whatsapp_contacts` y `whatsapp_campaigns` con RLS de service role.
 - Control API: endpoints `/marketing/whatsapp`, `/marketing/whatsapp/contacts` y `/marketing/whatsapp/campaigns`.
 - Marketer: `!marketer whatsapp` consulta contactos/campanas y resume el estado.
+- Discord: `!marketer whatsapp send <campaign_id>` muestra botones de aprobar/denegar y solo marca la campana como `queued` si un aprobador confirma.
 - OpenWA gateway: adapter HTTP preparado para `send-text`, sin envio masivo automatico.
 
 ## Guardrails

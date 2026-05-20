@@ -54,6 +54,13 @@ const navItems = [
   { value: "wiki", label: "Wiki / Ayuda", icon: BookOpen, group: "docs" },
 ] as const;
 
+const navGroups: Record<(typeof navItems)[number]["group"], string> = {
+  main: "Workspace",
+  agents: "Agentes",
+  ops: "Operación",
+  docs: "Sistema",
+};
+
 const tabTitles: Record<string, { title: string; subtitle: string }> = {
   overview: {
     title: "PC Agent Operations Dashboard",
@@ -246,87 +253,106 @@ export default function App() {
   const healthy = services.filter((service) => service.state === "healthy").length;
 
   return (
-    <div className="min-h-screen bg-[#dff2fb] text-slate-950">
-      <div className="min-h-screen bg-[#eaf6fc]">
+    <div className="min-h-screen bg-[#101010] text-neutral-950">
+      <div className="min-h-screen bg-[#f7f7f6]">
         <Tabs value={activeTab} onValueChange={setActiveTab} orientation="vertical" className="min-h-screen w-full flex-row gap-0">
-          <aside className="fixed inset-y-0 left-0 z-20 flex w-[92px] flex-col items-center border-r border-[#cfe1ec] bg-[#f8fcff] px-3 py-5 shadow-[10px_0_28px_rgba(68,112,143,0.08)]">
-            <div className="mb-7 flex size-[58px] shrink-0 items-center justify-center rounded-[8px] bg-white shadow-[0_8px_18px_rgba(45,93,126,0.12)] ring-1 ring-[#d4e5ef]">
-              <img src="/pc-agent-logo.png" alt="PC Agent" className="size-[42px] object-contain" />
+          <aside className="fixed inset-y-0 left-0 z-20 flex w-[72px] flex-col border-r border-white/10 bg-[#171717] px-2 py-3 text-neutral-300 shadow-[14px_0_32px_rgba(0,0,0,0.18)] md:w-[248px] md:px-3">
+            <div className="mb-3 flex h-11 items-center justify-center gap-3 rounded-[8px] px-0 md:justify-start md:px-2">
+              <div className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-[6px] bg-black ring-1 ring-white/10">
+                <img src="/pc-agent-logo.png" alt="PC Agent" className="size-7 object-contain" />
+              </div>
+              <div className="hidden min-w-0 md:block">
+                <p className="truncate text-sm font-semibold leading-5 text-white">PC Agent</p>
+                <p className="truncate text-xs leading-4 text-neutral-500">Control Plane</p>
+              </div>
             </div>
 
-            <TabsList className="h-auto w-full flex-1 items-center justify-start gap-2 overflow-y-auto bg-transparent p-0 text-[#748394] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <TabsList className="h-auto w-full flex-1 flex-col items-stretch justify-start gap-0 overflow-y-auto bg-transparent p-0 text-neutral-400 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {navItems.map((item, index) => {
                 const Icon = item.icon;
                 const previous = navItems[index - 1];
-                const startsGroup = previous && previous.group !== item.group;
+                const startsGroup = !previous || previous.group !== item.group;
 
                 return (
                   <div key={item.value} className="w-full">
-                    {startsGroup ? <div className="mx-auto my-3 h-px w-8 bg-[#cfdeea]" /> : null}
+                    {startsGroup ? (
+                      <div className={index === 0 ? "hidden px-2 pb-1 pt-2 md:block" : "hidden px-2 pb-1 pt-5 md:block"}>
+                        <p className="text-[11px] font-medium uppercase leading-4 tracking-[0.08em] text-neutral-600">
+                          {navGroups[item.group]}
+                        </p>
+                      </div>
+                    ) : null}
                     <TabsTrigger
                       value={item.value}
                       title={item.label}
                       aria-label={item.label}
-                      className="relative mx-auto !flex !size-11 !flex-none !grow-0 !basis-auto items-center justify-center rounded-[8px] border border-transparent bg-transparent p-0 text-[#8192a3] shadow-none transition-all before:absolute before:left-[-13px] before:top-1/2 before:h-6 before:w-[5px] before:-translate-y-1/2 before:rounded-full before:bg-transparent hover:border-[#d4e5ef] hover:bg-white hover:text-[#27384d] hover:shadow-[0_6px_14px_rgba(45,93,126,0.08)] data-active:!border-[#bee1f6] data-active:!bg-[#e8f6ff] data-active:!text-[#1688d8] data-active:shadow-[0_8px_18px_rgba(45,120,174,0.14)] data-active:before:bg-[#1688d8] [&_svg]:!size-[22px] [&_svg]:stroke-[2.2]"
+                      className="relative mb-0.5 !flex h-9 w-full !flex-none !grow-0 !basis-auto items-center justify-center gap-2.5 rounded-[6px] border border-transparent bg-transparent px-0 py-0 text-sm font-medium text-neutral-400 shadow-none transition-colors before:absolute before:left-0 before:top-1/2 before:h-4 before:w-[2px] before:-translate-y-1/2 before:rounded-full before:bg-transparent hover:bg-white/[0.06] hover:text-neutral-100 data-active:!border-white/10 data-active:!bg-white/[0.08] data-active:!text-white data-active:before:bg-[#3ecf8e] md:justify-start md:px-2.5 [&_svg]:!size-4 [&_svg]:shrink-0 [&_svg]:stroke-[2]"
                     >
-                      <Icon className="size-[22px]" />
+                      <Icon className="size-4" />
+                      <span className="hidden truncate md:inline">{item.label}</span>
                     </TabsTrigger>
                   </div>
                 );
               })}
             </TabsList>
 
-            <div className="mt-4 flex flex-col items-center gap-3">
-              <div className="h-px w-8 bg-[#cfdeea]" />
-              <Button variant="ghost" size="icon" onClick={refresh} title="Refrescar" aria-label="Refrescar" className="size-11 rounded-[8px] text-[#65778d] hover:bg-white hover:text-[#26394d] hover:shadow-[0_6px_14px_rgba(45,93,126,0.08)]">
-                <RefreshCw className="size-[22px]" />
+            <div className="mt-3 border-t border-white/10 pt-3">
+              <Button variant="ghost" onClick={refresh} title="Refrescar" aria-label="Refrescar" className="h-9 w-full justify-center gap-2 rounded-[6px] px-0 text-sm font-medium text-neutral-400 hover:bg-white/[0.06] hover:text-neutral-100 md:justify-start md:px-2.5">
+                <RefreshCw className="size-4" />
+                <span className="hidden md:inline">Refrescar</span>
               </Button>
-              <div className="flex size-11 items-center justify-center rounded-[8px] bg-white text-[#65778d] shadow-sm ring-1 ring-[#d4e5ef]" title="Perfil">
-                <UserCircle className="size-[22px]" />
+              <div className="mt-2 flex h-10 items-center justify-center gap-2 rounded-[6px] px-0 text-neutral-300 md:justify-start md:px-2" title="Perfil">
+                <div className="flex size-7 items-center justify-center rounded-full bg-neutral-800 ring-1 ring-white/10">
+                  <UserCircle className="size-4" />
+                </div>
+                <div className="hidden min-w-0 md:block">
+                  <p className="truncate text-sm font-medium leading-4 text-neutral-200">Admin</p>
+                  <p className="truncate text-xs leading-4 text-neutral-500">Local session</p>
+                </div>
               </div>
             </div>
           </aside>
 
-          <main className="min-h-screen min-w-0 flex-1 pl-[92px]">
-            <div className="min-h-screen bg-[#eaf6fc]">
-              <header className="w-full border-b border-white/70 bg-[#dceffb]/80 px-5 py-6 backdrop-blur sm:px-8 lg:px-12">
+          <main className="min-h-screen min-w-0 flex-1 pl-[72px] md:pl-[248px]">
+            <div className="min-h-screen bg-[#f7f7f6]">
+              <header className="w-full border-b border-neutral-200 bg-white/90 px-5 py-5 backdrop-blur sm:px-8 lg:px-10">
                 <div className="flex w-full flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
                   <div className="max-w-4xl">
-                    <div className="mb-3 flex items-center gap-3">
-                      <span className="inline-flex items-center gap-2 rounded-full bg-white/70 px-3 py-1 text-xs font-medium text-slate-600 ring-1 ring-slate-200/80">
-                        <ShieldCheck className="size-3.5 text-[#159947]" />
+                    <div className="mb-3 flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center gap-2 rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-medium text-neutral-600 ring-1 ring-neutral-200">
+                        <ShieldCheck className="size-3.5 text-[#2eb67d]" />
                         Control Panel v0.6.0
                       </span>
-                      <span className="inline-flex items-center gap-2 rounded-full bg-white/70 px-3 py-1 text-xs font-medium text-slate-600 ring-1 ring-slate-200/80">
-                        <Activity className="size-3.5 text-[#58aee9]" />
+                      <span className="inline-flex items-center gap-2 rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-medium text-neutral-600 ring-1 ring-neutral-200">
+                        <Activity className="size-3.5 text-[#2eb67d]" />
                         {healthy}/{services.length || 0} servicios healthy
                       </span>
                     </div>
-                    <h1 className="text-3xl font-semibold tracking-normal text-slate-950 sm:text-4xl">
+                    <h1 className="text-2xl font-semibold tracking-normal text-neutral-950 sm:text-3xl">
                       {activeTitle.title}
                     </h1>
-                    <p className="mt-3 max-w-3xl text-base text-slate-600">
+                    <p className="mt-2 max-w-3xl text-sm leading-6 text-neutral-600">
                       {activeTitle.subtitle}
                     </p>
                   </div>
 
-                  <div className="w-full max-w-md rounded-2xl border border-white/80 bg-white/70 p-3 shadow-sm lg:w-[360px]">
+                  <div className="w-full max-w-md rounded-[8px] border border-neutral-200 bg-white p-3 shadow-sm lg:w-[360px]">
                     <div className="mb-2 flex items-center justify-between gap-3">
-                      <span className="text-xs font-medium text-slate-500">Admin Token</span>
-                      <Zap className="size-4 text-[#58aee9]" />
+                      <span className="text-xs font-medium text-neutral-500">Admin Token</span>
+                      <Zap className="size-4 text-[#2eb67d]" />
                     </div>
                     <Input
                       type="password"
                       placeholder="Token secreto..."
                       value={adminToken}
                       onChange={e => setAdminToken(e.target.value)}
-                      className="h-10 border-slate-200 bg-white text-sm shadow-none"
+                      className="h-9 border-neutral-200 bg-white text-sm shadow-none"
                     />
                   </div>
                 </div>
               </header>
 
-              <div className="w-full px-5 py-7 sm:px-8 lg:px-12">
+              <div className="w-full px-5 py-6 sm:px-8 lg:px-10">
                 <div className="w-full">
                   {renderContent()}
                 </div>

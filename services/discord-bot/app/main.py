@@ -93,6 +93,23 @@ def _extract_account_flag(raw_query: str) -> tuple[str, str | None]:
     return cleaned, account_id
 
 
+async def _decide_whatsapp_campaign(campaign_id: str, approved: bool, decided_by: str) -> dict:
+    base_url = _get_env("CONTROL_API_URL", "http://control-api:8000").rstrip("/")
+    token = _get_env("ADMIN_API_TOKEN", "")
+    async with httpx.AsyncClient(timeout=15) as client_http:
+        response = await client_http.post(
+            f"{base_url}/marketing/whatsapp/campaigns/{campaign_id}/decision",
+            headers={"x-admin-token": token},
+            json={"approved": approved, "decided_by": decided_by},
+        )
+    try:
+        response.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        detail = response.text[:800] if response.text else str(exc)
+        raise RuntimeError(f"Control API HTTP {response.status_code}: {detail}") from exc
+    return response.json()
+
+
 async def main() -> None:
     token = None
     while not token:
@@ -218,6 +235,55 @@ async def main() -> None:
         @discord.ui.button(label="❌ Cancelar", style=discord.ButtonStyle.secondary)
         async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
             await interaction.message.edit(content="🚫 Acción cancelada. La memoria sigue intacta.", view=None)
+
+    class WhatsAppCampaignApprovalView(View):
+        def __init__(self, campaign_id: str, message_author):
+            super().__init__(timeout=180)
+            self.campaign_id = campaign_id
+            self.message_author = message_author
+
+        def _can_approve(self, user_id: int) -> bool:
+            approvers = _approvers()
+            if approvers:
+                return str(user_id) in approvers
+            return str(user_id) == str(self.message_author.id)
+
+        @discord.ui.button(label="✅ Aprobar WhatsApp", style=discord.ButtonStyle.green)
+        async def approve(self, interaction: discord.Interaction, button: discord.ui.Button):
+            if not self._can_approve(interaction.user.id):
+                await interaction.response.send_message("No estás autorizado como aprobador.", ephemeral=True)
+                return
+            await interaction.response.edit_message(content="⏳ Aprobando campaña WhatsApp...", embed=None, view=None)
+            try:
+                result = await _decide_whatsapp_campaign(self.campaign_id, True, str(interaction.user.id))
+                campaign = result.get("campaign", {})
+                await interaction.message.edit(
+                    content=(
+                        f"✅ Campaña WhatsApp `{campaign.get('name', self.campaign_id)}` aprobada "
+                        f"y marcada como `{campaign.get('status', 'queued')}`."
+                    ),
+                    embed=None,
+                    view=None,
+                )
+            except Exception as exc:
+                await interaction.message.edit(content=f"❌ No pude aprobar la campaña: {exc}", embed=None, view=None)
+
+        @discord.ui.button(label="❌ Denegar", style=discord.ButtonStyle.red)
+        async def deny(self, interaction: discord.Interaction, button: discord.ui.Button):
+            if not self._can_approve(interaction.user.id):
+                await interaction.response.send_message("No estás autorizado como aprobador.", ephemeral=True)
+                return
+            await interaction.response.edit_message(content="⏳ Denegando campaña WhatsApp...", embed=None, view=None)
+            try:
+                result = await _decide_whatsapp_campaign(self.campaign_id, False, str(interaction.user.id))
+                campaign = result.get("campaign", {})
+                await interaction.message.edit(
+                    content=f"🚫 Campaña WhatsApp `{campaign.get('name', self.campaign_id)}` denegada.",
+                    embed=None,
+                    view=None,
+                )
+            except Exception as exc:
+                await interaction.message.edit(content=f"❌ No pude denegar la campaña: {exc}", embed=None, view=None)
 
     intents = discord.Intents.default()
     intents.message_content = True
@@ -547,12 +613,12 @@ async def main() -> None:
             )
             embed.add_field(
                 name="📣 Marketing Datos",
-                value="`!marketer-status`: Estado del marketer.\n`!marketer dashboard`: Dashboard visual Zernio.\n`!marketer top-content`: Mejores contenidos.\n`!marketer audience`: Audiencia y segmentos.\n`!marketer alerts`: Alertas de crecimiento.\n`!marketer comments`: Comentarios recientes desde memoria operativa.\n`!marketer leads`: Leads detectados.\n`!marketer best-hours`: Mejores horarios.",
+                value="`!marketer-status`: Estado del marketer.\n`!marketer dashboard`: Dashboard visual Zernio.\n`!marketer top-content`: Mejores contenidos.\n`!marketer audience`: Audiencia y segmentos.\n`!marketer alerts`: Alertas de crecimiento.\n`!marketer comments`: Comentarios recientes desde memoria operativa.\n`!marketer leads`: Leads detectados.\n`!marketer whatsapp`: CRM/campañas WhatsApp.\n`!marketer best-hours`: Mejores horarios.",
                 inline=False
             )
             embed.add_field(
                 name="📣 Marketing Acciones",
-                value="`!marketer campaign <objetivo>`: Campaña asistida.\n`!marketer posts <tema>`: Borradores de posts.\n`!marketer reply-drafts`: Borradores para aprobación.\n`!marketer content-plan`: Calendario con métricas.\n`!marketer repurpose`: Reutilizar contenido ganador.\n`!marketer respond`: Borradores de respuesta.\n`!marketer qualify`: Detectar leads calientes.\n`!marketer magnet`: Lead Magnets (DM).\n`!marketer trends`: Buscar tendencias virales.\n`!marketer sentiment`: Análisis de sentimiento/crisis.\n`!marketer funnel <tema>`: Diseñar embudo.",
+                value="`!marketer campaign <objetivo>`: Campaña asistida.\n`!marketer posts <tema>`: Borradores de posts.\n`!marketer whatsapp send <campaign_id>`: Pedir aprobación por botones para una campaña WhatsApp.\n`!marketer reply-drafts`: Borradores para aprobación.\n`!marketer content-plan`: Calendario con métricas.\n`!marketer repurpose`: Reutilizar contenido ganador.\n`!marketer respond`: Borradores de respuesta.\n`!marketer qualify`: Detectar leads calientes.\n`!marketer magnet`: Lead Magnets (DM).\n`!marketer trends`: Buscar tendencias virales.\n`!marketer sentiment`: Análisis de sentimiento/crisis.\n`!marketer funnel <tema>`: Diseñar embudo.",
                 inline=False
             )
             embed.add_field(
@@ -894,6 +960,31 @@ async def main() -> None:
             elif raw_query.startswith("leads"):
                 sub_command = "leads"
                 prompt = "ver leads"
+            elif raw_query.startswith("whatsapp send "):
+                campaign_id = raw_query.removeprefix("whatsapp send ").strip()
+                if not campaign_id:
+                    await message.reply("⚠️ Usa `!marketer whatsapp send <campaign_id>`.")
+                    return
+                embed = discord.Embed(
+                    title="⚖️ Aprobación WhatsApp requerida",
+                    description=(
+                        f"¿Aprobar la campaña WhatsApp `{campaign_id}`?\n\n"
+                        "Si apruebas, quedará marcada como `queued`. El envío real debe ejecutarse "
+                        "por el worker OpenWA con rate limits, opt-out y auditoría."
+                    ),
+                    color=discord.Color.orange(),
+                )
+                try:
+                    await message.reply(embed=embed, view=WhatsAppCampaignApprovalView(campaign_id, message.author))
+                except discord.Forbidden:
+                    await message.reply(
+                        "❌ No tengo permisos para enviar botones en este canal. "
+                        "Revisa permisos de `Send Messages`, `Use Application Commands`, `Embed Links` y `Create Public Threads`."
+                    )
+                return
+            elif raw_query.startswith("whatsapp"):
+                sub_command = "whatsapp"
+                prompt = "ver whatsapp outreach"
             elif raw_query.startswith("content-plan"):
                 sub_command = "content-plan"
                 prompt = raw_query.removeprefix("content-plan").strip() or "7 días"

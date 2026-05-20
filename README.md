@@ -243,6 +243,7 @@ bot infiere el agente desde el nombre del hilo.
 | `!marketer posts <tema>` | Genera cola de posts. |
 | `!marketer approve-posts [texto]` | Ejecuta posts aprobados. |
 | `!marketer post <texto> --platform <instagram\|tiktok> --account <id> --schedule "fecha"` | Publica o programa contenido. |
+| `!marketer whatsapp send <campaign_id>` | Solicita aprobacion humana por botones para poner una campana WhatsApp en cola. |
 | `!marketer reply-drafts` | Prepara borradores de respuestas. |
 | `!marketer respond` | Responde comentarios. |
 | `!marketer qualify` | Cualifica leads calientes. |

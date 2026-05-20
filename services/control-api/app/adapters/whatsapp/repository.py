@@ -1,4 +1,5 @@
 from datetime import datetime
+from datetime import timezone
 
 import httpx
 
@@ -71,6 +72,31 @@ class SupabaseWhatsAppOutreachRepository(WhatsAppOutreachRepository):
             response = await client.post(f"{self.url}/rest/v1/whatsapp_campaigns", headers=headers, json=payload)
         response.raise_for_status()
         return self._campaign_from_row(response.json()[0])
+
+    async def decide_campaign(self, campaign_id: str, approved: bool, decided_by: str) -> WhatsAppCampaign:
+        status = "queued" if approved else "cancelled"
+        payload = {
+            "status": status,
+            "metadata": {
+                "decision": "approved" if approved else "denied",
+                "decided_by": decided_by,
+                "decided_at": datetime.now(timezone.utc).isoformat(),
+                "requires_approval": False,
+            },
+        }
+        headers = {**self._headers(), "Prefer": "return=representation"}
+        async with httpx.AsyncClient(timeout=8) as client:
+            response = await client.patch(
+                f"{self.url}/rest/v1/whatsapp_campaigns",
+                headers=headers,
+                params={"id": f"eq.{campaign_id}"},
+                json=payload,
+            )
+        response.raise_for_status()
+        rows = response.json()
+        if not rows:
+            raise RuntimeError("Campana WhatsApp no encontrada.")
+        return self._campaign_from_row(rows[0])
 
     async def count_opted_in_recipients(self, target_tag: str | None = None) -> int:
         params = {"select": "id", "consent_status": "eq.opted_in"}

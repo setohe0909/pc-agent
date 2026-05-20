@@ -125,6 +125,18 @@ class CreateWhatsAppCampaign:
         return await self.repository.create_campaign(draft)
 
 
+class DecideWhatsAppCampaign:
+    def __init__(self, repository: WhatsAppOutreachRepository) -> None:
+        self.repository = repository
+
+    async def execute(self, campaign_id: str, approved: bool, decided_by: str) -> WhatsAppCampaign:
+        if not campaign_id:
+            raise ValueError("campaign_id requerido.")
+        if not decided_by:
+            raise ValueError("decided_by requerido.")
+        return await self.repository.decide_campaign(campaign_id, approved, decided_by)
+
+
 class VerifySupabaseVectorStore:
     def __init__(self, knowledge_base: VectorKnowledgeBase) -> None:
         self.knowledge_base = knowledge_base

@@ -62,6 +62,9 @@ class WhatsAppOutreachRepository(Protocol):
     async def create_campaign(self, campaign: WhatsAppCampaign) -> WhatsAppCampaign:
         ...
 
+    async def decide_campaign(self, campaign_id: str, approved: bool, decided_by: str) -> WhatsAppCampaign:
+        ...
+
     async def count_opted_in_recipients(self, target_tag: str | None = None) -> int:
         ...
 

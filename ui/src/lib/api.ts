@@ -73,3 +73,13 @@ export async function createWhatsAppCampaign(payload: any, adminToken: string) {
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   return response.json();
 }
+
+export async function decideWhatsAppCampaign(campaignId: string, payload: any, adminToken: string) {
+  const response = await fetch(`${API_BASE}/marketing/whatsapp/campaigns/${campaignId}/decision`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Admin-Token": adminToken },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return response.json();
+}
