@@ -350,9 +350,9 @@ async def trigger_ingestion_run(request: TriggerIngestionRequest) -> dict:
 
 
 @router.get("/intelligence/memory/today")
-async def get_today_intelligence(context: str | None = None):
+async def get_today_intelligence(context: str | None = None, limit: int = 50):
     try:
-        memory = await ListMemoryFragments(_mentis_memory_repository()).execute(context=context, limit=50)
+        memory = await ListMemoryFragments(_mentis_memory_repository()).execute(context=context, limit=limit)
         return {"memory": memory}
     except Exception as exc:
         return {"memory": [], "detail": str(exc)}

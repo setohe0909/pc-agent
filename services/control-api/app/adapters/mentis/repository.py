@@ -79,7 +79,10 @@ class SupabaseMentisMemoryRepository(MemoryRepository):
             "order": "created_at.desc",
             "limit": str(min(max(limit, 1), 200)),
         }
-        endpoint = f"{self.url}/rest/v1/mentis_memory?{self._context_filter(context)}"
+        context_filter = self._context_filter(context)
+        endpoint = f"{self.url}/rest/v1/mentis_memory"
+        if context_filter:
+            endpoint = f"{endpoint}?{context_filter}"
         async with httpx.AsyncClient(timeout=8) as client:
             response = await client.get(endpoint, headers=self._headers(use_service_role=True), params=params)
         response.raise_for_status()
@@ -132,13 +135,17 @@ class SupabaseMentisMemoryRepository(MemoryRepository):
 
     @staticmethod
     def _context_filter(context: str | None) -> str:
+        if context == "all":
+            return ""
         if context == "marketer":
-            return "category=ilike.marketing_*"
+            return "category=ilike.marketing*"
+        if context == "writer":
+            return "category=ilike.writer*"
         if context == "picture":
-            return "category=ilike.picture_*"
+            return "category=ilike.picture*"
         if context == "coder-web":
-            return "category=ilike.coder-web_*"
-        return "category=not.ilike.marketing_*,category=not.ilike.picture_*,category=not.ilike.coder-web_*"
+            return "category=ilike.coder-web*"
+        return "category=not.ilike.marketing*,category=not.ilike.writer*,category=not.ilike.picture*,category=not.ilike.coder-web*"
 
     @staticmethod
     def _fragment_from_row(row: dict) -> MemoryFragment:
