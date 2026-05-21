@@ -1,45 +1,41 @@
-import { AlertTriangle, Brain, CheckCircle2, Database, Network, ShieldCheck } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import type { ReactNode } from "react";
+import type { LucideIcon } from "lucide-react";
+import { AlertTriangle, Brain, CheckCircle2, Database, Network, ShieldCheck, Sparkles, Timer } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 function StateBadge({ state }: { state: string }) {
-  const variant = state === "healthy" ? "default" : state === "offline" ? "destructive" : "secondary";
   const tone = state === "healthy"
-    ? "bg-[#159947] text-white"
+    ? "bg-emerald-50 text-emerald-700 ring-emerald-100"
     : state === "offline"
-      ? "bg-red-100 text-red-700"
-      : "bg-amber-100 text-amber-700";
+      ? "bg-red-50 text-red-700 ring-red-100"
+      : "bg-amber-50 text-amber-700 ring-amber-100";
 
-  return <Badge variant={variant} className={`rounded-[4px] px-2 uppercase text-[10px] ${tone}`}>{state}</Badge>;
+  return <Badge className={`rounded-full px-2.5 py-1 text-[10px] uppercase ring-1 hover:bg-inherit ${tone}`}>{state}</Badge>;
 }
 
 function MiniLineChart({ values }: { values: number[] }) {
   const width = 340;
-  const height = 110;
+  const height = 96;
   const max = Math.max(...values);
   const min = Math.min(...values);
   const range = Math.max(max - min, 1);
   const points = values.map((value, index) => {
     const x = (index / (values.length - 1)) * width;
-    const y = height - ((value - min) / range) * 64 - 24;
+    const y = height - ((value - min) / range) * 54 - 20;
     return `${x},${y}`;
   }).join(" ");
 
   return (
-    <div className="mt-5 h-[120px] w-full overflow-hidden">
+    <div className="mt-5 h-[105px] w-full overflow-hidden">
       <svg viewBox={`0 0 ${width} ${height}`} className="h-full w-full" role="img" aria-label="Tendencia semanal">
-        <g stroke="#d7e0e6" strokeDasharray="4 4" strokeWidth="1">
+        <g stroke="#e5e7eb" strokeDasharray="4 4" strokeWidth="1">
           <line x1="0" y1="22" x2={width} y2="22" />
-          <line x1="0" y1="58" x2={width} y2="58" />
-          <line x1="0" y1="94" x2={width} y2="94" />
+          <line x1="0" y1="54" x2={width} y2="54" />
+          <line x1="0" y1="86" x2={width} y2="86" />
         </g>
-        <g stroke="#e8eef2" strokeWidth="1">
-          {[0, 1, 2, 3, 4, 5, 6].map((tick) => (
-            <line key={tick} x1={(tick / 6) * width} y1="12" x2={(tick / 6) * width} y2="98" />
-          ))}
-        </g>
-        <polyline points={points} fill="none" stroke="#4a9bd0" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-        <line x1="0" y1="98" x2={width} y2="98" stroke="#8b969f" strokeWidth="2" />
+        <polyline points={points} fill="none" stroke="#168a5b" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+        <line x1="0" y1="88" x2={width} y2="88" stroke="#d4d4d4" strokeWidth="1.5" />
       </svg>
     </div>
   );
@@ -52,22 +48,22 @@ function ConfidenceDial({ value }: { value: number }) {
 
   return (
     <div className="mt-5 flex justify-center">
-      <div className="relative size-40">
+      <div className="relative size-36">
         <svg viewBox="0 0 120 120" className="size-full -rotate-90">
-          <circle cx="60" cy="60" r={radius} fill="none" stroke="#e4e9ec" strokeWidth="12" />
+          <circle cx="60" cy="60" r={radius} fill="none" stroke="#e5e7eb" strokeWidth="12" />
           <circle
             cx="60"
             cy="60"
             r={radius}
             fill="none"
-            stroke="#1688d8"
+            stroke="#168a5b"
             strokeLinecap="round"
             strokeWidth="12"
             strokeDasharray={circumference}
             strokeDashoffset={offset}
           />
         </svg>
-        <div className="absolute inset-0 flex items-center justify-center text-3xl font-medium text-slate-950">
+        <div className="absolute inset-0 flex items-center justify-center text-2xl font-semibold text-neutral-950">
           {value.toFixed(2)}
         </div>
       </div>
@@ -75,27 +71,38 @@ function ConfidenceDial({ value }: { value: number }) {
   );
 }
 
-function MetricCard({
-  title,
-  value,
-  detail,
-  chart,
-}: {
-  title: string;
-  value: string;
-  detail: string;
-  chart: "line" | "dial";
-}) {
+function MetricCard({ title, value, detail, chart }: { title: string; value: string; detail: string; chart: "line" | "dial" }) {
   return (
-    <Card className="rounded-[8px] border-white/80 bg-white py-0 shadow-sm ring-1 ring-slate-200/70">
-      <CardHeader className="p-6 pb-2">
-        <CardDescription className="text-base font-medium text-slate-700">{title}</CardDescription>
-        <CardTitle className="mt-3 text-4xl font-medium text-slate-950">{value}</CardTitle>
-        <p className="text-sm text-slate-500">{detail}</p>
+    <Card className="rounded-[10px] border-neutral-200 bg-white shadow-sm">
+      <CardHeader className="border-b border-neutral-200 px-5 py-4">
+        <CardDescription className="text-sm font-medium text-neutral-500">{title}</CardDescription>
+        <CardTitle className="mt-2 text-4xl font-semibold tracking-tight text-neutral-950">{value}</CardTitle>
+        <p className="text-sm leading-6 text-neutral-500">{detail}</p>
       </CardHeader>
-      <CardContent className="px-6 pb-6">
+      <CardContent className="px-5 pb-5">
         {chart === "line" ? <MiniLineChart values={[44, 51, 49, 46, 50, 47, 49]} /> : <ConfidenceDial value={0.71} />}
       </CardContent>
+    </Card>
+  );
+}
+
+function StatCard({ label, value, icon: Icon, tone }: { label: string; value: string; icon: LucideIcon; tone: string }) {
+  const toneClass = {
+    emerald: "bg-emerald-50 text-emerald-700",
+    sky: "bg-sky-50 text-sky-700",
+    amber: "bg-amber-50 text-amber-700",
+    red: "bg-red-50 text-red-700",
+  }[tone] || "bg-neutral-100 text-neutral-700";
+
+  return (
+    <Card className="rounded-[10px] border-neutral-200 bg-white shadow-sm">
+      <CardHeader className="p-4">
+        <div className={`mb-4 flex size-9 items-center justify-center rounded-[8px] ${toneClass}`}>
+          <Icon className="size-4" />
+        </div>
+        <CardDescription className="text-sm text-neutral-500">{label}</CardDescription>
+        <CardTitle className="text-3xl font-semibold tracking-tight text-neutral-950">{value}</CardTitle>
+      </CardHeader>
     </Card>
   );
 }
@@ -161,154 +168,116 @@ export function OverviewView({ data }: { data: OverviewData }) {
   const activeSources = sourcesList.filter((s) => s.enabled).length;
 
   return (
-    <div className="space-y-8">
-      <section>
-        <div className="mb-4 flex items-center justify-between gap-4">
-          <h2 className="text-xl font-semibold text-slate-950">Overview</h2>
-          <div className="text-sm text-slate-500">Actualización automática cada 5s</div>
-        </div>
-
-        <div className="grid grid-cols-1 gap-5 xl:grid-cols-4">
-          <Card className="rounded-[8px] border-white/80 bg-white py-0 shadow-sm ring-1 ring-slate-200/70">
-            <CardHeader className="p-5">
-              <div className="mb-4 flex size-11 items-center justify-center rounded-[8px] bg-[#edf8f1] text-[#159947]">
-                <CheckCircle2 className="size-5" />
+    <div className="space-y-5 pb-10">
+      <section className="rounded-[10px] border border-neutral-200 bg-white px-5 py-4 shadow-sm">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex min-w-0 gap-3">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-[8px] bg-neutral-950 text-white">
+              <Sparkles className="size-5" />
+            </span>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-xl font-semibold tracking-tight text-neutral-950">Operations Dashboard</h2>
+                <StateBadge state={offline > 0 ? "degraded" : "healthy"} />
               </div>
-              <CardDescription className="text-slate-500">Servicios healthy</CardDescription>
-              <CardTitle className="text-4xl font-medium text-slate-950">{healthy}/{services.length}</CardTitle>
-            </CardHeader>
-          </Card>
-          <Card className="rounded-[8px] border-white/80 bg-white py-0 shadow-sm ring-1 ring-slate-200/70">
-            <CardHeader className="p-5">
-              <div className="mb-4 flex size-11 items-center justify-center rounded-[8px] bg-[#eef7fd] text-[#1688d8]">
-                <Database className="size-5" />
-              </div>
-              <CardDescription className="text-slate-500">Fuentes activas</CardDescription>
-              <CardTitle className="text-4xl font-medium text-slate-950">{activeSources}</CardTitle>
-            </CardHeader>
-          </Card>
-          <Card className="rounded-[8px] border-white/80 bg-white py-0 shadow-sm ring-1 ring-slate-200/70">
-            <CardHeader className="p-5">
-              <div className="mb-4 flex size-11 items-center justify-center rounded-[8px] bg-[#fff8e8] text-[#d88716]">
-                <ShieldCheck className="size-5" />
-              </div>
-              <CardDescription className="text-slate-500">Discord</CardDescription>
-              <CardTitle className="text-4xl font-medium text-slate-950">{discordConfigured}/3</CardTitle>
-            </CardHeader>
-          </Card>
-          <Card className="rounded-[8px] border-white/80 bg-white py-0 shadow-sm ring-1 ring-slate-200/70">
-            <CardHeader className="p-5">
-              <div className="mb-4 flex size-11 items-center justify-center rounded-[8px] bg-[#fff1f1] text-red-600">
-                <AlertTriangle className="size-5" />
-              </div>
-              <CardDescription className="text-slate-500">Alertas offline</CardDescription>
-              <CardTitle className="text-4xl font-medium text-slate-950">{offline}</CardTitle>
-            </CardHeader>
-          </Card>
-        </div>
-
-        <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
-          <MetricCard title="Containment rate" value="49%" detail="Conversaciones resueltas por agentes sin intervención humana" chart="line" />
-          <MetricCard title="Escalation rate" value="38%" detail="Flujos que requieren aprobación, revisión o handoff" chart="line" />
-          <MetricCard title="AI confidence score (avg)" value="0.71" detail="Promedio combinado de señales de runtime y memoria" chart="dial" />
-          <MetricCard title="CSAT - overall" value="3.8/5" detail="Lectura operacional estimada para experiencias asistidas" chart="line" />
+              <p className="mt-1 text-sm text-neutral-500">Métricas, salud de servicios y señales de memoria para administrar la plataforma multiagente.</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 rounded-[8px] bg-neutral-50 px-3 py-2 text-sm font-medium text-neutral-600 ring-1 ring-neutral-200">
+            <Timer className="size-4" />
+            Actualización automática cada 5s
+          </div>
         </div>
       </section>
 
-      <section>
-        <div className="mb-4 flex items-center justify-between gap-4">
-          <h2 className="text-xl font-semibold text-slate-950">Estado de Servicios</h2>
-          <StateBadge state={offline > 0 ? "degraded" : "healthy"} />
-        </div>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {services.map((s) => (
-              <Card key={s.name} className="rounded-[8px] border-white/80 bg-white py-0 shadow-sm ring-1 ring-slate-200/70">
-                <CardHeader className="p-5">
-                  <div className="flex items-center justify-between mb-2">
-                    <CardTitle className="text-base text-slate-950">{s.name}</CardTitle>
-                    <StateBadge state={s.state} />
-                  </div>
-                  <CardDescription className="text-xs break-words text-slate-500">{s.detail}</CardDescription>
-                </CardHeader>
-              </Card>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Servicios healthy" value={`${healthy}/${services.length}`} icon={CheckCircle2} tone="emerald" />
+        <StatCard label="Fuentes activas" value={activeSources.toString()} icon={Database} tone="sky" />
+        <StatCard label="Discord" value={`${discordConfigured}/3`} icon={ShieldCheck} tone="amber" />
+        <StatCard label="Alertas offline" value={offline.toString()} icon={AlertTriangle} tone="red" />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <MetricCard title="Containment rate" value="49%" detail="Conversaciones resueltas por agentes sin intervención humana." chart="line" />
+        <MetricCard title="Escalation rate" value="38%" detail="Flujos que requieren aprobación, revisión o handoff." chart="line" />
+        <MetricCard title="AI confidence score" value="0.71" detail="Promedio combinado de señales de runtime y memoria." chart="dial" />
+        <MetricCard title="CSAT overall" value="3.8/5" detail="Lectura operacional estimada para experiencias asistidas." chart="line" />
+      </div>
+
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <Card className="rounded-[10px] border-neutral-200 bg-white shadow-sm">
+          <CardHeader className="border-b border-neutral-200 px-5 py-4">
+            <CardTitle className="text-base font-semibold text-neutral-950">Estado de servicios</CardTitle>
+            <CardDescription className="text-sm text-neutral-500">Runtime, workers e integraciones observadas por el panel.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 p-5 md:grid-cols-2">
+            {services.map((service) => (
+              <div key={service.name} className="rounded-[8px] border border-neutral-200 bg-neutral-50 p-4">
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <p className="text-sm font-semibold text-neutral-950">{service.name}</p>
+                  <StateBadge state={service.state} />
+                </div>
+                <p className="break-words text-xs leading-5 text-neutral-500">{service.detail || "Sin detalle adicional."}</p>
+              </div>
             ))}
-        </div>
+          </CardContent>
+        </Card>
+
+        <aside className="space-y-4">
+          <IntegrationCard title="Supabase PGVector" icon={Database} description="Vector store público para conocimiento.">
+            {supabase ? (
+              <>
+                <InfoRow label="Estado" value={<StateBadge state={supabase.supabase.knowledge_schema_ready ? "healthy" : supabase.supabase.reachable ? "degraded" : "offline"} />} />
+                <InfoRow label="REST" value={supabase.supabase.rest_available ? "Sí" : "No"} />
+                <InfoRow label="Detalle" value={supabase.supabase.detail || "N/A"} />
+              </>
+            ) : <p className="text-sm text-neutral-500">Verificando...</p>}
+          </IntegrationCard>
+
+          <IntegrationCard title="MentisDB" icon={Brain} description="Memoria operacional del asistente.">
+            {mentis ? (
+              <>
+                <InfoRow label="Estado" value={<StateBadge state={config?.integrations?.mentis_enabled ? (mentis.mentis.reachable ? "healthy" : "offline") : "unknown"} />} />
+                <InfoRow label="Lectura" value={mentis.mentis.can_read ? "Sí" : "No"} />
+                <InfoRow label="Escritura" value={mentis.mentis.can_write ? "Sí" : "No"} />
+              </>
+            ) : <p className="text-sm text-neutral-500">Verificando...</p>}
+          </IntegrationCard>
+
+          <IntegrationCard title="Langfuse" icon={Network} description="Observabilidad y traces.">
+            {config ? (
+              <>
+                <InfoRow label="Estado" value={<StateBadge state={config.integrations?.langfuse_enabled ? "healthy" : "unknown"} />} />
+                <InfoRow label="Host" value={config.integrations?.langfuse || "N/A"} />
+              </>
+            ) : <p className="text-sm text-neutral-500">Verificando...</p>}
+          </IntegrationCard>
+        </aside>
       </section>
+    </div>
+  );
+}
 
-      <section>
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-          <Card className="rounded-[8px] border-white/80 bg-white py-0 shadow-sm ring-1 ring-slate-200/70">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-slate-950"><Database className="w-5 h-5"/> Supabase PGVector</CardTitle>
-              <CardDescription className="text-slate-500">Vector store público para conocimiento.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {supabase ? (
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-500">Estado</span>
-                    <StateBadge state={supabase.supabase.knowledge_schema_ready ? "healthy" : supabase.supabase.reachable ? "degraded" : "offline"} />
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Detalle</span>
-                    <span className="truncate max-w-[150px]">{supabase.supabase.detail}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">REST Disponible</span>
-                    <span>{supabase.supabase.rest_available ? "Sí" : "No"}</span>
-                  </div>
-                </div>
-              ) : <div className="text-sm text-slate-500">Verificando...</div>}
-            </CardContent>
-          </Card>
+function IntegrationCard({ title, icon: Icon, description, children }: { title: string; icon: LucideIcon; description: string; children: ReactNode }) {
+  return (
+    <Card className="rounded-[10px] border-neutral-200 bg-white shadow-sm">
+      <CardHeader className="border-b border-neutral-200 px-5 py-4">
+        <CardTitle className="flex items-center gap-2 text-base font-semibold text-neutral-950">
+          <Icon className="size-4 text-[#3ecf8e]" />
+          {title}
+        </CardTitle>
+        <CardDescription className="text-sm text-neutral-500">{description}</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3 p-5">{children}</CardContent>
+    </Card>
+  );
+}
 
-          <Card className="rounded-[8px] border-white/80 bg-white py-0 shadow-sm ring-1 ring-slate-200/70">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-slate-950"><Brain className="w-5 h-5"/> MentisDB</CardTitle>
-              <CardDescription className="text-slate-500">Memoria operacional del asistente.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {mentis ? (
-                <div className="space-y-2 text-sm">
-                   <div className="flex justify-between items-center">
-                    <span className="text-slate-500">Estado</span>
-                    <StateBadge state={config?.integrations?.mentis_enabled ? (mentis.mentis.reachable ? "healthy" : "offline") : "unknown"} />
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Lectura</span>
-                    <span>{mentis.mentis.can_read ? "Sí" : "No"}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Escritura</span>
-                    <span>{mentis.mentis.can_write ? "Sí" : "No"}</span>
-                  </div>
-                </div>
-              ) : <div className="text-sm text-slate-500">Verificando...</div>}
-            </CardContent>
-          </Card>
-
-          <Card className="rounded-[8px] border-white/80 bg-white py-0 shadow-sm ring-1 ring-slate-200/70">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-slate-950"><Network className="w-5 h-5"/> Langfuse</CardTitle>
-              <CardDescription className="text-slate-500">Observabilidad y traces.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {config ? (
-                <div className="space-y-2 text-sm">
-                   <div className="flex justify-between items-center">
-                    <span className="text-slate-500">Estado</span>
-                    <StateBadge state={config.integrations?.langfuse_enabled ? "healthy" : "unknown"} />
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Host</span>
-                    <span className="truncate max-w-[150px]">{config.integrations?.langfuse || "N/A"}</span>
-                  </div>
-                </div>
-              ) : <div className="text-sm text-slate-500">Verificando...</div>}
-            </CardContent>
-          </Card>
-        </div>
-      </section>
+function InfoRow({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-[8px] bg-neutral-50 px-3 py-2">
+      <span className="text-sm font-medium text-neutral-700">{label}</span>
+      <span className="max-w-[180px] truncate text-right text-xs font-semibold text-neutral-950">{value}</span>
     </div>
   );
 }
