@@ -325,15 +325,15 @@ El comando acepta mockups o referencias visuales adjuntas.
 | `!email` / `!email status` | Estado del proveedor, lectura, envio y templates configurados. |
 | `!email sent-today` | Lista emails enviados el mismo dia desde el proveedor configurado. |
 | `!email categorize <categoria>` | Prepara categorizacion por filtros/categoria. |
-| `!email --template-<nombre> <categoria>` | Prepara respuestas bulk usando un template del administrador. |
+| `!email --template-<nombre> <categoria>` | Prepara respuestas bulk usando un template del administrador y solicita aprobacion. |
 | `!email --model-status` | Muestra modelos conectados para clasificacion, resumen y templates. |
 
 El sub-agente `!email` usa arquitectura hexagonal: el nucleo solo conoce
 casos de uso y puertos; Google, Outlook, IMAP/SMTP, cliente local de PC u otros
 proveedores viven como adaptadores. Los envios bulk requieren configuracion en
 Admin UI, permiso explicito de envio, limites por minuto, auditoria e
-idempotencia. Por defecto se genera un plan de aprobacion antes de encolar
-envios.
+idempotencia. Por defecto se genera un `job_id` aprobable; solo despues de la
+aprobacion humana se encola el envio real y queda auditado por job.
 
 ### Estado de modelos
 

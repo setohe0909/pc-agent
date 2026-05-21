@@ -61,17 +61,17 @@ El sub-agente de email opera correo con enfoque Clean/Hexagonal para que el domi
 - Configuracion de proveedores desde el administrador UI.
 - Categorizacion por filtros, categorias y clasificacion asistida.
 - Listado de emails enviados el mismo dia.
-- Respuestas bulk mediante templates administrados.
+- Respuestas bulk mediante templates administrados, job aprobable y auditoria.
 - Estado operacional con `!email status` y `!email --model-status`.
 
 ### Comandos
 - `!email` o `!email status`: revisa proveedor, lectura, envio y templates.
 - `!email sent-today`: lista enviados de hoy.
 - `!email categorize <categoria>`: prepara reglas/categorizacion.
-- `!email --template-<nombre> <categoria>`: prepara respuesta bulk para aprobacion.
+- `!email --template-<nombre> <categoria>`: prepara respuesta bulk para aprobacion con botones en Discord.
 
 ### Seguridad
-Los envios masivos requieren proveedor configurado, permiso explicito de envio, aprobacion humana, rate limits, idempotencia y auditoria. Por defecto el agente genera un plan antes de encolar envios reales.
+Los envios masivos requieren proveedor configurado, permiso explicito de envio, aprobacion humana, rate limits, idempotencia y auditoria. Por defecto el agente genera un `job_id`; la aprobacion encola el envio real y la denegacion cancela el job sin enviar correos.
 
 ## 6. Inteligencia Proactiva
 

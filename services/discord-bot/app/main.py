@@ -293,6 +293,63 @@ async def main() -> None:
             except Exception as exc:
                 await interaction.message.edit(content=f"❌ No pude denegar la campaña: {exc}", embed=None, view=None)
 
+    class EmailBulkApprovalView(View):
+        def __init__(self, job_id: str, message_author):
+            super().__init__(timeout=300)
+            self.job_id = job_id
+            self.message_author = message_author
+
+        def _can_approve(self, user_id: int) -> bool:
+            approvers = _approvers()
+            if approvers:
+                return str(user_id) in approvers
+            return str(user_id) == str(self.message_author.id)
+
+        @discord.ui.button(label="✅ Aprobar Email", style=discord.ButtonStyle.green)
+        async def approve(self, interaction: discord.Interaction, button: discord.ui.Button):
+            if not self._can_approve(interaction.user.id):
+                await interaction.response.send_message("No estás autorizado como aprobador.", ephemeral=True)
+                return
+            await interaction.response.edit_message(content="⏳ Aprobando bulk reply de email...", embed=None, view=None)
+            payload = {
+                "action_type": "email",
+                "prompt": "aprueba bulk reply de email",
+                "source": {"platform": "discord", "channel_id": str(interaction.channel_id), "user_id": str(interaction.user.id)},
+                "payload": {
+                    "sub_command": "bulk-reply",
+                    "job_id": self.job_id,
+                    "is_approved": True,
+                    "approved_by": str(interaction.user.id),
+                },
+            }
+            try:
+                result = await _send_assistant_request(payload)
+                await interaction.message.edit(content=result.get("message", "Bulk reply procesado."), embed=None, view=None)
+            except Exception as exc:
+                await interaction.message.edit(content=f"❌ No pude aprobar el bulk reply: {exc}", embed=None, view=None)
+
+        @discord.ui.button(label="❌ Denegar", style=discord.ButtonStyle.red)
+        async def deny(self, interaction: discord.Interaction, button: discord.ui.Button):
+            if not self._can_approve(interaction.user.id):
+                await interaction.response.send_message("No estás autorizado como aprobador.", ephemeral=True)
+                return
+            await interaction.response.edit_message(content="⏳ Denegando bulk reply de email...", embed=None, view=None)
+            payload = {
+                "action_type": "email",
+                "prompt": "deniega bulk reply de email",
+                "source": {"platform": "discord", "channel_id": str(interaction.channel_id), "user_id": str(interaction.user.id)},
+                "payload": {
+                    "sub_command": "deny-bulk-reply",
+                    "job_id": self.job_id,
+                    "rejected_by": str(interaction.user.id),
+                },
+            }
+            try:
+                result = await _send_assistant_request(payload)
+                await interaction.message.edit(content=result.get("message", "Bulk reply denegado."), embed=None, view=None)
+            except Exception as exc:
+                await interaction.message.edit(content=f"❌ No pude denegar el bulk reply: {exc}", embed=None, view=None)
+
     intents = discord.Intents.default()
     intents.message_content = True
     client = discord.Client(intents=intents)
@@ -612,7 +669,7 @@ async def main() -> None:
                     "`!email status`: Estado del proveedor, lectura, envio y templates.\n"
                     "`!email sent-today`: Lista emails enviados el dia actual.\n"
                     "`!email categorize <categoria>`: Prepara clasificacion por filtros/categoria.\n"
-                    "`!email --template-<nombre> <categoria>`: Prepara respuestas bulk con template del administrador.\n"
+                    "`!email --template-<nombre> <categoria>`: Prepara respuestas bulk con template del administrador y pide aprobación.\n"
                     "`!email --model-status`: Estado de modelos del sub-agent."
                 ),
                 inline=False,
@@ -693,7 +750,7 @@ async def main() -> None:
             )
             embed.add_field(
                 name="📬 Email Sub-Agent",
-                value="`!email status`: Estado del proveedor.\n`!email sent-today`: Emails enviados hoy.\n`!email categorize <categoria>`: Categorizar por filtros.\n`!email --template-seguimiento lead`: Preparar respuestas bulk con template.",
+                value="`!email status`: Estado del proveedor.\n`!email sent-today`: Emails enviados hoy.\n`!email categorize <categoria>`: Categorizar por filtros.\n`!email --template-seguimiento lead`: Preparar respuestas bulk con aprobación.",
                 inline=False,
             )
             embed.set_footer(text="PC Agent v0.6.1 - Help actualizado")
@@ -744,12 +801,32 @@ async def main() -> None:
                 "action_type": "email",
                 "prompt": prompt,
                 "source": {"platform": "discord", "channel_id": str(thread.id), "user_id": str(message.author.id)},
-                "payload": {"sub_command": sub_command, "autonomy_level": "assisted", **payload_extra},
+                "payload": {
+                    "sub_command": sub_command,
+                    "autonomy_level": "assisted",
+                    "requested_by": str(message.author.id),
+                    "source": "discord",
+                    **payload_extra,
+                },
             }
             await thread.send(f"📬 **Email Agent procesando `{sub_command}`...**")
             try:
                 result = await _send_assistant_request(request_payload)
-                await _send_long(thread, result.get("message", "No hubo respuesta."))
+                bulk = result.get("email_bulk_reply") or {}
+                job_id = bulk.get("job_id")
+                if result.get("status") == "requires_approval" and job_id:
+                    embed = discord.Embed(
+                        title="📬 Bulk reply pendiente de aprobación",
+                        description=result.get("message", "El Email Agent preparó un envío masivo."),
+                        color=discord.Color.orange(),
+                    )
+                    embed.add_field(name="Job", value=f"`{job_id}`", inline=False)
+                    embed.add_field(name="Template", value=f"`{bulk.get('template', 'N/D')}`", inline=True)
+                    embed.add_field(name="Categoría", value=f"`{bulk.get('category', 'N/D')}`", inline=True)
+                    embed.add_field(name="Destinatarios", value=f"`{bulk.get('recipient_count', 0)}`", inline=True)
+                    await thread.send(embed=embed, view=EmailBulkApprovalView(job_id, message.author))
+                else:
+                    await _send_long(thread, result.get("message", "No hubo respuesta."))
             except Exception as exc:
                 await thread.send(f"❌ Error al contactar al Email Agent: {exc}")
             return

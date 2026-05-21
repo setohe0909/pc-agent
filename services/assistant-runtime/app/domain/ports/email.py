@@ -1,7 +1,7 @@
 from datetime import date
 from typing import Protocol
 
-from app.domain.email.models import EmailMessage, EmailProviderHealth, EmailTemplate
+from app.domain.email.models import EmailAuditEvent, EmailBulkJob, EmailMessage, EmailProviderHealth, EmailTemplate
 
 
 class EmailProviderPort(Protocol):
@@ -26,4 +26,24 @@ class EmailConfigPort(Protocol):
         ...
 
     def list_templates(self) -> list[EmailTemplate]:
+        ...
+
+
+class EmailJobRepositoryPort(Protocol):
+    async def create_bulk_job(self, job: EmailBulkJob) -> EmailBulkJob:
+        ...
+
+    async def get_bulk_job(self, job_id: str) -> EmailBulkJob:
+        ...
+
+    async def approve_bulk_job(self, job_id: str, approved_by: str | None) -> EmailBulkJob:
+        ...
+
+    async def reject_bulk_job(self, job_id: str, rejected_by: str | None, reason: str) -> EmailBulkJob:
+        ...
+
+    async def mark_bulk_job_queued(self, job_id: str, provider_result: dict) -> EmailBulkJob:
+        ...
+
+    async def append_audit(self, event: EmailAuditEvent) -> None:
         ...

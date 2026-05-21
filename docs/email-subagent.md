@@ -8,6 +8,7 @@ El sub-agente `!email` administra flujos de correo para lectura, categorizacion 
 - Categorizar emails por filtros, categorias y clasificacion asistida.
 - Listar emails enviados el mismo dia con trazabilidad de cuenta/proveedor.
 - Preparar respuestas bulk usando templates administrados.
+- Generar jobs aprobables para respuestas bulk con auditoria y estado de cola.
 - Consultar `status` y `--model-status` sin consumir acciones de envio.
 
 ## Comandos
@@ -17,7 +18,7 @@ El sub-agente `!email` administra flujos de correo para lectura, categorizacion 
 | `!email` / `!email status` | Estado del proveedor, lectura, envio y templates. |
 | `!email sent-today` | Lista emails enviados hoy. |
 | `!email categorize <categoria>` | Prepara categorizacion por filtros/categoria. |
-| `!email --template-<nombre> <categoria>` | Prepara respuesta bulk para emails de esa categoria. |
+| `!email --template-<nombre> <categoria>` | Prepara respuesta bulk para emails de esa categoria y solicita aprobacion. |
 | `!email --model-status` | Muestra modelos usados para clasificacion, resumen y templates. |
 
 ## Diseno de Produccion
@@ -27,10 +28,13 @@ El flujo separa responsabilidades:
 - `EmailWorkflow`: orquesta casos de uso del sub-agente.
 - `EmailProviderPort`: define lectura de enviados, busqueda por categoria y envio bulk.
 - `EmailConfigPort`: lee proveedor default y templates.
+- `EmailJobRepositoryPort`: persiste jobs bulk, aprobaciones, denegaciones y auditoria.
 - `ConfiguredEmailProvider`: adapter de runtime que valida configuracion y delega a adaptadores reales.
+- `SupabaseEmailJobRepository`: adapter de produccion cuando existen `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY`.
+- `FileEmailJobRepository`: fallback local para persistir jobs en `EMAIL_JOBS_PATH` durante desarrollo.
 - Admin UI: guarda proveedor, credenciales, permiso de envio, limites y templates.
 
-Los envios bulk deben ejecutarse como cola aprobada, con idempotencia por email, rate limits por proveedor, auditoria, manejo de rebotes y opt-out cuando aplique. Por defecto el comando prepara un plan y solicita aprobacion antes de enviar.
+Los envios bulk se ejecutan en dos pasos: primero se crea un `job_id` con preview y auditoria; luego un aprobador confirma o deniega desde Discord. Solo al aprobar se llama al proveedor con `dry_run=false`. El proveedor debe aplicar idempotencia por email, rate limits, opt-out, manejo de rebotes y trazabilidad por mensaje.
 
 ## Configuracion
 
@@ -70,3 +74,13 @@ Cuando el proveedor es `pc_client`, el adapter llama al bridge HTTP configurado:
 | `/bulk-replies` | `POST` | Recibe `email_ids`, `template` y `dry_run`; devuelve estado `planned` o `queued`. |
 
 Si se configura `email_pc_client_bridge_token`, el runtime lo envia como `Authorization: Bearer <token>`.
+
+## Persistencia y Auditoria
+
+La migracion `20260521000100_email_agent.sql` crea:
+
+- `email_bulk_jobs`: job aprobable con proveedor, template, categoria, estado y resultado del proveedor.
+- `email_bulk_job_recipients`: destinatarios por job para idempotencia y seguimiento por mensaje.
+- `email_audit_events`: eventos de preparacion, aprobacion, denegacion y errores operativos.
+
+El runtime usa `EMAIL_JOB_REPOSITORY=auto` por defecto: selecciona Supabase si esta configurado y usa archivo local como fallback. Para forzar un modo se puede usar `EMAIL_JOB_REPOSITORY=supabase` o `EMAIL_JOB_REPOSITORY=file`.

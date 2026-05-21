@@ -13,6 +13,7 @@ from app.adapters.kalshi import KalshiHttpAdapter
 from app.adapters.open_claw import OpenClawLLMAdapter
 from app.adapters.memory import MentisMemoryAdapter
 from app.adapters.email import ConfiguredEmailProvider, RuntimeEmailConfig
+from app.adapters.email_jobs import FileEmailJobRepository, SupabaseEmailJobRepository
 from app.adapters.trading_audit import SupabaseTradeAuditRepository, SupabaseTradingExposureRepository
 from app.adapters.zernio_adapter import ZernioAdapter
 from app.domain.trading_policies import ConfigurableRiskPolicy
@@ -154,6 +155,16 @@ def _assistant_response(result: dict, request: AssistantRequest) -> dict:
     }
 
 
+def _email_job_repository():
+    requested = os.getenv("EMAIL_JOB_REPOSITORY", "auto").lower()
+    supabase_repo = SupabaseEmailJobRepository()
+    if requested == "file":
+        return FileEmailJobRepository()
+    if requested == "supabase" or (requested == "auto" and supabase_repo.configured):
+        return supabase_repo
+    return FileEmailJobRepository()
+
+
 @app.get("/health")
 async def health() -> dict:
     return {"status": "ok", "service": "assistant-runtime"}
@@ -187,6 +198,7 @@ async def assistant_request(request: AssistantRequest) -> dict:
     email_workflow = EmailWorkflow(
         email_provider=ConfiguredEmailProvider(email_config),
         email_config=email_config,
+        email_jobs=_email_job_repository(),
         llm=llm_port,
     )
     model_status_service = ModelStatusService(llm=llm_port)
