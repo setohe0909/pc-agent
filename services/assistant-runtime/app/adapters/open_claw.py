@@ -1,8 +1,8 @@
 import json
 import os
 import sys
+import asyncio
 from pathlib import Path
-import google.generativeai as genai
 from litellm import acompletion
 
 from app.domain.ports.llm import LLMPort
@@ -58,6 +58,7 @@ class OpenClawLLMAdapter(LLMPort):
             "models/gemini-2.5-flash",
         ]
         api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+        import google.generativeai as genai
         genai.configure(api_key=api_key)
         
         last_error = None
@@ -134,7 +135,7 @@ class OpenClawLLMAdapter(LLMPort):
         if context:
             messages.insert(0, {"role": "system", "content": f"Contexto: {json.dumps(context)}"})
         
-        response = await acompletion(model=litellm_model, messages=messages)
+        response = await _completion_with_retry(model=litellm_model, messages=messages)
         return response.choices[0].message.content
 
     async def analyze_trade(self, market_data: dict, prompt: str) -> dict:
@@ -168,7 +169,7 @@ class OpenClawLLMAdapter(LLMPort):
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_content}
         ]
-        response = await acompletion(model=litellm_model, messages=messages, response_format={"type": "json_object"})
+        response = await _completion_with_retry(model=litellm_model, messages=messages, response_format={"type": "json_object"})
         return json.loads(response.choices[0].message.content)
 
     def _to_gemini_schema(self, schema):
@@ -220,6 +221,7 @@ class OpenClawLLMAdapter(LLMPort):
         
         if provider == "gemini":
             api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+            import google.generativeai as genai
             genai.configure(api_key=api_key)
             gemini_tools = self._to_gemini_tools(tools)
 
@@ -276,7 +278,7 @@ class OpenClawLLMAdapter(LLMPort):
                 if system_instruction:
                     messages.insert(0, {"role": "system", "content": system_instruction})
                     
-                response = await acompletion(
+                response = await _completion_with_retry(
                     model=litellm_model,
                     messages=messages,
                     tools=self._to_openai_tools(tools),
@@ -670,3 +672,20 @@ def _safe_url_label(url: str) -> str:
         return f"{parts.scheme}://{hostname}{port}"
     except Exception:
         return "configured endpoint"
+
+
+async def _completion_with_retry(**kwargs):
+    attempts = int(os.getenv("ASSISTANT_LLM_RETRY_ATTEMPTS", "2"))
+    timeout = float(os.getenv("ASSISTANT_LLM_TIMEOUT_SECONDS", "90"))
+    last_exc = None
+    for attempt in range(max(1, attempts)):
+        try:
+            return await asyncio.wait_for(acompletion(**kwargs), timeout=timeout)
+        except Exception as exc:
+            last_exc = exc
+            text = str(exc).lower()
+            retryable = any(marker in text for marker in ("timeout", "429", "rate limit", "temporarily", "connection"))
+            if not retryable or attempt >= attempts - 1:
+                raise
+            await asyncio.sleep(min(2 ** attempt, 5))
+    raise last_exc or RuntimeError("LLM completion failed without an exception.")

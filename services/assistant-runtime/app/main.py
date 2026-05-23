@@ -1,37 +1,33 @@
-import os
-import json
 import base64
 import binascii
+import json
+import os
 import uuid
-from pathlib import Path
 from enum import Enum
+from pathlib import Path
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from pydantic import BaseModel, Field
 
-from app.adapters.email import ConfiguredEmailProvider, RuntimeEmailConfig
-from app.adapters.email_jobs import FileEmailJobRepository, SupabaseEmailJobRepository
-from app.use_cases.writer_workflow import WriterWorkflow
-from app.use_cases.email_workflow import EmailWorkflow
+from app.runtime.errors import error_envelope
 
-def load_runtime_config():
+
+def load_runtime_config() -> None:
     config_path = os.getenv("RUNTIME_CONFIG_PATH", "/config/runtime-config.json")
     try:
         if Path(config_path).exists():
             config = json.loads(Path(config_path).read_text(encoding="utf-8"))
             for key, value in config.items():
                 if value:
-                    # Update environment so litellm and other components see it
                     env_key = key.upper()
                     os.environ[env_key] = str(value)
-                    
-                    # Litellm compatibility for Ollama
                     if env_key == "OLLAMA_BASE_URL":
                         os.environ["OLLAMA_API_BASE"] = str(value)
             print(f"Configuracion runtime cargada desde {config_path}")
     except Exception as exc:
         print(f"Error cargando configuracion runtime: {exc}")
+
 
 load_runtime_config()
 
@@ -69,7 +65,7 @@ class AssistantRequest(BaseModel):
     prompt: str = Field(min_length=1, max_length=8000)
     source: Source
     approval: Approval | None = None
-    images: list[str] = Field(default_factory=list) # Base64 images
+    images: list[str] = Field(default_factory=list)
     image_metadata: list[dict] = Field(default_factory=list)
     payload: dict = Field(default_factory=dict)
 
@@ -78,53 +74,97 @@ MAX_IMAGE_SIZE = 5 * 1024 * 1024
 MAX_IMAGE_COUNT = 4
 
 
-def _format_internal_error(exc: Exception, request: AssistantRequest, stage: str) -> dict:
-    raw_detail = str(exc) or repr(exc)
-    error_type = type(exc).__name__
-    sub_command = request.payload.get("sub_command", "chat") if isinstance(request.payload, dict) else "chat"
-    hint = "Revisa los logs del assistant-runtime para el traceback completo."
+@app.on_event("startup")
+async def startup() -> None:
+    from app.runtime.container import build_runtime_container
 
-    if isinstance(exc, KeyError):
-        missing = str(exc).strip("'\"")
-        raw_detail = f"Clave o valor esperado no encontrado: {missing}"
-        if missing in {"object", "string", "array", "boolean", "number", "integer"}:
-            hint = (
-                "Parece un problema de schema de herramientas del LLM. "
-                "Asegúrate de reiniciar/reconstruir assistant-runtime para cargar el adapter actualizado."
-            )
-        else:
-            hint = f"El flujo intentó leer '{missing}' en una respuesta o payload que no lo tenía."
-    elif "schema JSON incompatible" in raw_detail or "detección de herramientas" in raw_detail:
-        hint = "El problema está en la detección de intención/tools del LLM, antes de ejecutar la acción."
-    elif "429" in raw_detail or "quota" in raw_detail.lower():
-        hint = "El proveedor LLM devolvió límite de cuota/rate limit. Cambia proveedor, revisa cuota o reintenta más tarde."
-    elif "nodename nor servname" in raw_detail or "Name or service not known" in raw_detail:
-        hint = "El servicio no pudo resolver/conectar a una dependencia externa desde el entorno actual."
-    elif "ZERNIO" in raw_detail.upper() or "zernio" in raw_detail.lower():
-        hint = "El problema parece venir de la integración Zernio o su respuesta."
+    app.state.runtime_container = build_runtime_container()
 
-    expose_details = os.getenv("EXPOSE_ERROR_DETAILS", "false").lower() == "true"
-    public_detail = raw_detail if expose_details else "Detalle tecnico retenido por seguridad. Usa trace_id en logs."
 
-    message = (
-        f"No pude completar `{request.action_type.value}`"
-        f" con subcomando `{sub_command}` durante `{stage}`.\n"
-        f"Tipo: `{error_type}`\n"
-        f"Detalle: {public_detail}\n"
-        f"Pista: {hint}"
-    )
+@app.get("/health")
+async def health() -> dict:
+    container_ready = hasattr(app.state, "runtime_container")
+    return {"status": "ok" if container_ready else "starting", "service": "assistant-runtime", "container_ready": container_ready}
 
-    response = {
-        "status": "error",
-        "message": message,
-        "error_type": error_type,
-        "error_stage": stage,
-        "hint": hint,
-    }
-    if expose_details:
-        response["error_detail"] = raw_detail
-    return response
-    return response
+
+@app.post("/assistant/request")
+async def assistant_request(request: AssistantRequest, http_request: Request) -> dict:
+    trace_id = str(uuid.uuid4())
+    stage = "validando permisos"
+    container = _get_runtime_container(http_request)
+
+    gate = _discord_gate(request)
+    if not gate["allowed"]:
+        return {
+            "status": "requires_discord_approval",
+            "reason": gate["reason"],
+            "decision": None,
+            "trace_id": trace_id,
+        }
+
+    try:
+        _check_rate_limit(container, request)
+        metadata = _trace_metadata(request, trace_id)
+        async with container.tracer.span("assistant.request", metadata):
+            result, stage = await dispatch_assistant_request(container, request)
+            if result is None:
+                result = {"status": "error", "message": "El sub-agente no devolvió ningún resultado."}
+            _debug_payload(f"Workflow result: {result}")
+            response = _assistant_response(result, request)
+            response["trace_id"] = trace_id
+            return response
+    except Exception as exc:
+        import traceback
+
+        error_trace = traceback.format_exc()
+        print(f"[CRITICAL ERROR][{trace_id}] {exc}\n{error_trace}")
+        sub_command = request.payload.get("sub_command", "chat") if isinstance(request.payload, dict) else "chat"
+        response = error_envelope(exc, request.action_type.value, sub_command, stage, trace_id).to_dict()
+        if os.getenv("EXPOSE_DEBUG_TRACES", "false").lower() == "true":
+            response["debug_trace"] = error_trace
+        return response
+
+
+async def dispatch_assistant_request(container, request: AssistantRequest) -> tuple[dict | None, str]:
+    if request.action_type in {ActionType.trade_decision, ActionType.open_position}:
+        stage = "ejecutando flujo de trading"
+        return await container.trading_workflow.execute_trade_decision(prompt=request.prompt, user_id=request.source.user_id), stage
+    if request.action_type == ActionType.marketing:
+        decoded = _decode_request_images(request.images)
+        if decoded["status"] == "error":
+            return decoded, "validando imagenes de marketing"
+        stage = f"ejecutando marketer:{request.payload.get('sub_command', 'chat')}"
+        return await container.marketing_workflow.run(prompt=request.prompt, payload=request.payload, images=decoded["images"]), stage
+    if request.action_type == ActionType.writer:
+        stage = "ejecutando writer"
+        return await container.writer_workflow.execute_writer_action(prompt=request.prompt, payload=request.payload), stage
+    if request.action_type == ActionType.email:
+        stage = f"ejecutando email:{request.payload.get('sub_command', 'status')}"
+        return await container.email_workflow.run(prompt=request.prompt, payload=request.payload), stage
+    if request.action_type == ActionType.picture:
+        decoded = _decode_request_images(request.images)
+        if decoded["status"] == "error":
+            return decoded, "validando imagenes de picture"
+        stage = "ejecutando picture"
+        return await container.picture_workflow.run(
+            prompt=request.prompt,
+            payload=request.payload,
+            images=decoded["images"],
+            image_metadata=request.image_metadata,
+        ), stage
+    if request.action_type == ActionType.coder_web:
+        decoded = _decode_request_images(request.images)
+        if decoded["status"] == "error":
+            return decoded, "validando imagenes de coder-web"
+        stage = "ejecutando coder-web"
+        return await container.coder_web_workflow.run(prompt=request.prompt, payload=request.payload, images=decoded["images"]), stage
+    if request.action_type == ActionType.model_status:
+        stage = "consultando modelos conectados"
+        return container.model_status_service.get_status(agent=request.payload.get("agent", request.prompt)), stage
+
+    stage = "ejecutando chat"
+    result_text = await container.trading_workflow.execute_chat(prompt=request.prompt, user_id=request.source.user_id)
+    return {"status": "success", "message": result_text}, stage
 
 
 def _assistant_response(result: dict, request: AssistantRequest) -> dict:
@@ -147,151 +187,37 @@ def _assistant_response(result: dict, request: AssistantRequest) -> dict:
         "model_status": result.get("model_status"),
         "email_status": result.get("email_status"),
         "email_bulk_reply": result.get("email_bulk_reply"),
+        "email_jobs": result.get("email_jobs"),
         "requires_approval": result.get("requires_approval", result.get("status") == "requires_approval"),
         "input": request.model_dump(),
     }
 
 
-def _email_job_repository():
-    requested = os.getenv("EMAIL_JOB_REPOSITORY", "auto").lower()
-    supabase_repo = SupabaseEmailJobRepository()
-    if requested == "file":
-        return FileEmailJobRepository()
-    if requested == "supabase" or (requested == "auto" and supabase_repo.configured):
-        return supabase_repo
-    return FileEmailJobRepository()
+def _get_runtime_container(http_request: Request):
+    if not hasattr(http_request.app.state, "runtime_container"):
+        from app.runtime.container import build_runtime_container
+
+        http_request.app.state.runtime_container = build_runtime_container()
+    return http_request.app.state.runtime_container
 
 
-@app.get("/health")
-async def health() -> dict:
-    return {"status": "ok", "service": "assistant-runtime"}
+def _check_rate_limit(container, request: AssistantRequest) -> None:
+    actor = request.source.user_id or request.source.channel_id or "anonymous"
+    decision = container.rate_limiter.check(f"{request.source.platform}:{actor}:{request.action_type.value}")
+    if not decision.allowed:
+        raise RuntimeError(f"Rate limit excedido. Reintenta en {decision.retry_after_seconds}s.")
 
 
-@app.post("/assistant/request")
-async def assistant_request(request: AssistantRequest) -> dict:
-    stage = "validando permisos"
-    gate = _discord_gate(request)
-    if not gate["allowed"]:
-        return {
-            "status": "requires_discord_approval",
-            "reason": gate["reason"],
-            "decision": None,
-        }
-
-    # Inyectar dependencias (Hexagonal Architecture)
-    from app.adapters.kalshi import KalshiHttpAdapter
-    from app.adapters.open_claw import OpenClawLLMAdapter
-    from app.adapters.memory import MentisMemoryAdapter
-    from app.adapters.pilot_web import PilotWebAdapter
-    from app.adapters.linear import LinearTaskTrackerAdapter
-    from app.adapters.trading_audit import SupabaseTradeAuditRepository, SupabaseTradingExposureRepository
-    from app.adapters.zernio_adapter import ZernioAdapter
-    from app.domain.trading_policies import ConfigurableRiskPolicy
-    from app.use_cases.marketing_graph import MarketingGraph
-    from app.use_cases.model_status import ModelStatusService
-    from app.use_cases.trading_workflow import TradingWorkflow
-
-    trading_port = KalshiHttpAdapter()
-    llm_port = OpenClawLLMAdapter()
-    memory_port = MentisMemoryAdapter()
-    workflow = TradingWorkflow(
-        trading_port=trading_port,
-        llm_port=llm_port,
-        memory_port=memory_port,
-        risk_policy=ConfigurableRiskPolicy(exposure_repository=SupabaseTradingExposureRepository()),
-        audit_repository=SupabaseTradeAuditRepository(),
-    )
-    marketing_workflow = MarketingGraph(llm=llm_port, memory=memory_port, marketing=ZernioAdapter())
-    writer_workflow = WriterWorkflow(llm_port=llm_port, memory_port=memory_port)
-    email_config = RuntimeEmailConfig()
-    email_workflow = EmailWorkflow(
-        email_provider=ConfiguredEmailProvider(email_config),
-        email_config=email_config,
-        email_jobs=_email_job_repository(),
-        llm=llm_port,
-    )
-    model_status_service = ModelStatusService(llm=llm_port)
-    from app.use_cases.picture_graph import PictureGraph
-    from app.use_cases.coder_web_graph import CoderWebGraph
-    picture_workflow = PictureGraph(llm=llm_port, memory=memory_port)
-    
-    coder_web_adapter = PilotWebAdapter()
-        
-    coder_web_workflow = CoderWebGraph(
-        llm=llm_port,
-        memory=memory_port,
-        coder_web=coder_web_adapter,
-        task_tracker=LinearTaskTrackerAdapter(),
-    )
-
-    try:
-        if request.action_type in {ActionType.trade_decision, ActionType.open_position}:
-            stage = "ejecutando flujo de trading"
-            result = await workflow.execute_trade_decision(prompt=request.prompt, user_id=request.source.user_id)
-        elif request.action_type == ActionType.marketing:
-            stage = "preparando flujo de marketing"
-            _debug_payload(f"Entrando a MarketingGraph con prompt: {request.prompt}")
-            decoded = _decode_request_images(request.images)
-            if decoded["status"] == "error":
-                return decoded
-            image_data = decoded["images"]
-            
-            stage = f"ejecutando marketer:{request.payload.get('sub_command', 'chat')}"
-            result = await marketing_workflow.run(prompt=request.prompt, payload=request.payload, images=image_data)
-        elif request.action_type == ActionType.writer:
-            stage = "ejecutando writer"
-            _debug_payload(f"Entrando a WriterWorkflow con prompt: {request.prompt}")
-            result = await writer_workflow.execute_writer_action(prompt=request.prompt, payload=request.payload)
-        elif request.action_type == ActionType.email:
-            stage = f"ejecutando email:{request.payload.get('sub_command', 'status')}"
-            _debug_payload(f"Entrando a EmailWorkflow con prompt: {request.prompt}")
-            result = await email_workflow.run(prompt=request.prompt, payload=request.payload)
-        elif request.action_type == ActionType.picture:
-            stage = "ejecutando picture"
-            _debug_payload(f"Entrando a PictureGraph con prompt: {request.prompt}")
-            decoded = _decode_request_images(request.images)
-            if decoded["status"] == "error":
-                return decoded
-            image_data = decoded["images"]
-            result = await picture_workflow.run(
-                prompt=request.prompt,
-                payload=request.payload,
-                images=image_data,
-                image_metadata=request.image_metadata,
-            )
-        elif request.action_type == ActionType.coder_web:
-            stage = "ejecutando coder-web"
-            _debug_payload(f"Entrando a CoderWebGraph con prompt: {request.prompt}")
-            decoded = _decode_request_images(request.images)
-            if decoded["status"] == "error":
-                return decoded
-            image_data = decoded["images"]
-            result = await coder_web_workflow.run(prompt=request.prompt, payload=request.payload, images=image_data)
-        elif request.action_type == ActionType.model_status:
-            stage = "consultando modelos conectados"
-            result = model_status_service.get_status(agent=request.payload.get("agent", request.prompt))
-        else:
-            stage = "ejecutando chat"
-            result_text = await workflow.execute_chat(prompt=request.prompt, user_id=request.source.user_id)
-            result = {"status": "success", "message": result_text}
-
-        # Fallback if result is None
-        if result is None:
-            result = {"status": "error", "message": "El sub-agente no devolvió ningún resultado."}
-
-        _debug_payload(f"Workflow result: {result}")
-
-        return _assistant_response(result, request)
-    except Exception as exc:
-        import traceback
-        trace_id = str(uuid.uuid4())
-        error_trace = traceback.format_exc()
-        print(f"[CRITICAL ERROR][{trace_id}] {exc}\n{error_trace}")
-        response = _format_internal_error(exc, request, stage)
-        response["trace_id"] = trace_id
-        if os.getenv("EXPOSE_DEBUG_TRACES", "false").lower() == "true":
-            response["debug_trace"] = error_trace
-        return response
+def _trace_metadata(request: AssistantRequest, trace_id: str) -> dict:
+    return {
+        "trace_id": trace_id,
+        "action_type": request.action_type.value,
+        "sub_command": request.payload.get("sub_command", "chat") if isinstance(request.payload, dict) else "chat",
+        "platform": request.source.platform,
+        "channel_id": request.source.channel_id,
+        "user_id": request.source.user_id,
+        "image_count": len(request.images),
+    }
 
 
 def _discord_gate(request: AssistantRequest) -> dict:
