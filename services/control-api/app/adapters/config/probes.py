@@ -13,6 +13,8 @@ class HttpSystemProbe(SystemProbe):
         checks = [
             ("control-api", "self"),
             ("assistant-runtime", f"{self.settings.effective('open_claw_base_url')}/health"),
+            ("ingestion-worker", f"{self.settings.effective('ingestion_worker_base_url')}/health"),
+            ("discord-bot", f"{self.settings.effective('discord_bot_base_url')}/health"),
         ]
         if self.settings.effective("mentis_enabled"):
             checks.append(("mentis", f"{self.settings.effective('mentis_base_url')}/health"))

@@ -48,12 +48,18 @@ class TradingWorkflow:
 
     async def execute_trade_decision(self, prompt: str, user_id: str | None = None) -> dict:
         # 1. Chequeo de Salud Financiera (Robustez)
-        balance = await self.trading.get_balance()
+        try:
+            balance = await self.trading.get_balance()
+        except RuntimeError as exc:
+            return {"status": "needs_configuration", "message": str(exc)}
         if balance <= 0:
             return {"status": "error", "message": "Saldo insuficiente o error consultando balance."}
 
         # 2. Obtener mercados disponibles
-        markets = await self.trading.get_markets()
+        try:
+            markets = await self.trading.get_markets()
+        except RuntimeError as exc:
+            return {"status": "needs_configuration", "message": str(exc)}
         
         # 3. FASE ANALISTA: Proponer una jugada
         analysis = await self.llm.analyze_trade(market_data=markets, prompt=prompt)

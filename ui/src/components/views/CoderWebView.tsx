@@ -43,22 +43,23 @@ const pilotCapabilities = [
 const pilotFlow = ["Brief", "Scaffold", "Review", "Deploy"];
 
 const monitorItems = [
-  { label: "Pilot Engine", value: "Online", icon: Zap, tone: "emerald" },
-  { label: "Supabase Sync", value: "Conectado", icon: Database, tone: "sky" },
-  { label: "CI/CD Pipelines", value: "Activos", icon: Globe2, tone: "violet" },
+  { label: "GitHub Writes", value: "Branch + PR", icon: Zap, tone: "emerald" },
+  { label: "Linear Intake", value: "Issue linked", icon: Database, tone: "sky" },
+  { label: "CI/CD Pipelines", value: "PR checks", icon: Globe2, tone: "violet" },
 ];
 
 const terminalLines = [
-  "[SYSTEM] Pilot initialized.",
-  "[INFO] Watching repository ecommerce-3a2f.",
-  "[QUEUE] No pending deployments.",
-  "[STATUS] Awaiting next instruction.",
+  "[SYSTEM] Production adapter initialized.",
+  "[GITHUB] Branch, commit and pull request required.",
+  "[LINEAR] Issue comments enabled when API key is configured.",
+  "[PREVIEW] Deploy hook required for preview_required tasks.",
 ];
 
 export function CoderWebView({ data, onSave }: { data: any, adminToken: string, onSave: (payload: any) => Promise<void> }) {
   const { runtime } = data;
   const currentRuntime = runtime?.runtime || {};
   const secrets = currentRuntime.secrets || {};
+  const coderWebConfig = data.config?.integrations?.coder_web || {};
 
   const handleSave = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -102,12 +103,11 @@ export function CoderWebView({ data, onSave }: { data: any, adminToken: string, 
             title="GitHub Repository Control"
             description="Credenciales y destino para crear, actualizar y publicar proyectos React/TS."
             action={
-              secrets.github_token ? (
-                <Badge className="rounded-full bg-emerald-50 text-emerald-700 hover:bg-emerald-50">
-                  <CheckCircle2 className="mr-1 size-3" />
-                  Token guardado
-                </Badge>
-              ) : null
+              <div className="flex flex-wrap justify-end gap-2">
+                <ConfigBadge configured={Boolean(secrets.github_token || coderWebConfig.has_github_auth)} label="GitHub" />
+                <ConfigBadge configured={Boolean(secrets.linear_api_key || coderWebConfig.has_linear_api_key)} label="Linear" />
+                <ConfigBadge configured={Boolean(secrets.coder_web_preview_deploy_hook_url || coderWebConfig.has_preview_hook)} label="Preview" />
+              </div>
             }
           >
             <Field label="GitHub Personal Token" hint="Solo se actualiza si escribes un nuevo token.">
@@ -125,6 +125,39 @@ export function CoderWebView({ data, onSave }: { data: any, adminToken: string, 
                 defaultValue={currentRuntime.github_org || ""}
                 className="coder-input"
               />
+            </Field>
+            <Field label="Repositorio destino" hint="Opcional. Si está vacío, Coder Web crea un repo nuevo en el owner configurado.">
+              <Input
+                name="coder_web_repository"
+                placeholder="owner/repo"
+                defaultValue={currentRuntime.coder_web_repository || ""}
+                className="coder-input"
+              />
+            </Field>
+            <Field label="Linear API Key" hint="Permite comentar PRs en issues asignados desde Linear.">
+              <Input
+                name="linear_api_key"
+                type="password"
+                placeholder={secrets.linear_api_key ? "Key existente protegida" : "lin_api_..."}
+                className="coder-input"
+              />
+            </Field>
+            <Field label="Preview deploy hook" hint="Webhook de Vercel/Netlify/CI para generar preview por PR.">
+              <Input
+                name="coder_web_preview_deploy_hook_url"
+                type="password"
+                placeholder={secrets.coder_web_preview_deploy_hook_url ? "Hook existente protegido" : "https://api.vercel.com/v1/integrations/deploy/..."}
+                className="coder-input"
+              />
+            </Field>
+            <Field label="Privacidad de repos nuevos">
+              <Select name="coder_web_private_repo" defaultValue={String(currentRuntime.coder_web_private_repo ?? true)}>
+                <SelectTrigger className="coder-select"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="true">Privado</SelectItem>
+                  <SelectItem value="false">Público</SelectItem>
+                </SelectContent>
+              </Select>
             </Field>
           </SettingsSection>
 
@@ -165,7 +198,7 @@ export function CoderWebView({ data, onSave }: { data: any, adminToken: string, 
             <div className="rounded-[8px] border border-neutral-200 bg-neutral-50 p-4">
               <p className="text-sm font-semibold text-neutral-950">Modo de entrega</p>
               <p className="mt-1 text-xs leading-5 text-neutral-500">
-                El piloto prepara ramas y diffs revisables antes de tocar ambientes productivos.
+                El piloto siempre prepara branch, commit, pull request, checks y rollback antes de tocar ambientes productivos.
               </p>
               <code className="mt-3 block rounded-[6px] bg-neutral-950 px-3 py-2 text-xs text-neutral-100">
                 branch: feature/coder-web-pilot
@@ -290,6 +323,19 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
       {children}
       {hint ? <p className="text-xs leading-5 text-neutral-500">{hint}</p> : null}
     </div>
+  );
+}
+
+function ConfigBadge({ configured, label }: { configured: boolean; label: string }) {
+  return configured ? (
+    <Badge className="rounded-full bg-emerald-50 text-emerald-700 hover:bg-emerald-50">
+      <CheckCircle2 className="mr-1 size-3" />
+      {label}
+    </Badge>
+  ) : (
+    <Badge className="rounded-full bg-neutral-100 text-neutral-500 hover:bg-neutral-100">
+      {label}
+    </Badge>
   );
 }
 

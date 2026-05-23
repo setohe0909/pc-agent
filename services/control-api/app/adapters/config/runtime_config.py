@@ -9,6 +9,8 @@ CONFIG_PATH = Path(os.getenv("RUNTIME_CONFIG_PATH", "runtime-config.json"))
 
 PUBLIC_KEYS = {
     "open_claw_base_url",
+    "ingestion_worker_base_url",
+    "discord_bot_base_url",
     "mentis_base_url",
     "mentis_enabled",
     "langfuse_host",
@@ -26,6 +28,8 @@ PUBLIC_KEYS = {
     "coder_web_stack",
     "coder_web_autonomy",
     "coder_web_perf",
+    "coder_web_repository",
+    "coder_web_private_repo",
     "github_org",
     "kalshi_env",
     "kalshi_trading_enabled",
@@ -46,6 +50,7 @@ PUBLIC_KEYS = {
     "email_pc_client_bridge_url",
     "email_outlook_tenant_id",
     "email_templates",
+    "email_categories",
 }
 
 SECRET_KEYS = {
@@ -66,6 +71,8 @@ SECRET_KEYS = {
     "marketing_tone",
     "marketing_poll_frequency",
     "github_token",
+    "linear_api_key",
+    "coder_web_preview_deploy_hook_url",
     "kalshi_username",
     "kalshi_password",
     "kalshi_key_id",
@@ -81,6 +88,8 @@ SECRET_KEYS = {
 
 class RuntimeConfigUpdate(BaseModel):
     open_claw_base_url: str | None = Field(default=None, max_length=2048)
+    ingestion_worker_base_url: str | None = Field(default=None, max_length=2048)
+    discord_bot_base_url: str | None = Field(default=None, max_length=2048)
     mentis_base_url: str | None = Field(default=None, max_length=2048)
     mentis_enabled: bool | None = None
     langfuse_host: str | None = Field(default=None, max_length=2048)
@@ -144,12 +153,19 @@ class RuntimeConfigUpdate(BaseModel):
     email_pc_client_bridge_url: str | None = Field(default=None, max_length=2048)
     email_pc_client_bridge_token: str | None = Field(default=None, max_length=4096)
     email_templates: list[dict[str, Any]] | str | None = None
+    email_categories: list[dict[str, Any]] | str | None = None
     coder_web_stack: str | None = Field(default=None, max_length=80)
     coder_web_autonomy: str | None = Field(default=None, max_length=80)
     coder_web_perf: str | None = Field(default=None, max_length=80)
+    coder_web_repository: str | None = Field(default=None, max_length=240)
+    coder_web_private_repo: bool | None = None
+    coder_web_preview_deploy_hook_url: str | None = Field(default=None, max_length=2048)
+    linear_api_key: str | None = Field(default=None, max_length=4096)
 
     @field_validator(
         "open_claw_base_url",
+        "ingestion_worker_base_url",
+        "discord_bot_base_url",
         "mentis_base_url",
         "langfuse_host",
         "supabase_url",
@@ -157,6 +173,7 @@ class RuntimeConfigUpdate(BaseModel):
         "kalshi_api_base_url",
         "openwa_base_url",
         "email_pc_client_bridge_url",
+        "coder_web_preview_deploy_hook_url",
     )
     @classmethod
     def validate_url(cls, value: str | None) -> str | None:

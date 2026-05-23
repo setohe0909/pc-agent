@@ -30,23 +30,7 @@ class KalshiHttpAdapter(TradingPort):
     async def get_markets(self) -> list[dict]:
         creds = self._get_credentials()
         if not creds or not creds["username"]:
-            # Fallback a demo si no hay credenciales
-            return [
-                {
-                    "ticker": "KXFED-DEMO",
-                    "title": "Will the Fed target rate be 3.50%? (DEMO)",
-                    "yes_price": 0.45,
-                    "no_price": 0.55,
-                    "volume": 120000,
-                },
-                {
-                    "ticker": "KXINFL-DEMO",
-                    "title": "Will US Inflation be > 3.1%? (DEMO)",
-                    "yes_price": 0.12,
-                    "no_price": 0.88,
-                    "volume": 45000,
-                }
-            ]
+            raise RuntimeError("Kalshi no esta configurado. Define credenciales reales antes de consultar mercados.")
         try:
             async with httpx.AsyncClient(timeout=8) as client:
                 response = await client.get(f"{self.api_base_url}/markets", params={"limit": "20"})
@@ -62,7 +46,7 @@ class KalshiHttpAdapter(TradingPort):
     async def get_balance(self) -> float:
         creds = self._get_credentials()
         if not creds or not creds["username"]:
-            return 1000.0  # Balance ficticio para demo
+            raise RuntimeError("Kalshi no esta configurado. No se puede calcular balance real.")
         
         if self.environment != "live":
             return float(os.getenv("KALSHI_PAPER_BALANCE", "1000"))
@@ -74,8 +58,12 @@ class KalshiHttpAdapter(TradingPort):
         order_id = client_order_id or f"ord-{os.urandom(4).hex()}"
         
         if not creds or not creds["username"]:
-            print(f"[KALSHI DEMO] Orden {order_id}: {action} {amount} en {ticker}")
-            return {"status": "executed", "order_id": order_id, "message": "Orden DEMO ejecutada."}
+            return {
+                "status": "blocked",
+                "order_id": order_id,
+                "environment": self.environment,
+                "message": "Orden no enviada: Kalshi no esta configurado con credenciales reales.",
+            }
 
         if self.environment != "live" or os.getenv("KALSHI_TRADING_ENABLED", "false").lower() != "true":
             return {

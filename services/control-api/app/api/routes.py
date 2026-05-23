@@ -1,3 +1,4 @@
+import json
 import os
 import httpx
 from datetime import datetime
@@ -157,7 +158,11 @@ async def config() -> dict:
             },
             "coder_web": {
                 "has_github_auth": bool(runtime.get("github_token")),
-                "stack": runtime.get("coder_web_stack", "react-ts")
+                "stack": runtime.get("coder_web_stack", "react-ts"),
+                "repository": runtime.get("coder_web_repository"),
+                "private_repo": runtime.get("coder_web_private_repo", True),
+                "has_preview_hook": bool(runtime.get("coder_web_preview_deploy_hook_url")),
+                "has_linear_api_key": bool(runtime.get("linear_api_key")),
             },
             "email": {
                 "provider": settings.effective("email_provider") or "not_configured",
@@ -177,10 +182,23 @@ async def config() -> dict:
                 ),
                 "has_imap_smtp": bool(runtime.get("email_imap_host") and runtime.get("email_smtp_host") and runtime.get("email_username") and runtime.get("email_password")),
                 "has_pc_client_bridge": bool(runtime.get("email_pc_client_bridge_url")),
-                "template_count": len(runtime.get("email_templates") or []),
+                "template_count": _json_list_count(runtime.get("email_templates")),
+                "category_count": _json_list_count(runtime.get("email_categories")),
             }
         },
     }
+
+
+def _json_list_count(value) -> int:
+    if isinstance(value, list):
+        return len(value)
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError:
+            return 0
+        return len(parsed) if isinstance(parsed, list) else 0
+    return 0
 
 
 @router.get("/config/runtime")
@@ -360,7 +378,7 @@ async def update_ingestion_schedule(request: IngestionScheduleRequest) -> dict:
 
 @router.post("/ingestion/runs", dependencies=[Depends(require_admin)])
 async def trigger_ingestion_run(request: TriggerIngestionRequest) -> dict:
-    worker_url = "http://ingestion-worker:8000"
+    worker_url = str(settings.effective("ingestion_worker_base_url") or "http://ingestion-worker:8000").rstrip("/")
     async with httpx.AsyncClient(timeout=5) as client:
         try:
             resp = await client.post(f"{worker_url}/run/{request.target}")
@@ -426,6 +444,14 @@ async def get_whatsapp_outreach() -> dict:
         return {"contacts": contacts, "campaigns": campaigns}
     except Exception as exc:
         return {"contacts": [], "campaigns": [], "detail": str(exc)}
+
+
+@router.get("/email/jobs")
+async def get_email_jobs(limit: int = 50) -> dict:
+    try:
+        return {"jobs": await _list_email_jobs(limit=limit)}
+    except Exception as exc:
+        return {"jobs": [], "detail": str(exc)}
 
 
 @router.post("/marketing/whatsapp/contacts", dependencies=[Depends(require_admin)])
@@ -500,6 +526,42 @@ def _whatsapp_outreach_repository() -> SupabaseWhatsAppOutreachRepository:
         url=settings.effective("supabase_url"),
         service_role_key=settings.effective("supabase_service_role_key"),
     )
+
+
+async def _list_email_jobs(limit: int = 50) -> list[dict]:
+    supabase_url = settings.effective("supabase_url")
+    service_role_key = settings.effective("supabase_service_role_key")
+    if not supabase_url or not service_role_key:
+        raise RuntimeError("Supabase service role no configurado para listar jobs de email.")
+    headers = {
+        "apikey": service_role_key,
+        "Authorization": f"Bearer {service_role_key}",
+    }
+    async with httpx.AsyncClient(timeout=8) as client:
+        jobs_response = await client.get(
+            f"{str(supabase_url).rstrip('/')}/rest/v1/email_bulk_jobs",
+            headers=headers,
+            params={
+                "select": "id,provider,account_id,template_name,category,status,requested_by,approved_by,recipient_count,created_at,updated_at,provider_result",
+                "order": "created_at.desc",
+                "limit": str(min(max(limit, 1), 200)),
+            },
+        )
+        jobs_response.raise_for_status()
+        jobs = jobs_response.json()
+        for job in jobs:
+            recipients_response = await client.get(
+                f"{str(supabase_url).rstrip('/')}/rest/v1/email_bulk_job_recipients",
+                headers=headers,
+                params={
+                    "job_id": f"eq.{job.get('id')}",
+                    "select": "email_id,recipient,subject,status,provider_message_id,error_detail,created_at,updated_at",
+                    "order": "created_at.asc",
+                },
+            )
+            recipients_response.raise_for_status()
+            job["recipients"] = recipients_response.json()
+    return jobs
 
 
 def _knowledge_source_repository(require_persistence: bool = False):

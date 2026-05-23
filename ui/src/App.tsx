@@ -178,6 +178,10 @@ type DashboardData = {
       detail?: string;
     }>;
   } | null;
+  emailJobs?: {
+    jobs?: Array<Record<string, unknown>>;
+    detail?: string;
+  } | null;
 };
 
 export default function App() {
@@ -194,9 +198,10 @@ export default function App() {
       getJson("/supabase/verify").catch(() => null),
       getJson("/mentis/verify").catch(() => null),
       getJson("/ingestion").catch(() => null),
-      getJson("/models/usage").catch(() => null)
-    ]).then(([status, config, runtime, sources, supabase, mentis, ingestion, modelUsage]) => {
-      setData({ status, config, runtime, sources, supabase, mentis, ingestion, modelUsage });
+      getJson("/models/usage").catch(() => null),
+      getJson("/email/jobs").catch(() => null)
+    ]).then(([status, config, runtime, sources, supabase, mentis, ingestion, modelUsage, emailJobs]) => {
+      setData({ status, config, runtime, sources, supabase, mentis, ingestion, modelUsage, emailJobs });
     }).catch(err => console.error("Error cargando status", err));
   };
 
@@ -215,10 +220,8 @@ export default function App() {
   }, []);
 
   const handleSaveConfig = async (payload: unknown) => {
-    console.log("[CONFIG] Intentando guardar payload:", payload);
     try {
-      const result = await saveRuntimeConfig(payload, adminToken);
-      console.log("[CONFIG] Resultado del servidor:", result);
+      await saveRuntimeConfig(payload, adminToken);
       refresh();
       alert("Configuración guardada exitosamente");
     } catch (err: unknown) {
@@ -246,7 +249,7 @@ export default function App() {
       case "marketing": return <MarketerView data={data} adminToken={adminToken} onSave={handleSaveConfig} />;
       case "leads": return <LeadsView />;
       case "whatsapp": return <WhatsAppView adminToken={adminToken} />;
-      case "email": return <EmailView data={data} />;
+      case "email": return <EmailView data={data} adminToken={adminToken} onSave={handleSaveConfig} />;
       case "writer": return <WriterView data={data} adminToken={adminToken} onSave={handleSaveConfig} />;
       case "picture": return <PictureView data={data} adminToken={adminToken} onSave={handleSaveConfig} />;
       case "coder": return <CoderWebView data={data} adminToken={adminToken} onSave={handleSaveConfig} />;

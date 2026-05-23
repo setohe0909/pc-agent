@@ -69,9 +69,12 @@ El sub-agente de email opera correo con enfoque Clean/Hexagonal para que el domi
 - `!email sent-today`: lista enviados de hoy.
 - `!email categorize <categoria>`: prepara reglas/categorizacion.
 - `!email --template-<nombre> <categoria>`: prepara respuesta bulk para aprobacion con botones en Discord.
+- `!email process-queued`: procesa jobs bulk aprobados en cola.
 
 ### Seguridad
-Los envios masivos requieren proveedor configurado, permiso explicito de envio, aprobacion humana, rate limits, idempotencia y auditoria. Por defecto el agente genera un `job_id`; la aprobacion encola el envio real y la denegacion cancela el job sin enviar correos.
+Los envios masivos requieren proveedor configurado, permiso explicito de envio, aprobacion humana, rate limits, idempotencia y auditoria. Por defecto el agente genera un `job_id`; la aprobacion deja el job en cola, `!email process-queued` ejecuta el envio real y la denegacion cancela el job sin enviar correos.
+
+La vista `Email Agent` del administrador funciona como consola operativa: muestra estado de proveedor, envio, persistencia, categorias y templates, y permite editar esa configuracion desde el mismo panel.
 
 ## 6. Inteligencia Proactiva
 

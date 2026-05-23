@@ -19,6 +19,10 @@ from langfuse.decorators import observe
 # --- Servidor API para ejecuciones manuales ---
 app = FastAPI()
 
+@app.get("/health")
+async def health() -> dict:
+    return {"status": "ok", "service": "ingestion-worker"}
+
 @app.post("/run/{target}")
 async def run_manual_job(target: str, background_tasks: BackgroundTasks):
     print(f"[API] Solicitud de ejecucion manual recibida para: {target}")

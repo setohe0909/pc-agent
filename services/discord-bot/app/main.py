@@ -101,6 +101,21 @@ def _extract_email_template_flag(raw_query: str) -> tuple[str, str | None]:
     return cleaned, template
 
 
+def _extract_named_flag(raw_query: str, flag: str) -> tuple[str, str | None]:
+    match = re.search(rf"(^|\s)--{re.escape(flag)}\s+([^\s]+)(?=\s|$)", raw_query)
+    value = match.group(2).strip() if match else None
+    cleaned = re.sub(rf"(^|\s)--{re.escape(flag)}\s+[^\s]+(?=\s|$)", " ", raw_query).strip()
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    return cleaned, value
+
+
+def _extract_bool_flag(raw_query: str, flag: str) -> tuple[str, bool]:
+    has_flag = bool(re.search(rf"(^|\s)--{re.escape(flag)}(?=\s|$)", raw_query))
+    cleaned = re.sub(rf"(^|\s)--{re.escape(flag)}(?=\s|$)", " ", raw_query).strip()
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    return cleaned, has_flag
+
+
 async def _decide_whatsapp_campaign(campaign_id: str, approved: bool, decided_by: str) -> dict:
     base_url = _get_env("CONTROL_API_URL", "http://control-api:8000").rstrip("/")
     token = _get_env("ADMIN_API_TOKEN", "")
@@ -670,6 +685,7 @@ async def main() -> None:
                     "`!email sent-today`: Lista emails enviados el dia actual.\n"
                     "`!email categorize <categoria>`: Prepara clasificacion por filtros/categoria.\n"
                     "`!email --template-<nombre> <categoria>`: Prepara respuestas bulk con template del administrador y pide aprobación.\n"
+                    "`!email process-queued`: Procesa jobs bulk aprobados y en cola.\n"
                     "`!email --model-status`: Estado de modelos del sub-agent."
                 ),
                 inline=False,
@@ -745,12 +761,12 @@ async def main() -> None:
             )
             embed.add_field(
                 name="💻 Coder Web Sub-Agent", 
-                value="`!coder-web <descripción>`: Crear/ajustar e-commerce (Repositorio).\n`!coder-web memory`: Ver aprendizajes del desarrollador web.\n`!coder-web memory --clean`: Borrar memoria del día.", 
+                value="`!coder-web <descripción>`: Crea branch, commit y PR real.\n`!coder-web --linear <issue_id> --repo owner/repo`: Ejecuta una tarea asignada desde Linear.\n`!coder-web --preview-required <descripción>`: Exige preview hook configurado.\n`!coder-web memory`: Ver aprendizajes.\n`!coder-web memory --clean`: Borrar memoria del día.", 
                 inline=False
             )
             embed.add_field(
                 name="📬 Email Sub-Agent",
-                value="`!email status`: Estado del proveedor.\n`!email sent-today`: Emails enviados hoy.\n`!email categorize <categoria>`: Categorizar por filtros.\n`!email --template-seguimiento lead`: Preparar respuestas bulk con aprobación.",
+                value="`!email status`: Estado del proveedor.\n`!email sent-today`: Emails enviados hoy.\n`!email categorize <categoria>`: Categorizar por filtros.\n`!email --template-seguimiento lead`: Preparar respuestas bulk con aprobación.\n`!email process-queued`: Procesar jobs aprobados.",
                 inline=False,
             )
             embed.set_footer(text="PC Agent v0.6.1 - Help actualizado")
@@ -780,6 +796,13 @@ async def main() -> None:
             elif raw_query in {"sent-today", "enviados-hoy", "sent today"}:
                 sub_command = "sent-today"
                 prompt = "lista emails enviados hoy"
+            elif raw_query in {"process-queued", "procesar-cola", "process queued"}:
+                approvers = _approvers()
+                if approvers and str(message.author.id) not in approvers:
+                    await message.reply("❌ Solo un aprobador puede procesar la cola de email.")
+                    return
+                sub_command = "process-queued"
+                prompt = "procesa jobs de email en cola"
             elif raw_query.startswith("categorize "):
                 sub_command = "categorize"
                 category = raw_query.removeprefix("categorize ").strip()
@@ -1558,6 +1581,10 @@ async def main() -> None:
         
         if content.startswith("!coder-web"):
             raw_query = content.removeprefix("!coder-web").strip()
+            raw_query, linear_issue_id = _extract_named_flag(raw_query, "linear")
+            raw_query, repo_full_name = _extract_named_flag(raw_query, "repo")
+            raw_query, branch_name = _extract_named_flag(raw_query, "branch")
+            raw_query, preview_required = _extract_bool_flag(raw_query, "preview-required")
 
             if raw_query == "--model-status":
                 await _send_model_status(message, "coder-web")
@@ -1595,12 +1622,13 @@ async def main() -> None:
                     await message.reply(f"❌ Error: {e}")
                 return
 
-            if not raw_query:
+            if not raw_query and not linear_issue_id:
                 await message.reply("💻 Por favor, añade una descripción para el proyecto web. Ejemplo: `!coder-web crea un ecommerce de zapatos con React`.")
                 return
 
             try:
-                thread = await _get_or_create_agent_thread(message, "Coder", raw_query)
+                prompt_text = raw_query or f"Implementa la tarea de Linear {linear_issue_id}"
+                thread = await _get_or_create_agent_thread(message, "Coder", prompt_text)
                 await thread.send("⏳ **Coder Web Agent** (Pilot) está analizando la arquitectura y preparando el stack...")
 
                 # Capturar imágenes adjuntas (Mockups/Referencias)
@@ -1614,10 +1642,15 @@ async def main() -> None:
 
                 payload = {
                     "action_type": "coder-web",
-                    "prompt": raw_query,
+                    "prompt": prompt_text,
                     "source": {"platform": "discord", "channel_id": str(thread.id), "user_id": str(message.author.id)},
                     "images": images_b64,
-                    "payload": {}
+                    "payload": {
+                        "linear_issue_id": linear_issue_id,
+                        "github_repo_full_name": repo_full_name,
+                        "branch_name": branch_name,
+                        "preview_required": preview_required,
+                    }
                 }
 
                 result = await _send_assistant_request(payload)
@@ -1693,6 +1726,14 @@ async def main() -> None:
 
     # --- Servidor API interno para notificaciones ---
     app_api = FastAPI()
+
+    @app_api.get("/health")
+    async def health():
+        return {
+            "status": "ok" if client.is_ready() else "starting",
+            "service": "discord-bot",
+            "discord_ready": client.is_ready(),
+        }
 
     @app_api.post("/notify/trade")
     async def notify_trade(request: Request):

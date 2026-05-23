@@ -8,6 +8,8 @@ class Settings(BaseSettings):
     admin_api_token: str = "change-me-admin-token"
     cors_allow_origins: str = "http://localhost:8080,http://127.0.0.1:8080"
     open_claw_base_url: str = "http://assistant-runtime:8100"
+    ingestion_worker_base_url: str = "http://ingestion-worker:8000"
+    discord_bot_base_url: str = "http://discord-bot:8001"
     mentis_base_url: str = "http://mentisdb:9471"
     mentis_enabled: bool = False
     langfuse_host: str = "http://langfuse-web:3000"
@@ -51,6 +53,10 @@ class Settings(BaseSettings):
     email_pc_client_bridge_url: str | None = None
     email_pc_client_bridge_token: str | None = None
     default_llm_provider: str = "openai"
+    coder_web_repository: str | None = None
+    coder_web_private_repo: bool = True
+    coder_web_preview_deploy_hook_url: str | None = None
+    linear_api_key: str | None = None
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

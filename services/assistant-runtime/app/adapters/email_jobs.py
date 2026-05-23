@@ -121,6 +121,61 @@ class SupabaseEmailJobRepository(EmailJobRepositoryPort):
         )
         return replace(job, status=EmailBulkJobStatus.queued, provider_result=provider_result)
 
+    async def mark_bulk_job_status(self, job_id: str, status: str, provider_result: dict | None = None) -> EmailBulkJob:
+        job = await self.get_bulk_job(job_id)
+        payload = {"status": status}
+        if provider_result is not None:
+            payload["provider_result"] = provider_result
+        await self._patch_job(job_id, payload)
+        return replace(job, status=EmailBulkJobStatus(status), provider_result=provider_result or job.provider_result)
+
+    async def update_recipient_status(
+        self,
+        job_id: str,
+        email_id: str,
+        status: str,
+        provider_message_id: str | None = None,
+        error_detail: str | None = None,
+    ) -> None:
+        payload = {
+            "status": status,
+            "provider_message_id": provider_message_id,
+            "error_detail": error_detail,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        async with httpx.AsyncClient(timeout=10) as client:
+            response = await client.patch(
+                self._table_url("email_bulk_job_recipients"),
+                headers=self._headers("return=minimal"),
+                params={"job_id": f"eq.{job_id}", "email_id": f"eq.{email_id}"},
+                json=payload,
+            )
+        self._raise_for_supabase(response, "patch email_bulk_job_recipients")
+
+    async def list_bulk_jobs(self, statuses: list[str] | None = None, limit: int = 50) -> list[EmailBulkJob]:
+        self._ensure_configured()
+        params = {
+            "select": "*",
+            "order": "created_at.desc",
+            "limit": str(min(max(limit, 1), 200)),
+        }
+        if statuses:
+            params["status"] = f"in.({','.join(statuses)})"
+        async with httpx.AsyncClient(timeout=10) as client:
+            response = await client.get(self._table_url("email_bulk_jobs"), headers=self._headers(), params=params)
+            self._raise_for_supabase(response, "list email_bulk_jobs")
+            rows = response.json()
+            jobs = []
+            for row in rows:
+                recipient_response = await client.get(
+                    self._table_url("email_bulk_job_recipients"),
+                    headers=self._headers(),
+                    params={"job_id": f"eq.{row.get('id')}", "select": "*", "order": "created_at.asc"},
+                )
+                self._raise_for_supabase(recipient_response, "list email_bulk_job_recipients")
+                jobs.append(_supabase_job_from_rows(row, recipient_response.json()))
+        return jobs
+
     async def append_audit(self, event: EmailAuditEvent) -> None:
         self._ensure_configured()
         payload = _audit_to_dict(event)
@@ -208,6 +263,43 @@ class FileEmailJobRepository(EmailJobRepositoryPort):
         updated = replace(job, status=EmailBulkJobStatus.queued, provider_result=provider_result)
         await self._replace_job(updated)
         return updated
+
+    async def mark_bulk_job_status(self, job_id: str, status: str, provider_result: dict | None = None) -> EmailBulkJob:
+        job = await self.get_bulk_job(job_id)
+        updated = replace(job, status=EmailBulkJobStatus(status), provider_result=provider_result or job.provider_result)
+        await self._replace_job(updated)
+        return updated
+
+    async def update_recipient_status(
+        self,
+        job_id: str,
+        email_id: str,
+        status: str,
+        provider_message_id: str | None = None,
+        error_detail: str | None = None,
+    ) -> None:
+        job = await self.get_bulk_job(job_id)
+        updated_recipients = []
+        for recipient in job.recipients:
+            if recipient.email_id != email_id:
+                updated_recipients.append(recipient)
+                continue
+            metadata = {**recipient.metadata}
+            if provider_message_id:
+                metadata["provider_message_id"] = provider_message_id
+            if error_detail:
+                metadata["error_detail"] = error_detail
+            updated_recipients.append(replace(recipient, status=status, metadata=metadata))
+        await self._replace_job(replace(job, recipients=updated_recipients))
+
+    async def list_bulk_jobs(self, statuses: list[str] | None = None, limit: int = 50) -> list[EmailBulkJob]:
+        data = self._read()
+        jobs = [_job_from_dict(item) for item in data.get("jobs", {}).values()]
+        if statuses:
+            allowed = set(statuses)
+            jobs = [job for job in jobs if job.status.value in allowed]
+        jobs.sort(key=lambda item: item.created_at, reverse=True)
+        return jobs[: min(max(limit, 1), 200)]
 
     async def append_audit(self, event: EmailAuditEvent) -> None:
         data = self._read()

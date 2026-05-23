@@ -6,7 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "services" / "assistant-runtime"))
 
-from app.domain.email.models import EmailAuditEvent, EmailBulkJob, EmailMessage, EmailProviderHealth, EmailTemplate
+from app.domain.email.models import EmailAuditEvent, EmailBulkJob, EmailCategory, EmailMessage, EmailProviderHealth, EmailTemplate
 from app.adapters.email import _message_from_dict
 from app.use_cases.email_workflow import EmailWorkflow
 
@@ -30,6 +30,9 @@ class FakeEmailConfig:
 
     def list_templates(self) -> list[EmailTemplate]:
         return self.templates
+
+    def list_categories(self) -> list[EmailCategory]:
+        return [EmailCategory(name="lead", description="Leads entrantes")]
 
 
 class FakeEmailProvider:
@@ -74,7 +77,7 @@ class FakeEmailProvider:
 
     async def send_bulk_replies(self, email_ids: list[str], template: EmailTemplate, dry_run: bool) -> dict:
         self.sent_calls.append({"email_ids": email_ids, "template": template.name, "dry_run": dry_run})
-        return {"email_ids": email_ids, "template": template.name, "dry_run": dry_run}
+        return {"status": "sent" if not dry_run else "planned", "email_ids": email_ids, "template": template.name, "dry_run": dry_run}
 
 
 class FakeEmailJobRepository:
@@ -118,6 +121,35 @@ class FakeEmailJobRepository:
         self.jobs[job_id] = job
         return job
 
+    async def mark_bulk_job_status(self, job_id: str, status: str, provider_result: dict | None = None) -> EmailBulkJob:
+        from dataclasses import replace
+
+        from app.domain.email.models import EmailBulkJobStatus
+
+        job = replace(self.jobs[job_id], status=EmailBulkJobStatus(status), provider_result=provider_result or self.jobs[job_id].provider_result)
+        self.jobs[job_id] = job
+        return job
+
+    async def update_recipient_status(
+        self,
+        job_id: str,
+        email_id: str,
+        status: str,
+        provider_message_id: str | None = None,
+        error_detail: str | None = None,
+    ) -> None:
+        from dataclasses import replace
+
+        job = self.jobs[job_id]
+        recipients = [replace(item, status=status) if item.email_id == email_id else item for item in job.recipients]
+        self.jobs[job_id] = replace(job, recipients=recipients)
+
+    async def list_bulk_jobs(self, statuses: list[str] | None = None, limit: int = 50) -> list[EmailBulkJob]:
+        jobs = list(self.jobs.values())
+        if statuses:
+            jobs = [job for job in jobs if job.status.value in set(statuses)]
+        return jobs[:limit]
+
     async def append_audit(self, event: EmailAuditEvent) -> None:
         self.audit.append(event)
 
@@ -130,6 +162,7 @@ class EmailWorkflowTests(unittest.TestCase):
             self.assertEqual(result["status"], "success")
             self.assertIn("team@example.com", result["message"])
             self.assertEqual(result["email_status"]["templates"], ["seguimiento"])
+            self.assertEqual(result["email_status"]["categories"], ["lead"])
 
         asyncio.run(scenario())
 
@@ -155,7 +188,7 @@ class EmailWorkflowTests(unittest.TestCase):
 
         asyncio.run(scenario())
 
-    def test_approved_bulk_reply_queues_provider_send(self) -> None:
+    def test_approved_bulk_reply_queues_without_provider_send(self) -> None:
         async def scenario() -> None:
             provider = FakeEmailProvider()
             jobs = FakeEmailJobRepository()
@@ -172,7 +205,30 @@ class EmailWorkflowTests(unittest.TestCase):
             self.assertEqual(approved["status"], "accepted")
             self.assertFalse(approved["requires_approval"])
             self.assertEqual(approved["email_bulk_reply"]["status"], "queued")
+            self.assertEqual(len(provider.sent_calls), 1)
+            self.assertEqual(provider.sent_calls[-1]["dry_run"], True)
+
+        asyncio.run(scenario())
+
+    def test_process_queued_sends_pending_recipients_once(self) -> None:
+        async def scenario() -> None:
+            provider = FakeEmailProvider()
+            jobs = FakeEmailJobRepository()
+            workflow = EmailWorkflow(provider, FakeEmailConfig(), jobs, llm=None)
+            prepared = await workflow.run(
+                "lead",
+                {"sub_command": "bulk-reply", "template_name": "seguimiento", "category": "lead"},
+            )
+            job_id = prepared["email_bulk_reply"]["job_id"]
+            await workflow.run(
+                "approve",
+                {"sub_command": "bulk-reply", "job_id": job_id, "is_approved": True, "approved_by": "manager-1"},
+            )
+            processed = await workflow.run("process", {"sub_command": "process-queued"})
+            self.assertEqual(processed["status"], "success")
+            self.assertEqual(jobs.jobs[job_id].status.value, "sent")
             self.assertEqual(provider.sent_calls[-1]["dry_run"], False)
+            self.assertEqual(jobs.jobs[job_id].recipients[0].status, "sent")
 
         asyncio.run(scenario())
 

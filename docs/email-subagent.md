@@ -19,6 +19,7 @@ El sub-agente `!email` administra flujos de correo para lectura, categorizacion 
 | `!email sent-today` | Lista emails enviados hoy. |
 | `!email categorize <categoria>` | Prepara categorizacion por filtros/categoria. |
 | `!email --template-<nombre> <categoria>` | Prepara respuesta bulk para emails de esa categoria y solicita aprobacion. |
+| `!email process-queued` | Procesa jobs bulk aprobados en cola. |
 | `!email --model-status` | Muestra modelos usados para clasificacion, resumen y templates. |
 
 ## Diseno de Produccion
@@ -34,7 +35,9 @@ El flujo separa responsabilidades:
 - `FileEmailJobRepository`: fallback local para persistir jobs en `EMAIL_JOBS_PATH` durante desarrollo.
 - Admin UI: guarda proveedor, credenciales, permiso de envio, limites y templates.
 
-Los envios bulk se ejecutan en dos pasos: primero se crea un `job_id` con preview y auditoria; luego un aprobador confirma o deniega desde Discord. Solo al aprobar se llama al proveedor con `dry_run=false`. El proveedor debe aplicar idempotencia por email, rate limits, opt-out, manejo de rebotes y trazabilidad por mensaje.
+Los envios bulk se ejecutan en tres pasos: primero se crea un `job_id` con preview y auditoria; luego un aprobador confirma o deniega desde Discord; finalmente un worker procesa jobs `queued` con `!email process-queued`. Solo el worker llama al proveedor con `dry_run=false`, actualiza destinatarios y marca el job como `sent`, `queued` o `failed`. El proveedor debe aplicar idempotencia por email, rate limits, opt-out, manejo de rebotes y trazabilidad por mensaje.
+
+Los proveedores Google, Outlook e IMAP/SMTP ya no simulan envios: si no existe adapter real, el runtime responde `adapter_required`. Hoy el provider operativo end-to-end es `pc_client` mediante bridge HTTP.
 
 ## Configuracion
 
@@ -47,6 +50,8 @@ En `Configuracion > Email` se administra:
 - Permiso explicito de envio.
 - Limite bulk por minuto.
 - Templates JSON para `!email --template-<nombre>`.
+
+La vista `Email Agent` del administrador tambien permite editar estos valores sin salir del sub-agente: proveedor activo, permisos de envio, credenciales, categorias, templates y estado de persistencia de jobs.
 
 Ejemplo de template:
 

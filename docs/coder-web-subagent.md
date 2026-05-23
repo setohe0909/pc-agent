@@ -1,42 +1,60 @@
-# 💻 Coder Web Sub-Agent v0.1.0
+# Coder Web Sub-Agent
 
-El **Coder Web Sub-Agent** es un agente autónomo diseñado para la creación y mantenimiento de plataformas e-commerce y proyectos de desarrollo web complejos.
+Coder Web ejecuta tareas web en modo produccion: genera un paquete de archivos,
+crea branch, hace commit atomico, abre Pull Request, adjunta workflow de
+validacion y deja una ruta de rollback. No devuelve repositorios ni cambios
+ficticios.
 
-## 🚀 Capacidades Principales
+## Capacidades
 
-1. **Creación de E-commerce (Repo Puro):**
-   - Generación de proyectos desde cero usando el stack: **React/TypeScript + Tailwind CSS + Supabase**.
-   - Configuración automática de autenticación, base de datos y almacenamiento.
-   - Integración con **Pilot AI** para el diseño de componentes y layouts.
+- Generacion de archivos reales para React/TypeScript, Tailwind y stacks web configurados.
+- GitHub: repositorio destino o repositorio nuevo, branch aislado, commit via Git Data API y Pull Request.
+- Validacion: workflow `.github/workflows/coder-web-validate.yml` con install, lint, test y build cuando hay `package.json`.
+- Preview deploy: webhook configurable con `CODER_WEB_PREVIEW_DEPLOY_HOOK_URL` o `coder_web_preview_deploy_hook_url`.
+- Linear: acepta `linear_issue_id`, lee el brief con `LINEAR_API_KEY` y comenta el PR/preview en el issue.
+- Assets: adjuntos de Discord se versionan en `public/coder-web-assets/`.
+- Rollback: cerrar PR y borrar branch; el plan queda registrado en el resultado y en el run log.
+- Auditoria local: logs JSON en `CODER_WEB_RUN_LOG_DIR` o `/tmp/pc-agent-coder-web-runs`.
 
-2. **Memoria Proactiva (`!coder-web memory`):**
-   - Almacena contextos de proyectos previos.
-   - Recuerda preferencias de diseño y decisiones arquitectónicas.
-   - Permite un seguimiento continuo del hilo de desarrollo.
+## Comandos
 
-## 🛠️ Comandos de Discord
+| Comando | Uso |
+| --- | --- |
+| `!coder-web <descripcion>` | Genera branch, commit y PR real. |
+| `!coder-web --repo owner/repo <descripcion>` | Aplica el cambio sobre un repo existente. |
+| `!coder-web --linear <issue_id> --repo owner/repo` | Ejecuta una tarea asignada desde Linear. |
+| `!coder-web --branch feature/nombre <descripcion>` | Usa una rama base sugerida. |
+| `!coder-web --preview-required <descripcion>` | Falla si no hay webhook de preview configurado. |
+| `!coder-web memory` | Muestra memoria del agente. |
+| `!coder-web memory --clean` | Solicita borrar memoria del dia. |
 
-| Comando | Descripción |
-|---------|-------------|
-| `!coder-web <desc>` | Inicia un nuevo proyecto o solicita un ajuste. Crea un hilo dedicado. |
-| `!coder-web memory` | Muestra los aprendizajes y contextos actuales del agente. |
-| `!coder-web memory --clean` | Borra la memoria del día (requiere confirmación). |
+## Configuracion Requerida
 
-## 🏗️ Arquitectura Técnica
+```text
+GITHUB_TOKEN=
+GITHUB_OWNER=
+CODER_WEB_PRIVATE_REPO=true
+CODER_WEB_PREVIEW_DEPLOY_HOOK_URL=
+LINEAR_API_KEY=
+```
 
-El agente utiliza **LangGraph** para orquestar sus estados:
-- **Initialize:** Configura el entorno y stack.
-- **Retrieve Context:** Inyecta memoria proactiva del contexto `coder-web`.
-- **Analyze:** Diseña la arquitectura del repositorio.
-- **Execute Task:** Interactúa con GitHub para crear el repositorio y genera código.
-- **Finalize:** Reporta el estado final y guarda aprendizajes en MentisDB.
+Tambien puede configurarse desde el Admin UI:
 
-## 🖥️ Panel Administrativo
+- `github_token`
+- `github_org`
+- `coder_web_repository`
+- `coder_web_private_repo`
+- `coder_web_preview_deploy_hook_url`
+- `linear_api_key`
 
-El portal administrativo permite configurar:
-- **GitHub Tokens & Organizaciones.**
-- **Stack Tecnológico Preferido.**
-- **Nivel de Autonomía de Pilot AI.**
+## Flujo Productivo
 
----
-*PC Agent Pro - Autonomía en el Desarrollo Web*
+1. Coder Web recibe prompt, adjuntos y opcionalmente `linear_issue_id`.
+2. Si hay Linear configurado, carga titulo, descripcion, assignee, team y URL.
+3. El LLM genera plan y archivos obligatoriamente; si no hay `package.json`, la tarea falla.
+4. GitHub verifica permisos de escritura sobre el repo destino.
+5. Se crea branch aislado y commit atomico con archivos, assets, runbook y workflow CI.
+6. Se abre PR para revision humana.
+7. Se dispara preview hook si esta configurado o si la tarea lo exige.
+8. Se comenta el resultado en Linear cuando hay issue y API key.
+9. Se registra run log y se devuelve rollback.

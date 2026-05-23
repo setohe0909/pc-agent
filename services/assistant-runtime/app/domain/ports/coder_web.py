@@ -1,9 +1,36 @@
-from abc import ABC, abstractmethod
-from typing import List, Optional
+from dataclasses import dataclass, field
+from typing import Protocol
 
-class CoderWebPort(ABC):
-    @abstractmethod
-    async def create_repository(self, name: str, stack: str, description: str) -> dict:
-        """Crea un repositorio con el stack especificado."""
-        pass
 
+@dataclass(frozen=True)
+class CoderWebFile:
+    path: str
+    content: str
+    encoding: str = "utf-8"
+
+
+@dataclass(frozen=True)
+class CoderWebAsset:
+    path: str
+    content_b64: str
+
+
+@dataclass(frozen=True)
+class CoderWebTask:
+    name: str
+    description: str
+    stack: str
+    plan: dict
+    files: list[CoderWebFile]
+    assets: list[CoderWebAsset] = field(default_factory=list)
+    repository_full_name: str | None = None
+    base_branch: str = "main"
+    branch_name: str | None = None
+    linear_issue_id: str | None = None
+    preview_required: bool = False
+
+
+class CoderWebPort(Protocol):
+    async def execute_task(self, task: CoderWebTask) -> dict:
+        """Apply a generated web task to source control and return PR/deploy/audit details."""
+        ...

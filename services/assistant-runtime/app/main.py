@@ -2,6 +2,7 @@ import os
 import json
 import base64
 import binascii
+import uuid
 from pathlib import Path
 from enum import Enum
 
@@ -9,20 +10,10 @@ import uvicorn
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
 
-from app.adapters.kalshi import KalshiHttpAdapter
-from app.adapters.open_claw import OpenClawLLMAdapter
-from app.adapters.memory import MentisMemoryAdapter
 from app.adapters.email import ConfiguredEmailProvider, RuntimeEmailConfig
 from app.adapters.email_jobs import FileEmailJobRepository, SupabaseEmailJobRepository
-from app.adapters.trading_audit import SupabaseTradeAuditRepository, SupabaseTradingExposureRepository
-from app.adapters.zernio_adapter import ZernioAdapter
-from app.domain.trading_policies import ConfigurableRiskPolicy
-from app.use_cases.trading_workflow import TradingWorkflow
-from app.use_cases.marketing_graph import MarketingGraph
-from app.use_cases.model_status import ModelStatusService
 from app.use_cases.writer_workflow import WriterWorkflow
 from app.use_cases.email_workflow import EmailWorkflow
-from app.adapters.pilot_web import PilotWebAdapter
 
 def load_runtime_config():
     config_path = os.getenv("RUNTIME_CONFIG_PATH", "/config/runtime-config.json")
@@ -112,22 +103,28 @@ def _format_internal_error(exc: Exception, request: AssistantRequest, stage: str
     elif "ZERNIO" in raw_detail.upper() or "zernio" in raw_detail.lower():
         hint = "El problema parece venir de la integración Zernio o su respuesta."
 
+    expose_details = os.getenv("EXPOSE_ERROR_DETAILS", "false").lower() == "true"
+    public_detail = raw_detail if expose_details else "Detalle tecnico retenido por seguridad. Usa trace_id en logs."
+
     message = (
         f"No pude completar `{request.action_type.value}`"
         f" con subcomando `{sub_command}` durante `{stage}`.\n"
         f"Tipo: `{error_type}`\n"
-        f"Detalle: {raw_detail}\n"
+        f"Detalle: {public_detail}\n"
         f"Pista: {hint}"
     )
 
-    return {
+    response = {
         "status": "error",
         "message": message,
         "error_type": error_type,
         "error_stage": stage,
-        "error_detail": raw_detail,
         "hint": hint,
     }
+    if expose_details:
+        response["error_detail"] = raw_detail
+    return response
+    return response
 
 
 def _assistant_response(result: dict, request: AssistantRequest) -> dict:
@@ -182,6 +179,18 @@ async def assistant_request(request: AssistantRequest) -> dict:
         }
 
     # Inyectar dependencias (Hexagonal Architecture)
+    from app.adapters.kalshi import KalshiHttpAdapter
+    from app.adapters.open_claw import OpenClawLLMAdapter
+    from app.adapters.memory import MentisMemoryAdapter
+    from app.adapters.pilot_web import PilotWebAdapter
+    from app.adapters.linear import LinearTaskTrackerAdapter
+    from app.adapters.trading_audit import SupabaseTradeAuditRepository, SupabaseTradingExposureRepository
+    from app.adapters.zernio_adapter import ZernioAdapter
+    from app.domain.trading_policies import ConfigurableRiskPolicy
+    from app.use_cases.marketing_graph import MarketingGraph
+    from app.use_cases.model_status import ModelStatusService
+    from app.use_cases.trading_workflow import TradingWorkflow
+
     trading_port = KalshiHttpAdapter()
     llm_port = OpenClawLLMAdapter()
     memory_port = MentisMemoryAdapter()
@@ -208,7 +217,12 @@ async def assistant_request(request: AssistantRequest) -> dict:
     
     coder_web_adapter = PilotWebAdapter()
         
-    coder_web_workflow = CoderWebGraph(llm=llm_port, memory=memory_port, coder_web=coder_web_adapter)
+    coder_web_workflow = CoderWebGraph(
+        llm=llm_port,
+        memory=memory_port,
+        coder_web=coder_web_adapter,
+        task_tracker=LinearTaskTrackerAdapter(),
+    )
 
     try:
         if request.action_type in {ActionType.trade_decision, ActionType.open_position}:
@@ -216,7 +230,7 @@ async def assistant_request(request: AssistantRequest) -> dict:
             result = await workflow.execute_trade_decision(prompt=request.prompt, user_id=request.source.user_id)
         elif request.action_type == ActionType.marketing:
             stage = "preparando flujo de marketing"
-            print(f"[DEBUG] Entrando a MarketingGraph con prompt: {request.prompt}")
+            _debug_payload(f"Entrando a MarketingGraph con prompt: {request.prompt}")
             decoded = _decode_request_images(request.images)
             if decoded["status"] == "error":
                 return decoded
@@ -226,15 +240,15 @@ async def assistant_request(request: AssistantRequest) -> dict:
             result = await marketing_workflow.run(prompt=request.prompt, payload=request.payload, images=image_data)
         elif request.action_type == ActionType.writer:
             stage = "ejecutando writer"
-            print(f"[DEBUG] Entrando a WriterWorkflow con prompt: {request.prompt}")
+            _debug_payload(f"Entrando a WriterWorkflow con prompt: {request.prompt}")
             result = await writer_workflow.execute_writer_action(prompt=request.prompt, payload=request.payload)
         elif request.action_type == ActionType.email:
             stage = f"ejecutando email:{request.payload.get('sub_command', 'status')}"
-            print(f"[DEBUG] Entrando a EmailWorkflow con prompt: {request.prompt}")
+            _debug_payload(f"Entrando a EmailWorkflow con prompt: {request.prompt}")
             result = await email_workflow.run(prompt=request.prompt, payload=request.payload)
         elif request.action_type == ActionType.picture:
             stage = "ejecutando picture"
-            print(f"[DEBUG] Entrando a PictureGraph con prompt: {request.prompt}")
+            _debug_payload(f"Entrando a PictureGraph con prompt: {request.prompt}")
             decoded = _decode_request_images(request.images)
             if decoded["status"] == "error":
                 return decoded
@@ -247,9 +261,11 @@ async def assistant_request(request: AssistantRequest) -> dict:
             )
         elif request.action_type == ActionType.coder_web:
             stage = "ejecutando coder-web"
-            print(f"[DEBUG] Entrando a CoderWebGraph con prompt: {request.prompt}")
-            import base64
-            image_data = [base64.b64decode(img) for img in request.images]
+            _debug_payload(f"Entrando a CoderWebGraph con prompt: {request.prompt}")
+            decoded = _decode_request_images(request.images)
+            if decoded["status"] == "error":
+                return decoded
+            image_data = decoded["images"]
             result = await coder_web_workflow.run(prompt=request.prompt, payload=request.payload, images=image_data)
         elif request.action_type == ActionType.model_status:
             stage = "consultando modelos conectados"
@@ -263,16 +279,18 @@ async def assistant_request(request: AssistantRequest) -> dict:
         if result is None:
             result = {"status": "error", "message": "El sub-agente no devolvió ningún resultado."}
 
-        # DEBUG: Ver que esta devolviendo el workflow
-        print(f"[DEBUG] Workflow result: {result}")
+        _debug_payload(f"Workflow result: {result}")
 
         return _assistant_response(result, request)
     except Exception as exc:
         import traceback
+        trace_id = str(uuid.uuid4())
         error_trace = traceback.format_exc()
-        print(f"[CRITICAL ERROR] {exc}\n{error_trace}")
+        print(f"[CRITICAL ERROR][{trace_id}] {exc}\n{error_trace}")
         response = _format_internal_error(exc, request, stage)
-        response["debug_trace"] = error_trace
+        response["trace_id"] = trace_id
+        if os.getenv("EXPOSE_DEBUG_TRACES", "false").lower() == "true":
+            response["debug_trace"] = error_trace
         return response
 
 
@@ -297,6 +315,11 @@ def _discord_gate(request: AssistantRequest) -> dict:
     if approvers and request.approval.approver_user_id not in approvers:
         return {"allowed": False, "reason": "El aprobador no esta autorizado."}
     return {"allowed": True, "reason": "Aprobado por Discord."}
+
+
+def _debug_payload(message: str) -> None:
+    if os.getenv("DEBUG_ASSISTANT_PAYLOADS", "false").lower() == "true":
+        print(f"[DEBUG] {message}")
 
 
 def _decode_request_images(images_b64: list[str]) -> dict:

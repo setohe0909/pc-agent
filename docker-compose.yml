@@ -20,6 +20,11 @@ services:
       - RUNTIME_CONFIG_PATH=/config/runtime-config.json
       - PYTHONUNBUFFERED=1
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3).read()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   assistant-runtime:
     build:
@@ -38,6 +43,11 @@ services:
       - OBSIDIAN_VAULT_PATH=/vault
       - PYTHONUNBUFFERED=1
     command: python -m app.main
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8100/health', timeout=3).read()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   discord-bot:
     build:
@@ -54,8 +64,12 @@ services:
     environment:
       - RUNTIME_CONFIG_PATH=/config/runtime-config.json
       - PYTHONUNBUFFERED=1
-      - PYTHONUNBUFFERED=1
     command: python -m app.main
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health', timeout=3).read()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   ingestion-worker:
     container_name: ingestion-worker
@@ -75,6 +89,11 @@ services:
       - RUNTIME_CONFIG_PATH=/config/runtime-config.json
       - PYTHONUNBUFFERED=1
     command: python -m app.main
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3).read()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   ollama:
     image: ollama/ollama:0.6.8
@@ -95,7 +114,13 @@ services:
     ports:
       - "${UI_PORT:-8080}:80"
     depends_on:
-      - control-api
+      control-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   supabase-vector-db:
     image: pgvector/pgvector:pg16
