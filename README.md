@@ -508,6 +508,7 @@ python3 services/discord-bot/test_marketer_approval.py
 ## Documentacion Relacionada
 
 - [Arquitectura del sistema](docs/architecture.md)
+- [MarketingGraph en produccion](docs/langgraph_production.md)
 - [Observabilidad](docs/observability.md)
 - [Marketer memory](docs/marketer-memory.md)
 - [Marketer lead qualification](docs/marketer-lead-qualification.md)

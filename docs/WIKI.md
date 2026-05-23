@@ -18,15 +18,29 @@ PC Agent no es un simple bot; es un sistema de microservicios coordinados:
 El agente de marketing es el más avanzado actualmente.
 
 ### Flujo de Trabajo
-1.  **Análisis de Intención**: El LLM decide si necesitas `qualify_leads`, `monitor_trends`, `analyze_sentiment` o un `plan_campaign`.
-2.  **Compuerta de Aprobación**: Para acciones críticas (como generar un plan costoso), el agente enviará una solicitud de aprobación a Discord.
-3.  **Ejecución**: Una vez aprobado, el agente interactúa con las APIs de redes sociales (vía adapters).
+1.  **Inicialización**: Normaliza payload, subcomando, fuente de datos y aprobaciones.
+2.  **Análisis de Intención**: `MarketingGraph` decide si necesita dashboard, comentarios, leads, publicaciones, campaña, sentimiento, tendencias u otra acción.
+3.  **Contexto y Voz**: Recupera memoria del Marketer y refina planes complejos antes de mostrarlos.
+4.  **Compuerta de Aprobación**: Publicaciones, respuestas, DMs y acciones con escritura externa requieren aprobación humana y políticas de autonomía.
+5.  **Ejecución**: La ruta productiva usa `ZernioAdapter` y contratos `MarketingPort`; no debe depender de datos demo en runtime.
 
 ### Comandos Interactivos
 *   `!marketer`: Abre el panel de botones para acciones rápidas.
 *   `!marketer memory`: Consulta los aprendizajes que el agente ha consolidado sobre tu marca.
+*   `!marketer --source zernio comments --account <id>`: Lee comentarios actuales desde Zernio con trazabilidad de cuenta.
+*   `!marketer post <texto> --platform <instagram|tiktok> --account <id>`: Prepara/publica contenido solo cuando exista aprobación y permisos de escritura.
 
-## 3. Generación de Imágenes (!picture)
+## 3. Redacción Editorial (!writer)
+
+Writer crea contenido editorial con contrato productivo:
+
+*   `!writer blog <es|en> <tema>`: genera Markdown y lo guarda en Obsidian.
+*   `!writer story <es|en> <tema>`: genera storytelling y lo guarda en Obsidian.
+*   `!writer <mensaje>`: chat editorial con memoria de marca.
+
+Si Obsidian no está disponible o no tiene permisos, Writer devuelve `writer.persistence_failed` y no reporta éxito parcial. Las imágenes externas no se insertan automáticamente; se sugieren keywords para usar assets licenciados o generados.
+
+## 4. Generación de Imágenes (!picture)
 
 El agente de imágenes utiliza **DALL-E 3** y memoria proactiva para generar contenido visual de alta calidad.
 
@@ -40,7 +54,7 @@ El agente de imágenes utiliza **DALL-E 3** y memoria proactiva para generar con
 - `!picture memory`: Muestra un resumen de los estilos y preferencias guardadas.
 - `!picture memory --clean`: Limpia la memoria operativa de imágenes.
 
-## 4. Desarrollo Web (!coder-web)
+## 5. Desarrollo Web (!coder-web)
 
 El sub-agente de desarrollo web permite automatizar la creación y ajuste de plataformas e-commerce mediante repositorios de código.
 
@@ -53,7 +67,7 @@ El sub-agente de desarrollo web permite automatizar la creación y ajuste de pla
 - `!coder-web memory`: Muestra contextos de proyectos previos.
 - `!coder-web memory --clean`: Borra la memoria operativa de desarrollo.
 
-## 5. Email (!email)
+## 6. Email (!email)
 
 El sub-agente de email opera correo con enfoque Clean/Hexagonal para que el dominio no dependa de Gmail, Outlook, IMAP/SMTP ni clientes locales.
 
@@ -76,7 +90,7 @@ Los envios masivos requieren proveedor configurado, permiso explicito de envio, 
 
 La vista `Email Agent` del administrador funciona como consola operativa: muestra estado de proveedor, envio, persistencia, categorias y templates, y permite editar esa configuracion desde el mismo panel.
 
-## 6. Inteligencia Proactiva
+## 7. Inteligencia Proactiva
 
 El sistema aprende mientras duermes:
 *   **Consolidación Diaria**: Cada medianoche (UTC), el `ingestion-worker` toma todas las memorias del día y genera un resumen ejecutivo.

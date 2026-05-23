@@ -25,20 +25,23 @@ Actualmente usamos Supabase y MentisDB. Propuesta de evolución:
 ## 3. Tool Calling & Agentes Autónomos
 
 ### Listado Actual de Herramientas (Marketing):
-1.  `respond_to_comments`: Responde automáticamente en IG/TikTok.
-2.  `plan_campaign`: Genera planes de contenido.
+1.  `respond_to_comments`: Prepara respuestas y solo publica si existe aprobacion y permisos de escritura.
+2.  `plan_campaign`: Genera planes de contenido y drafts aprobables.
 3.  `research_competitors`: Analiza datos de competencia.
 4.  `qualify_leads`: Identifica intención de compra en comentarios.
-5.  `process_lead_magnets`: Envía DMs automáticos con recursos.
+5.  `process_lead_magnets`: Prepara DMs con recursos; el envio real requiere aprobacion.
 6.  `generate_funnel`: Crea estrategias de embudo.
 7.  `monitor_trends`: Detecta tendencias virales.
 8.  `analyze_sentiment`: Evalúa la reputación de la marca.
 9.  `find_collaborations`: Busca influencers y marcas aliadas.
+10. `publish_post`: Genera sugerencia de post y publica/programa solo con aprobacion.
+11. `generate_post_queue`: Crea cola de posts como drafts aprobables.
 
 ### [x] Transición a Tool Calling Nativo:
 Implementado en `MarketingGraph` usando el SDK de Gemini. El agente ahora:
-*   Decida qué herramienta usar según el prompt.
-*   Combine herramientas autónomamente.
+*   Decide qué herramienta usar según el prompt o subcomando explícito.
+*   Usa `ZernioAdapter` como ruta productiva.
+*   Mantiene acciones sensibles detrás de aprobación humana.
 
 ## 4. [x] LangGraph en el Proyecto
 Implementado el `MarketingGraph` como una máquina de estados con aprobación humana nativa.
@@ -59,7 +62,18 @@ graph TD
     MonitorSentiment --> End
 ```
 
-**Ventajas**:
-*   **Persistencia de Estado**: El grafo sabe en qué paso se quedó si el servicio se reinicia.
-*   **Multi-Agente**: Un nodo puede ser el "Marketer" y otro el "Copywriter" o "Designer".
-*   **Human-in-the-loop**: Capacidad de pausar la ejecución esperando aprobación en Discord.
+**Ventajas actuales**:
+*   **Trazabilidad de pasos**: El grafo separa intención, contexto, revisión, aprobación, ejecución y cierre.
+*   **Contratos limpios**: El dominio habla con `MarketingPort` y la integración real vive en `ZernioAdapter`.
+*   **Human-in-the-loop**: Las escrituras externas permanecen bloqueadas hasta aprobación y políticas activas.
+
+## 5. Writer Productivo
+
+Writer ya no es solo generación de texto:
+
+*   Valida `chat`, `blog` y `storytelling`.
+*   Rechaza prompts vacíos y comandos desconocidos con códigos de error claros.
+*   Guarda Markdown en Obsidian con nombres seguros.
+*   Registra cada ejecución en memoria cuando el adapter está disponible.
+*   Devuelve `writer.persistence_failed` si no puede guardar, evitando falsos éxitos.
+*   Sugiere keywords visuales sin insertar assets externos no licenciados.
