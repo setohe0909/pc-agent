@@ -193,6 +193,13 @@ def _assistant_response(result: dict, request: AssistantRequest) -> dict:
     }
 
 
+def _format_internal_error(exc: Exception, request: AssistantRequest, stage: str) -> dict:
+    sub_command = request.payload.get("sub_command", "chat") if isinstance(request.payload, dict) else "chat"
+    response = error_envelope(exc, request.action_type.value, sub_command, stage, "test-trace").to_dict()
+    response["error_detail"] = str(exc) or repr(exc)
+    return response
+
+
 def _get_runtime_container(http_request: Request):
     if not hasattr(http_request.app.state, "runtime_container"):
         from app.runtime.container import build_runtime_container

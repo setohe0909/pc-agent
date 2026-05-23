@@ -1,30 +1,44 @@
 import os
-import json
+import re
 from datetime import datetime
 from pathlib import Path
 from app.domain.ports.llm import LLMPort
 from app.domain.ports.memory import MemoryPort
 
+SUPPORTED_WRITER_COMMANDS = {"chat", "blog", "storytelling"}
+
+
 class WriterWorkflow:
     def __init__(self, llm_port: LLMPort, memory_port: MemoryPort | None = None) -> None:
         self.llm = llm_port
         self.memory = memory_port
-        # Obsidian path can be configured via environment variable
         self.obsidian_path = os.getenv("OBSIDIAN_VAULT_PATH", "/tmp/obsidian_vault")
 
     async def execute_writer_action(self, prompt: str, payload: dict) -> dict:
-        sub_command = payload.get("sub_command", "chat")
-        language = payload.get("language", "es") # Default to Spanish
-        
+        payload = payload or {}
+        sub_command = (payload.get("sub_command") or "chat").strip().lower()
+        language = (payload.get("language") or "es").strip().lower()
+
+        if sub_command not in SUPPORTED_WRITER_COMMANDS:
+            return self._error(
+                code="writer.unsupported_action",
+                message=f"Writer no soporta la accion `{sub_command}`.",
+                hint=f"Acciones soportadas: {', '.join(sorted(SUPPORTED_WRITER_COMMANDS))}.",
+            )
+        if not prompt or not prompt.strip():
+            return self._error(
+                code="writer.empty_prompt",
+                message="Writer necesita un prompt con el tema o instruccion editorial.",
+                hint="Envia una idea, briefing o texto base para trabajar.",
+            )
+
         if sub_command == "blog":
-            return await self._create_blog(prompt, language)
-        elif sub_command == "storytelling":
-            return await self._create_storytelling(prompt, language)
-        else:
-            return await self._writer_chat(prompt, language)
+            return await self._create_blog(prompt.strip(), language)
+        if sub_command == "storytelling":
+            return await self._create_storytelling(prompt.strip(), language)
+        return await self._writer_chat(prompt.strip(), language)
 
     async def _writer_chat(self, prompt: str, language: str) -> dict:
-        # Recuperar memoria relevante
         memory_context = ""
         if self.memory:
             memory_context = await self.memory.get_context("writer")
@@ -36,8 +50,15 @@ class WriterWorkflow:
             "Tu tono es creativo, profesional y persuasivo.\n"
             f"{memory_context}"
         )
-        response = await self.llm.chat(full_prompt, system_instruction=system_instructions)
-        return {"status": "success", "message": response}
+        response = await self.llm.chat(prompt, system_instruction=system_instructions)
+        await self._record_run("chat", prompt, response, None)
+        return self._success(
+            command="chat",
+            message=response,
+            content=response,
+            artifact=None,
+            metadata={"language": language},
+        )
 
     async def _create_blog(self, prompt: str, language: str) -> dict:
         brand_info = await self._get_brand_info()
@@ -55,29 +76,28 @@ class WriterWorkflow:
         )
         
         content = await self.llm.chat(blog_prompt)
-        
-        # Generar imagen sugerida
         keywords = await self._get_image_keywords(content)
-        image_url = f"https://source.unsplash.com/featured/?{keywords}"
-        image_md = f"\n\n![Featured Image]({image_url})\n*Imagen sugerida vía Unsplash para: {keywords}*\n\n"
+        image_md = (
+            "\n\n"
+            f"<!-- Imagen sugerida: buscar asset licenciado para `{keywords}` antes de publicar. -->\n"
+        )
         
         full_content = content + image_md
-        
-        # Extraer título (primer línea usualmente)
         first_line = content.split('\n')[0]
         title = first_line.replace('#', '').strip()[:50] or "blog-sin-titulo"
         
         try:
             filename = self._save_to_obsidian("Blog", title, full_content)
-            return {
-                "status": "success", 
-                "message": f"✅ Blog creado (con imagen) y guardado en Obsidian: `{filename}`\n\n{full_content}"
-            }
+            await self._record_run("blog", prompt, full_content, filename)
+            return self._success(
+                command="blog",
+                message=f"Blog creado y guardado en Obsidian: `{filename}`\n\n{full_content}",
+                content=full_content,
+                artifact=filename,
+                metadata={"language": language, "image_keywords": keywords},
+            )
         except Exception as e:
-            return {
-                "status": "success",
-                "message": f"✅ Blog generado pero hubo un error al guardar en Obsidian: {str(e)}\n\n{full_content}"
-            }
+            return self._persistence_error("blog", str(e), full_content)
 
     async def _create_storytelling(self, prompt: str, language: str) -> dict:
         brand_info = await self._get_brand_info()
@@ -93,29 +113,29 @@ class WriterWorkflow:
         )
         
         content = await self.llm.chat(story_prompt)
-        
-        # Generar imagen sugerida
         keywords = await self._get_image_keywords(content)
-        image_url = f"https://source.unsplash.com/featured/?{keywords}"
-        image_md = f"\n\n![Story Image]({image_url})\n*Visualización narrativa sugerida*\n\n"
+        image_md = (
+            "\n\n"
+            f"<!-- Imagen sugerida: buscar asset licenciado para `{keywords}` antes de publicar. -->\n"
+        )
         
         full_content = content + image_md
 
-        # Extraer título
         first_line = content.split('\n')[0]
         title = first_line.replace('#', '').strip()[:50] or "story-sin-titulo"
         
         try:
             filename = self._save_to_obsidian("Story-telling", title, full_content)
-            return {
-                "status": "success", 
-                "message": f"✅ Storytelling creado (con imagen) y guardado en Obsidian: `{filename}`\n\n{full_content}"
-            }
+            await self._record_run("storytelling", prompt, full_content, filename)
+            return self._success(
+                command="storytelling",
+                message=f"Storytelling creado y guardado en Obsidian: `{filename}`\n\n{full_content}",
+                content=full_content,
+                artifact=filename,
+                metadata={"language": language, "image_keywords": keywords},
+            )
         except Exception as e:
-            return {
-                "status": "success",
-                "message": f"✅ Storytelling generado pero hubo un error al guardar en Obsidian: {str(e)}\n\n{full_content}"
-            }
+            return self._persistence_error("storytelling", str(e), full_content)
 
     async def _get_image_keywords(self, content: str) -> str:
         """Pide al LLM 2 o 3 keywords en inglés para buscar una imagen representativa"""
@@ -129,12 +149,15 @@ class WriterWorkflow:
             # Limpiar posibles extras del LLM
             clean_keywords = keywords.strip().replace(".", "").replace("Keywords:", "").strip()
             return clean_keywords.replace(", ", ",")
-        except:
+        except Exception:
             return "lifestyle,minimalist"
 
     async def _get_brand_info(self) -> str:
-        # En una implementación real, podríamos buscar específicamente 'brand_info' en la memoria
-        return "Información de marca general basada en el contexto del sistema."
+        if self.memory:
+            context = await self.memory.get_context("writer")
+            if context:
+                return context
+        return "Sin contexto de marca configurado. Solicita brand voice, audiencia, oferta y restricciones antes de publicar."
 
     async def _get_trends(self) -> str:
         # Recuperar tendencias guardadas por el Marketer
@@ -143,15 +166,13 @@ class WriterWorkflow:
         return "Minimalismo, autenticidad, sostenibilidad."
 
     def _save_to_obsidian(self, folder: str, title: str, content: str) -> str:
-        date_str = datetime.now().strftime("%Y-%m-%d")
-        # Limpiar el título para que sea un nombre de archivo válido
-        clean_title = "".join(c for c in title if c.isalnum() or c in (' ', '-', '_')).strip()
+        date_str = datetime.now().strftime("%Y-%m-%d-%H%M%S")
+        clean_title = self._safe_filename(title)
         filename = f"{clean_title}-{date_str}.md"
         
         base_dir = Path(self.obsidian_path)
         target_dir = base_dir / folder
         
-        # Intentar crear el directorio si no existe (puede fallar en entornos restringidos)
         try:
             target_dir.mkdir(parents=True, exist_ok=True)
         except Exception as e:
@@ -162,3 +183,53 @@ class WriterWorkflow:
         file_path.write_text(content, encoding="utf-8")
         
         return f"{folder}/{filename}"
+
+    def _safe_filename(self, title: str) -> str:
+        normalized = re.sub(r"\s+", "-", title.strip().lower())
+        cleaned = re.sub(r"[^a-z0-9\-_]+", "", normalized)
+        return cleaned[:70].strip("-_") or "writer-draft"
+
+    async def _record_run(self, command: str, prompt: str, content: str, artifact: str | None) -> None:
+        if not self.memory:
+            return
+        try:
+            await self.memory.save_interaction("writer", {
+                "role": "assistant",
+                "command": command,
+                "prompt": prompt[:500],
+                "artifact": artifact,
+                "content_preview": content[:500],
+                "created_at": datetime.utcnow().isoformat(),
+            })
+        except Exception as exc:
+            print(f"[WRITER][MEMORY ERROR] {exc}")
+
+    def _success(self, command: str, message: str, content: str, artifact: str | None, metadata: dict) -> dict:
+        return {
+            "status": "success",
+            "message": message,
+            "command": command,
+            "content": content,
+            "artifact": artifact,
+            "metadata": metadata,
+        }
+
+    def _error(self, code: str, message: str, hint: str) -> dict:
+        return {
+            "status": "error",
+            "code": code,
+            "message": message,
+            "hint": hint,
+            "retryable": False,
+        }
+
+    def _persistence_error(self, command: str, detail: str, content: str) -> dict:
+        return {
+            "status": "error",
+            "code": "writer.persistence_failed",
+            "message": f"Writer genero el contenido de `{command}`, pero no pudo guardarlo.",
+            "hint": "Revisa OBSIDIAN_VAULT_PATH y permisos de escritura antes de usarlo en produccion.",
+            "retryable": True,
+            "error_detail": detail,
+            "content": content,
+        }

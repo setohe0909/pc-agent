@@ -8,6 +8,9 @@ class SocialMediaStubAdapter(MarketingPort):
         self.post_drafts: list[dict] = []
         self.automation_runs: list[dict] = []
 
+    async def get_connected_accounts(self) -> dict:
+        return {"instagram": "stub", "tiktok": "stub"}
+
     async def get_comments(
         self,
         platform: str,

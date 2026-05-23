@@ -2,6 +2,10 @@ from abc import ABC, abstractmethod
 
 class MarketingPort(ABC):
     @abstractmethod
+    async def get_connected_accounts(self) -> dict:
+        pass
+
+    @abstractmethod
     async def get_comments(
         self,
         platform: str,

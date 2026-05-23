@@ -1,14 +1,14 @@
 from app.domain.ports.llm import LLMPort
 from app.domain.ports.memory import MemoryPort
 from app.domain.ports.marketing import MarketingPort
-from app.adapters.marketing import SocialMediaStubAdapter
+from app.adapters.zernio_adapter import ZernioAdapter
 import json
 
 class MarketingWorkflow:
     def __init__(self, llm_port: LLMPort, memory_port: MemoryPort | None = None, marketing_port: MarketingPort | None = None) -> None:
         self.llm = llm_port
         self.memory = memory_port
-        self.marketing = marketing_port or SocialMediaStubAdapter()
+        self.marketing = marketing_port or ZernioAdapter()
 
     async def execute_marketing_action(self, prompt: str, payload: dict) -> dict:
         sub_command = payload.get("sub_command", "chat")
@@ -56,7 +56,6 @@ class MarketingWorkflow:
         return {"status": "success", "message": response}
 
     async def _respond_to_comments(self, prompt: str) -> dict:
-        # 1. Obtener comentarios (usando el stub por ahora)
         comments = await self.marketing.get_comments("instagram", "latest_post")
         
         responses = []
@@ -69,7 +68,6 @@ class MarketingWorkflow:
             )
             reply_text = await self.llm.chat(response_prompt)
             
-            # 3. Publicar respuesta (stub)
             await self.marketing.reply_to_comment("instagram", comment['id'], reply_text)
             responses.append({"comment": comment['text'], "reply": reply_text})
 
@@ -186,7 +184,6 @@ class MarketingWorkflow:
             text_upper = comment["text"].upper()
             for trigger, data in magnets.items():
                 if trigger in text_upper:
-                    # 2. Enviar DM (stub)
                     dm_text = f"¡Hola! Gracias por tu interés. Aquí tienes tu {data['name']}: {data['link']}"
                     await self.marketing.send_dm("instagram", comment["user"], dm_text)
                     
