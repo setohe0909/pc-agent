@@ -31,7 +31,7 @@ flowchart TD
     subgraph "External Services"
         LLM["Gemini / MiniMax / OpenAI"]
         Kalshi["Kalshi API (Trading)"]
-        Unsplash["Unsplash API (Visuals)"]
+        Zernio["Zernio API (Marketing)"]
     end
 
     subgraph "Observability (Langfuse Stack)"
@@ -47,7 +47,7 @@ flowchart TD
     Runtime <--> Mentis
     Runtime <--> Obsidian
     Runtime <--> Kalshi
-    Runtime <--> Unsplash
+    Runtime <--> Zernio
     Runtime --> LF_Web
     
     %% Background Work
@@ -78,8 +78,8 @@ El sistema se orquesta mediante **Docker Compose**, dividiéndose en los siguien
 
 El `assistant-runtime` delega la inteligencia en agentes especializados:
 
-*   **!marketer**: Especializado en análisis de sentimientos, detección de tendencias en TikTok/Instagram y cualificación de leads.
-*   **!writer**: Especializado en Copywriting creativo, Storytelling y generación de Blogs con persistencia directa en Obsidian.
+*   **!marketer**: LangGraph de marketing con datos Zernio, aprobaciones humanas, drafts, campañas, publicaciones, comentarios, leads, dashboards y memoria.
+*   **!writer**: Copywriting creativo, storytelling y blogs con contrato estructurado, persistencia directa en Obsidian y errores seguros cuando falla el storage.
 *   **Trading Core**: Ejecuta la lógica de predicción asimétrica y gestión de órdenes en Kalshi.
 
 ## 4. Matriz de Modelos
@@ -100,6 +100,20 @@ El `assistant-runtime` delega la inteligencia en agentes especializados:
     *   *Memoria Documental*: Obsidian (Markdown).
 4.  **Capa de Observabilidad**: Langfuse para debugging de cadenas de pensamiento y optimización de costos.
 
-## 6. Configuración de Red
+## 6. Contratos Productivos De Writer Y Marketer
+
+### Writer
+
+`WriterWorkflow` soporta `chat`, `blog` y `storytelling`. Cada acción valida el prompt, devuelve salida estructurada y registra la ejecución en memoria cuando existe `MemoryPort`.
+
+Los artefactos Markdown se guardan en Obsidian con rutas relativas (`Blog/...md` o `Story-telling/...md`). Si el contenido se genera pero no puede persistirse, el workflow devuelve `status=error` con `code=writer.persistence_failed`; no se marca como éxito parcial.
+
+### Marketer
+
+El runtime productivo instancia `MarketingGraph` con `ZernioAdapter`. El puerto `MarketingPort` declara las capacidades usadas por el grafo, incluyendo `get_connected_accounts`, lectura de comentarios, dashboard, reportes, drafts, publicaciones, respuestas, DMs, leads, idempotencia y runs de automatización.
+
+Las acciones con escritura externa siguen pasando por políticas de autonomía y aprobación humana. Las rutas legacy ya no deben usarse como fuente demo en producción; si se instancian sin adapter explícito, apuntan al adapter real de Zernio.
+
+## 7. Configuración de Red
 
 Todos los servicios residen en una red interna de Docker, permitiendo la comunicación por hostname (ej: `http://assistant-runtime:8100`). La persistencia se garantiza mediante volúmenes compartidos como `obsidian-vault`, que permite la escritura en tiempo real entre el sub-agente escritor y la interfaz de usuario.

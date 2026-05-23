@@ -38,7 +38,7 @@ humano sobre decisiones de alto impacto.
 - Bot de Discord con comandos, hilos por subagente, embeds, botones y flujos de aprobacion.
 - Runtime de IA en FastAPI con acciones `chat`, `research`, `trade_decision`, `marketing`, `writer`, `picture`, `coder-web` y `email`.
 - Grafo de marketing con LangGraph: contexto, vision, deteccion de intencion, critica, refinamiento de voz y aprobacion humana.
-- Subagente Writer con salida a Obsidian para blogs y storytelling.
+- Subagente Writer con contrato estructurado, validacion de prompts, salida a Obsidian para blogs/storytelling y errores seguros de persistencia.
 - Subagente Picture con memoria visual y soporte de imagenes adjuntas.
 - Subagente Coder Web para crear o ajustar e-commerce y experiencias React/TS.
 - Subagente Email para proveedores Google, Outlook, IMAP/SMTP, clientes locales y respuestas bulk aprobadas.
@@ -272,6 +272,11 @@ texto antes de ejecutar.
 la memoria operativa local. Para entornos con varias cuentas conectadas, usa
 `--account <id>` para evitar ambiguedad y mantener trazabilidad empresarial.
 
+El runtime productivo instancia `MarketingGraph` con `ZernioAdapter`. El contrato
+`MarketingPort` incluye cuentas conectadas, comentarios, dashboard, reportes,
+drafts, publicaciones, leads, DMs, respuestas, idempotencia y auditoria de runs.
+El workflow legacy no debe usarse como ruta demo en produccion.
+
 ### Writer
 
 | Comando | Uso |
@@ -281,6 +286,12 @@ la memoria operativa local. Para entornos con varias cuentas conectadas, usa
 | `!writer storytelling <es\|en> <tema>` | Alias de `story`. |
 | `!writer <mensaje>` | Chat directo con el redactor. |
 | `!writer --model-status` | Muestra modelos conectados para redaccion y keywords visuales. |
+
+Writer devuelve `status`, `message`, `command`, `content`, `artifact` y
+`metadata`. Si Obsidian no esta disponible, devuelve `writer.persistence_failed`
+en lugar de reportar exito parcial. Las imagenes no se insertan desde fuentes
+externas no licenciadas; el agente sugiere keywords para buscar o generar assets
+aprobados antes de publicar.
 
 ### Picture
 
@@ -487,7 +498,10 @@ docker compose --profile observability --profile embeddings config
 Tambien hay pruebas especificas por servicio, por ejemplo:
 
 ```bash
-python3 services/assistant-runtime/test_marketing_graph_regression.py
+services/assistant-runtime/venv/bin/python -m unittest services/assistant-runtime/test_marketing_graph_regression.py
+services/assistant-runtime/venv/bin/python -m unittest services/assistant-runtime/test_marketing_automation.py
+services/assistant-runtime/venv/bin/python -m unittest services/assistant-runtime/test_writer_workflow.py
+services/assistant-runtime/venv/bin/python tests/test_assistant_runtime_dispatch.py
 python3 services/discord-bot/test_marketer_approval.py
 ```
 
@@ -517,6 +531,8 @@ python3 services/discord-bot/test_marketer_approval.py
 - [x] Historial visual de consolidaciones en UI con contrato normalizado.
 - [x] Base Kalshi con limites de riesgo, auditoria durable y fail-closed para ordenes bloqueadas.
 - [x] Base WhatsApp/OpenWA para contactos opt-in, campanas draft, UI y acceso desde `!marketer whatsapp`.
+- [x] Writer endurecido con contrato estructurado, validacion, auditoria ligera y errores de persistencia.
+- [x] Marketer con contrato `MarketingPort` alineado a Zernio y ruta productiva sin fallback demo en runtime.
 - [ ] Envio WhatsApp/OpenWA con aprobacion humana, rate limits, opt-out y webhooks de entrega.
 - [ ] Adapter Kalshi live con autenticacion RSA-PSS, submit real de ordenes e idempotencia end-to-end.
 - [ ] Reconciliacion Kalshi de ordenes, fills, cancelaciones y drift de posicion.

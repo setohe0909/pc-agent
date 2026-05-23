@@ -12,8 +12,9 @@ El agente utiliza su capacidad de análisis para proponer socios estratégicos y
     - **Formatos de Campaña**: Propone ideas como Takeovers, Unboxings o Guest Posting.
 
 ## Implementación Técnica
-- **Workflow**: `MarketingWorkflow._find_collaborations()`
-- **Lógica**: Basada en el perfil de la marca, el LLM genera una lista de criterios de búsqueda y ejemplos de colaboración que maximizan la credibilidad y el alcance.
+- **Workflow**: `MarketingGraph._find_collaborations()`
+- **Lógica**: basada en el perfil de la marca y el contexto disponible en memoria, el LLM genera criterios de búsqueda y ejemplos de colaboración que maximizan credibilidad y alcance.
+- **Producción**: esta acción es consultiva; no contacta perfiles ni ejecuta outreach externo sin una acción aprobada.
 
 ## Beneficios
 - Ahorra tiempo en la fase de prospección de influencers.

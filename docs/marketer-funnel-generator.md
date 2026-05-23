@@ -12,8 +12,9 @@ El agente genera una propuesta estratégica dividida en tres fases clave para ma
     3. **BOFU (Bottom of Funnel)**: Contenido de conversión y cierre de ventas.
 
 ## Implementación Técnica
-- **Workflow**: `MarketingWorkflow._generate_funnel()`
+- **Workflow**: `MarketingGraph._generate_funnel()`
 - **Lógica**: Utiliza un prompt estructurado enviado al LLM para organizar las ideas de contenido en una jerarquía lógica de marketing.
+- **Producción**: es una acción de estrategia y no ejecuta publicaciones, DMs ni cambios externos por sí sola.
 
 ## Beneficios
 - Asegura que no todo el contenido sea de venta directa (lo cual agota a la audiencia).

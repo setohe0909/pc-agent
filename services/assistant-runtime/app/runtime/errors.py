@@ -41,7 +41,10 @@ def error_envelope(exc: Exception, action_type: str, sub_command: str, stage: st
         code = "missing_expected_value"
         missing = str(exc).strip("'\"")
         raw_detail = f"Clave o valor esperado no encontrado: {missing}"
-        hint = f"El flujo intentó leer `{missing}` en una respuesta o payload que no lo tenía."
+        if missing in {"object", "type", "properties"}:
+            hint = "El problema parece estar en el schema de herramientas del LLM antes de ejecutar la acción."
+        else:
+            hint = f"El flujo intentó leer `{missing}` en una respuesta o payload que no lo tenía."
     elif "429" in raw_detail or "quota" in raw_detail.lower() or "rate limit" in raw_detail.lower():
         code = "provider_rate_limited"
         retryable = True
