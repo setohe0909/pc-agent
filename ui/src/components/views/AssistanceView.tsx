@@ -178,7 +178,7 @@ function recognitionErrorMessage(error?: string) {
     case "no-speech":
       return "No detecte voz. Pulsa el microfono otra vez y habla un poco mas cerca o durante mas tiempo.";
     case "network":
-      return "El reconocimiento de voz del navegador no pudo conectar su servicio. Prueba Chrome o una conexion estable.";
+      return "El dictado del navegador no esta disponible: Chrome/Edge usan un servicio externo para convertir voz a texto y no pudo conectar. Puedes escribir la peticion aqui; para voz estable necesitamos activar STT local en backend.";
     case "aborted":
       return "Dictado cancelado.";
     default:
@@ -201,6 +201,7 @@ export function AssistanceView({ data, adminToken }: AssistanceViewProps) {
   const [isSpeaking, setIsSpeaking] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [speechRecognitionUnavailable, setSpeechRecognitionUnavailable] = useState(false);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [voiceName, setVoiceName] = useState("");
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
@@ -326,6 +327,10 @@ export function AssistanceView({ data, adminToken }: AssistanceViewProps) {
   };
 
   const toggleListening = async () => {
+    if (speechRecognitionUnavailable) {
+      appendMessage("system", "El dictado del navegador esta desactivado por el fallo de conexion anterior. Usa el campo de texto o activa STT local en backend.");
+      return;
+    }
     const speechWindow = window as SpeechRecognitionWindow;
     const SpeechRecognitionApi = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
     if (!SpeechRecognitionApi) {
@@ -356,6 +361,9 @@ export function AssistanceView({ data, adminToken }: AssistanceViewProps) {
     recognition.onend = () => setIsListening(false);
     recognition.onerror = (event) => {
       if (event.error !== "aborted") {
+        if (event.error === "network") {
+          setSpeechRecognitionUnavailable(true);
+        }
         appendMessage("system", recognitionErrorMessage(event.error));
       }
       setIsListening(false);
@@ -446,12 +454,12 @@ export function AssistanceView({ data, adminToken }: AssistanceViewProps) {
             <p className="text-2xl font-semibold tracking-[0.22em] text-cyan-100">{assistantName}</p>
             <p className="mt-3 inline-flex items-center gap-2 rounded-[8px] border border-cyan-300/10 bg-cyan-950/40 px-3 py-2 text-sm text-cyan-100/75">
               <span className={`size-2 rounded-full ${isListening ? "bg-emerald-300" : "bg-cyan-300"}`} />
-              {isListening ? "Escuchando..." : isSending ? "Procesando..." : "Listo para recibir ordenes"}
+              {isListening ? "Escuchando..." : isSending ? "Procesando..." : speechRecognitionUnavailable ? "Dictado del navegador no disponible" : "Listo para recibir ordenes"}
             </p>
           </div>
 
           <div className="relative mt-12 flex items-center gap-4">
-            <Button type="button" size="icon-lg" variant="outline" title="Dictar" aria-label="Dictar" onClick={() => void toggleListening()} className="size-14 rounded-[8px] border-cyan-300/20 bg-cyan-950/50 text-cyan-100 hover:bg-cyan-900/60">
+            <Button type="button" size="icon-lg" variant="outline" title={speechRecognitionUnavailable ? "Dictado no disponible" : "Dictar"} aria-label="Dictar" onClick={() => void toggleListening()} className="size-14 rounded-[8px] border-cyan-300/20 bg-cyan-950/50 text-cyan-100 hover:bg-cyan-900/60">
               {isListening ? <MicOff className="size-5" /> : <Mic className="size-5" />}
             </Button>
             <Button type="button" size="icon-lg" variant="outline" title="Voz" aria-label="Voz" onClick={() => setIsSpeaking((value) => !value)} className="size-14 rounded-[8px] border-cyan-300/20 bg-cyan-950/50 text-cyan-100 hover:bg-cyan-900/60">
