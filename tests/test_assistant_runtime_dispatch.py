@@ -48,6 +48,11 @@ class FakeModelStatusService:
         return {"status": "success", "message": f"models:{agent}"}
 
 
+class FakeOrchestratorWorkflow:
+    async def run(self, prompt, payload):
+        return {"status": "success", "message": f"orchestrator:{prompt}:{payload.get('interface')}"}
+
+
 def fake_container():
     return SimpleNamespace(
         trading_workflow=FakeTradingWorkflow(),
@@ -56,6 +61,7 @@ def fake_container():
         email_workflow=FakeEmailWorkflow(),
         picture_workflow=FakePictureWorkflow(),
         coder_web_workflow=FakeCoderWebWorkflow(),
+        orchestrator_workflow=FakeOrchestratorWorkflow(),
         model_status_service=FakeModelStatusService(),
     )
 
@@ -76,6 +82,7 @@ class AssistantRuntimeDispatchTests(unittest.TestCase):
         container = fake_container()
         cases = [
             ("chat", {}, "chat:haz algo:u1"),
+            ("orchestrator", {"interface": "assistance"}, "orchestrator:haz algo:assistance"),
             ("trade_decision", {}, "trade:haz algo:u1"),
             ("marketing", {"sub_command": "status"}, "marketing:status:0"),
             ("writer", {}, "writer:haz algo"),

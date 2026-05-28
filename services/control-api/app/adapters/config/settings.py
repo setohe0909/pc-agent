@@ -53,6 +53,8 @@ class Settings(BaseSettings):
     email_pc_client_bridge_url: str | None = None
     email_pc_client_bridge_token: str | None = None
     default_llm_provider: str = "openai"
+    openai_api_key: str | None = None
+    speech_to_text_model: str = "gpt-4o-mini-transcribe"
     coder_web_repository: str | None = None
     coder_web_private_repo: bool = True
     coder_web_preview_deploy_hook_url: str | None = None

@@ -21,10 +21,10 @@ import {
   VolumeX,
   Zap,
 } from "lucide-react";
-import { submitAssistantRequest } from "@/lib/api";
+import { submitAssistantRequest, transcribeAssistantAudio } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 
-type AssistantAction = "chat" | "marketing" | "email" | "writer" | "picture" | "coder-web" | "model_status";
+type AssistantAction = "orchestrator" | "marketing" | "email" | "writer" | "picture" | "coder-web" | "model_status";
 type MessageRole = "assistant" | "user" | "system";
 
 type AssistantMessage = {
@@ -53,43 +53,8 @@ type AssistantResponse = {
   reason?: string;
 };
 
-type SpeechRecognitionResultEventLike = {
-  results?: {
-    length?: number;
-    [index: number]: {
-      isFinal?: boolean;
-      [index: number]: {
-        transcript?: string;
-      };
-    };
-  };
-};
-
-type SpeechRecognitionLike = {
-  lang: string;
-  interimResults: boolean;
-  continuous: boolean;
-  onresult: ((event: SpeechRecognitionResultEventLike) => void) | null;
-  onend: (() => void) | null;
-  onerror: ((event: SpeechRecognitionErrorEventLike) => void) | null;
-  start: () => void;
-  stop: () => void;
-};
-
-type SpeechRecognitionErrorEventLike = {
-  error?: string;
-  message?: string;
-};
-
-type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
-
-type SpeechRecognitionWindow = Window & {
-  SpeechRecognition?: SpeechRecognitionConstructor;
-  webkitSpeechRecognition?: SpeechRecognitionConstructor;
-};
-
 const actionOptions: Array<{ value: AssistantAction; label: string; icon: typeof Bot; subCommand?: string }> = [
-  { value: "chat", label: "General", icon: Sparkles },
+  { value: "orchestrator", label: "Orquestador", icon: Sparkles },
   { value: "marketing", label: "Marketing", icon: Megaphone, subCommand: "chat" },
   { value: "email", label: "Email", icon: Mail, subCommand: "status" },
   { value: "writer", label: "Redactor", icon: PenTool },
@@ -111,6 +76,7 @@ function currentTime() {
 
 function detectAction(prompt: string, fallback: AssistantAction): AssistantAction {
   const text = prompt.toLowerCase();
+  if (text.includes("estado") || text.includes("status") || text.includes("agentes conectados")) return "model_status";
   if (text.includes("marketing") || text.includes("campana") || text.includes("leads")) return "marketing";
   if (text.includes("email") || text.includes("correo")) return "email";
   if (text.includes("redact") || text.includes("articulo") || text.includes("writer")) return "writer";
@@ -168,27 +134,19 @@ function isLocalOrSecureContext() {
   return window.isSecureContext || ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
 }
 
-function recognitionErrorMessage(error?: string) {
-  switch (error) {
-    case "not-allowed":
-    case "service-not-allowed":
-      return "El navegador no tiene permiso para usar el microfono. Activalo en permisos del sitio y vuelve a intentar.";
-    case "audio-capture":
-      return "No encuentro un microfono disponible. Revisa que el microfono este conectado y no lo este usando otra app.";
-    case "no-speech":
-      return "No detecte voz. Pulsa el microfono otra vez y habla un poco mas cerca o durante mas tiempo.";
-    case "network":
-      return "El dictado del navegador no esta disponible: Chrome/Edge usan un servicio externo para convertir voz a texto y no pudo conectar. Puedes escribir la peticion aqui; para voz estable necesitamos activar STT local en backend.";
-    case "aborted":
-      return "Dictado cancelado.";
-    default:
-      return "No pude iniciar el dictado. Revisa permisos de microfono y prueba de nuevo.";
-  }
+function preferredAudioMimeType() {
+  const candidates = [
+    "audio/webm;codecs=opus",
+    "audio/webm",
+    "audio/mp4",
+    "audio/ogg;codecs=opus",
+  ];
+  return candidates.find((mimeType) => MediaRecorder.isTypeSupported(mimeType)) || "";
 }
 
 export function AssistanceView({ data, adminToken }: AssistanceViewProps) {
   const [prompt, setPrompt] = useState("");
-  const [activeAction, setActiveAction] = useState<AssistantAction>("chat");
+  const [activeAction, setActiveAction] = useState<AssistantAction>("orchestrator");
   const [messages, setMessages] = useState<AssistantMessage[]>([
     {
       id: "welcome",
@@ -200,11 +158,13 @@ export function AssistanceView({ data, adminToken }: AssistanceViewProps) {
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(true);
   const [isSending, setIsSending] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [speechRecognitionUnavailable, setSpeechRecognitionUnavailable] = useState(false);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [voiceName, setVoiceName] = useState("");
-  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioStreamRef = useRef<MediaStream | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
   const logRef = useRef<HTMLDivElement | null>(null);
 
   const selectedVoice = useMemo(() => {
@@ -241,6 +201,16 @@ export function AssistanceView({ data, adminToken }: AssistanceViewProps) {
     };
   }, [isExpanded]);
 
+  useEffect(() => {
+    return () => {
+      audioStreamRef.current?.getTracks().forEach((track) => track.stop());
+      if (mediaRecorderRef.current?.state === "recording") {
+        mediaRecorderRef.current.onstop = null;
+        mediaRecorderRef.current.stop();
+      }
+    };
+  }, []);
+
   const speak = (text: string) => {
     if (!isSpeaking || !window.speechSynthesis) return;
     window.speechSynthesis.cancel();
@@ -264,18 +234,23 @@ export function AssistanceView({ data, adminToken }: AssistanceViewProps) {
     setMessages((current) => [...current, { id: crypto.randomUUID(), role, text, time: currentTime() }]);
   };
 
-  const ensureMicrophoneAccess = async () => {
+  const getMicrophoneStream = async () => {
     if (!isLocalOrSecureContext()) {
-      appendMessage("system", "El dictado requiere HTTPS o localhost para acceder al microfono.");
-      return false;
+      appendMessage("system", "La captura de voz requiere HTTPS o localhost para acceder al microfono.");
+      return null;
     }
     if (!navigator.mediaDevices?.getUserMedia) {
-      return true;
+      appendMessage("system", "Este navegador no permite capturar audio desde la pagina.");
+      return null;
     }
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      stream.getTracks().forEach((track) => track.stop());
-      return true;
+      return await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
     } catch (error) {
       const name = error instanceof DOMException ? error.name : "";
       if (name === "NotAllowedError" || name === "SecurityError") {
@@ -285,7 +260,42 @@ export function AssistanceView({ data, adminToken }: AssistanceViewProps) {
       } else {
         appendMessage("system", "No pude acceder al microfono. Revisa permisos o selecciona otro dispositivo de entrada.");
       }
-      return false;
+      return null;
+    }
+  };
+
+  const stopRecording = () => {
+    const recorder = mediaRecorderRef.current;
+    if (recorder && recorder.state !== "inactive") {
+      recorder.stop();
+    }
+    setIsListening(false);
+  };
+
+  const transcribeRecording = async (audioBlob: Blob) => {
+    if (!adminToken) {
+      appendMessage("system", "Configura el Admin Token para transcribir voz.");
+      return;
+    }
+    if (!audioBlob.size) {
+      appendMessage("system", "No recibi audio. Pulsa el microfono y habla durante uno o dos segundos.");
+      return;
+    }
+    setIsTranscribing(true);
+    try {
+      const response = await transcribeAssistantAudio(audioBlob, adminToken);
+      const transcript = String(response?.text || "").trim();
+      if (!transcript) {
+        appendMessage("system", "No pude convertir el audio en texto claro. Intenta hablar un poco mas cerca.");
+        return;
+      }
+      setPrompt(transcript);
+      await submitPrompt(transcript);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "error desconocido";
+      appendMessage("system", `No pude transcribir el audio: ${message}`);
+    } finally {
+      setIsTranscribing(false);
     }
   };
 
@@ -312,6 +322,7 @@ export function AssistanceView({ data, adminToken }: AssistanceViewProps) {
           sub_command: option?.subCommand || "chat",
           agent: action === "model_status" ? "marketing" : action,
           interface: "assistance",
+          role: "multi_agent_orchestrator",
           language: "es",
         },
       }, adminToken);
@@ -327,53 +338,45 @@ export function AssistanceView({ data, adminToken }: AssistanceViewProps) {
   };
 
   const toggleListening = async () => {
-    if (speechRecognitionUnavailable) {
-      appendMessage("system", "El dictado del navegador esta desactivado por el fallo de conexion anterior. Usa el campo de texto o activa STT local en backend.");
-      return;
-    }
-    const speechWindow = window as SpeechRecognitionWindow;
-    const SpeechRecognitionApi = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
-    if (!SpeechRecognitionApi) {
-      appendMessage("system", "Este navegador no expone reconocimiento de voz local.");
-      return;
-    }
     if (isListening) {
-      recognitionRef.current?.stop();
-      setIsListening(false);
+      stopRecording();
       return;
     }
-    const canUseMicrophone = await ensureMicrophoneAccess();
-    if (!canUseMicrophone) return;
-    const recognition = new SpeechRecognitionApi();
-    recognition.lang = "es-419";
-    recognition.interimResults = true;
-    recognition.continuous = false;
-    recognition.onresult = (event) => {
-      const index = Math.max((event.results?.length || 1) - 1, 0);
-      const transcript = event.results?.[index]?.[0]?.transcript || "";
-      if (!transcript.trim()) return;
-      setPrompt(transcript);
-      if (event.results?.[index]?.isFinal !== false) {
-        recognition.stop();
-        void submitPrompt(transcript);
+    if (typeof MediaRecorder === "undefined") {
+      appendMessage("system", "Este navegador no soporta grabacion de audio desde la pagina. Prueba Chrome o Edge actualizado.");
+      return;
+    }
+    const stream = await getMicrophoneStream();
+    if (!stream) return;
+    const mimeType = preferredAudioMimeType();
+    const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+    audioChunksRef.current = [];
+    audioStreamRef.current = stream;
+    mediaRecorderRef.current = recorder;
+    recorder.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        audioChunksRef.current.push(event.data);
       }
     };
-    recognition.onend = () => setIsListening(false);
-    recognition.onerror = (event) => {
-      if (event.error !== "aborted") {
-        if (event.error === "network") {
-          setSpeechRecognitionUnavailable(true);
-        }
-        appendMessage("system", recognitionErrorMessage(event.error));
-      }
+    recorder.onstop = () => {
+      stream.getTracks().forEach((track) => track.stop());
+      const audioBlob = new Blob(audioChunksRef.current, { type: recorder.mimeType || "audio/webm" });
+      audioChunksRef.current = [];
+      mediaRecorderRef.current = null;
+      audioStreamRef.current = null;
+      void transcribeRecording(audioBlob);
+    };
+    recorder.onerror = () => {
+      stream.getTracks().forEach((track) => track.stop());
+      appendMessage("system", "La captura del microfono se detuvo por un error del navegador.");
       setIsListening(false);
     };
-    recognitionRef.current = recognition;
     try {
-      recognition.start();
+      recorder.start();
       setIsListening(true);
     } catch {
-      appendMessage("system", "El dictado ya estaba iniciandose. Espera un segundo y vuelve a pulsar el microfono.");
+      stream.getTracks().forEach((track) => track.stop());
+      appendMessage("system", "No pude iniciar la grabacion de voz en este navegador.");
       setIsListening(false);
     }
   };
@@ -454,12 +457,12 @@ export function AssistanceView({ data, adminToken }: AssistanceViewProps) {
             <p className="text-2xl font-semibold tracking-[0.22em] text-cyan-100">{assistantName}</p>
             <p className="mt-3 inline-flex items-center gap-2 rounded-[8px] border border-cyan-300/10 bg-cyan-950/40 px-3 py-2 text-sm text-cyan-100/75">
               <span className={`size-2 rounded-full ${isListening ? "bg-emerald-300" : "bg-cyan-300"}`} />
-              {isListening ? "Escuchando..." : isSending ? "Procesando..." : speechRecognitionUnavailable ? "Dictado del navegador no disponible" : "Listo para recibir ordenes"}
+              {isListening ? "Grabando voz..." : isTranscribing ? "Transcribiendo..." : isSending ? "Procesando..." : "Listo para recibir ordenes"}
             </p>
           </div>
 
           <div className="relative mt-12 flex items-center gap-4">
-            <Button type="button" size="icon-lg" variant="outline" title={speechRecognitionUnavailable ? "Dictado no disponible" : "Dictar"} aria-label="Dictar" onClick={() => void toggleListening()} className="size-14 rounded-[8px] border-cyan-300/20 bg-cyan-950/50 text-cyan-100 hover:bg-cyan-900/60">
+            <Button type="button" size="icon-lg" variant="outline" title={isListening ? "Detener y transcribir" : "Grabar voz"} aria-label="Grabar voz" onClick={() => void toggleListening()} className="size-14 rounded-[8px] border-cyan-300/20 bg-cyan-950/50 text-cyan-100 hover:bg-cyan-900/60">
               {isListening ? <MicOff className="size-5" /> : <Mic className="size-5" />}
             </Button>
             <Button type="button" size="icon-lg" variant="outline" title="Voz" aria-label="Voz" onClick={() => setIsSpeaking((value) => !value)} className="size-14 rounded-[8px] border-cyan-300/20 bg-cyan-950/50 text-cyan-100 hover:bg-cyan-900/60">

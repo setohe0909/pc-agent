@@ -2,7 +2,7 @@ import json
 import os
 import httpx
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from apscheduler.triggers.cron import CronTrigger
 from pydantic import BaseModel, Field, field_validator
 
@@ -13,6 +13,7 @@ from app.adapters.config.in_memory import InMemoryKnowledgeSourceRepository
 from app.adapters.config.probes import HttpSystemProbe
 from app.adapters.config.runtime_config import RuntimeConfigStore, RuntimeConfigUpdate
 from app.adapters.config.settings import settings
+from app.adapters.speech_transcription import OpenAISpeechTranscriber
 from app.adapters.mentis.repository import SupabaseMentisMemoryRepository
 from app.adapters.supabase.client import SupabaseVectorKnowledgeBase
 from app.adapters.whatsapp.repository import SupabaseWhatsAppOutreachRepository
@@ -30,6 +31,7 @@ from app.application.use_cases import (
     RegisterKnowledgeSource,
     ClearMemoryContext,
     SubmitAssistantRequest,
+    TranscribeAssistantAudio,
     TriggerIngestionRun,
     UpsertWhatsAppContact,
     UpdateIngestionSchedule,
@@ -109,7 +111,7 @@ class AssistantSourceRequest(BaseModel):
 
 
 class AssistantProxyRequest(BaseModel):
-    action_type: str = Field(default="chat", pattern="^(chat|research|trade_decision|open_position|marketing|writer|picture|coder-web|email|model_status)$")
+    action_type: str = Field(default="orchestrator", pattern="^(chat|orchestrator|research|trade_decision|open_position|marketing|writer|picture|coder-web|email|model_status)$")
     prompt: str = Field(min_length=1, max_length=8000)
     source: AssistantSourceRequest = Field(default_factory=AssistantSourceRequest)
     payload: dict = Field(default_factory=dict)
@@ -285,6 +287,41 @@ async def submit_assistant_request(request: AssistantProxyRequest) -> dict:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Assistant runtime HTTP {upstream_status}: {detail}") from exc
     except httpx.RequestError as exc:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=f"No se pudo contactar assistant-runtime: {exc}") from exc
+
+
+@router.post("/assistant/transcribe", dependencies=[Depends(require_admin)])
+async def transcribe_assistant_audio(
+    audio: UploadFile = File(...),
+    language: str = Form(default="es"),
+) -> dict:
+    api_key = settings.effective("openai_api_key") or os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Falta configurar OPENAI_API_KEY para transcribir audio desde el navegador.",
+        )
+    content = await audio.read()
+    use_case = TranscribeAssistantAudio(
+        OpenAISpeechTranscriber(
+            api_key=api_key,
+            model=str(settings.effective("speech_to_text_model") or "gpt-4o-mini-transcribe"),
+        )
+    )
+    try:
+        return await use_case.execute(
+            audio=content,
+            filename=audio.filename or "speech.webm",
+            content_type=audio.content_type or "application/octet-stream",
+            language=language or "es",
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except httpx.HTTPStatusError as exc:
+        detail = exc.response.text[:500] if exc.response is not None else str(exc)
+        upstream_status = exc.response.status_code if exc.response is not None else "unknown"
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"STT HTTP {upstream_status}: {detail}") from exc
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=f"No se pudo contactar el servicio STT: {exc}") from exc
 
 
 async def _openai_usage(runtime: dict, start: datetime) -> dict:

@@ -5,7 +5,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "services" / "control-api"))
 
-from app.application.use_cases import ListKnowledgeSources, RegisterKnowledgeSource, SubmitAssistantRequest
+from app.application.use_cases import ListKnowledgeSources, RegisterKnowledgeSource, SubmitAssistantRequest, TranscribeAssistantAudio
 from app.domain.models import KnowledgeSource, SourceType
 
 
@@ -28,6 +28,11 @@ class FakeAssistantRuntimeGateway:
     async def submit_request(self, payload: dict) -> dict:
         self.payload = payload
         return {"status": "success", "message": f"ok:{payload['prompt']}"}
+
+
+class FakeSpeechTranscriber:
+    async def transcribe(self, audio: bytes, filename: str, content_type: str, language: str) -> str:
+        return f"voz:{len(audio)}:{language}:{filename}:{content_type}"
 
 
 class UseCaseTests(unittest.TestCase):
@@ -68,6 +73,31 @@ class UseCaseTests(unittest.TestCase):
         async def scenario() -> None:
             with self.assertRaises(ValueError):
                 await SubmitAssistantRequest(FakeAssistantRuntimeGateway()).execute({"prompt": "   "})
+
+        asyncio.run(scenario())
+
+    def test_transcribe_assistant_audio_returns_text(self) -> None:
+        async def scenario() -> None:
+            response = await TranscribeAssistantAudio(FakeSpeechTranscriber()).execute(
+                audio=b"audio",
+                filename="speech.webm",
+                content_type="audio/webm",
+                language="es",
+            )
+
+            self.assertEqual(response["text"], "voz:5:es:speech.webm:audio/webm")
+
+        asyncio.run(scenario())
+
+    def test_transcribe_assistant_audio_rejects_empty_audio(self) -> None:
+        async def scenario() -> None:
+            with self.assertRaises(ValueError):
+                await TranscribeAssistantAudio(FakeSpeechTranscriber()).execute(
+                    audio=b"",
+                    filename="speech.webm",
+                    content_type="audio/webm",
+                    language="es",
+                )
 
         asyncio.run(scenario())
 

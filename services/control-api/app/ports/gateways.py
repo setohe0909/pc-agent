@@ -96,3 +96,8 @@ class IngestionControl(Protocol):
 class AssistantRuntimeGateway(Protocol):
     async def submit_request(self, payload: dict) -> dict:
         ...
+
+
+class SpeechTranscriber(Protocol):
+    async def transcribe(self, audio: bytes, filename: str, content_type: str, language: str) -> str:
+        ...

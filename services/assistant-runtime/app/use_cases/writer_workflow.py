@@ -175,12 +175,14 @@ class WriterWorkflow:
         
         try:
             target_dir.mkdir(parents=True, exist_ok=True)
+            self._apply_obsidian_permissions(target_dir, is_dir=True)
         except Exception as e:
             print(f"[OBSIDIAN ERROR] No se pudo crear el directorio {target_dir}: {e}")
             raise e
         
         file_path = target_dir / filename
         file_path.write_text(content, encoding="utf-8")
+        self._apply_obsidian_permissions(file_path, is_dir=False)
         
         return f"{folder}/{filename}"
 
@@ -188,6 +190,47 @@ class WriterWorkflow:
         normalized = re.sub(r"\s+", "-", title.strip().lower())
         cleaned = re.sub(r"[^a-z0-9\-_]+", "", normalized)
         return cleaned[:70].strip("-_") or "writer-draft"
+
+    def _apply_obsidian_permissions(self, path: Path, is_dir: bool) -> None:
+        mode = 0o775 if is_dir else 0o664
+        try:
+            path.chmod(mode)
+        except Exception as exc:
+            print(f"[OBSIDIAN PERMISSIONS WARNING] No se pudo ajustar chmod en {path}: {exc}")
+
+        uid, gid = self._obsidian_owner_ids(path)
+        if uid is None and gid is None:
+            return
+        try:
+            os.chown(path, -1 if uid is None else uid, -1 if gid is None else gid)
+        except AttributeError:
+            return
+        except PermissionError as exc:
+            print(f"[OBSIDIAN PERMISSIONS WARNING] No se pudo ajustar propietario en {path}: {exc}")
+        except Exception as exc:
+            print(f"[OBSIDIAN PERMISSIONS WARNING] Error ajustando propietario en {path}: {exc}")
+
+    def _obsidian_owner_ids(self, path: Path) -> tuple[int | None, int | None]:
+        uid = self._parse_optional_int(os.getenv("OBSIDIAN_FILE_UID") or os.getenv("PUID"))
+        gid = self._parse_optional_int(os.getenv("OBSIDIAN_FILE_GID") or os.getenv("PGID"))
+        if (uid is None or gid is None) and self._is_container_vault_path(path):
+            uid = 1000 if uid is None else uid
+            gid = 1000 if gid is None else gid
+        return uid, gid
+
+    def _is_container_vault_path(self, path: Path) -> bool:
+        try:
+            return path.resolve().is_relative_to(Path("/vault"))
+        except Exception:
+            return str(path).startswith("/vault/")
+
+    def _parse_optional_int(self, value: str | None) -> int | None:
+        if value is None or value == "":
+            return None
+        try:
+            return int(value)
+        except ValueError:
+            return None
 
     async def _record_run(self, command: str, prompt: str, content: str, artifact: str | None) -> None:
         if not self.memory:

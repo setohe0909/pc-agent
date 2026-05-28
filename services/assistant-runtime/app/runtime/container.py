@@ -16,6 +16,7 @@ from app.use_cases.coder_web_graph import CoderWebGraph
 from app.use_cases.email_workflow import EmailWorkflow
 from app.use_cases.marketing_graph import MarketingGraph
 from app.use_cases.model_status import ModelStatusService
+from app.use_cases.orchestrator_workflow import OrchestratorWorkflow
 from app.use_cases.picture_graph import PictureGraph
 from app.use_cases.trading_workflow import TradingWorkflow
 from app.use_cases.writer_workflow import WriterWorkflow
@@ -29,6 +30,7 @@ class AssistantRuntimeContainer:
     email_workflow: EmailWorkflow
     picture_workflow: PictureGraph
     coder_web_workflow: CoderWebGraph
+    orchestrator_workflow: OrchestratorWorkflow
     model_status_service: ModelStatusService
     rate_limiter: InMemoryRateLimiter
     tracer: RuntimeTracer
@@ -61,6 +63,7 @@ def build_runtime_container() -> AssistantRuntimeContainer:
             coder_web=PilotWebAdapter(),
             task_tracker=LinearTaskTrackerAdapter(),
         ),
+        orchestrator_workflow=OrchestratorWorkflow(llm_port=llm_port),
         model_status_service=ModelStatusService(llm=llm_port),
         rate_limiter=InMemoryRateLimiter(),
         tracer=RuntimeTracer(),

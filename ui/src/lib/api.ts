@@ -93,3 +93,20 @@ export async function submitAssistantRequest(payload: unknown, adminToken: strin
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   return response.json();
 }
+
+export async function transcribeAssistantAudio(audio: Blob, adminToken: string) {
+  const form = new FormData();
+  const extension = audio.type.includes("mp4") ? "m4a" : audio.type.includes("ogg") ? "ogg" : "webm";
+  form.append("audio", audio, `speech.${extension}`);
+  form.append("language", "es");
+  const response = await fetch(`${API_BASE}/assistant/transcribe`, {
+    method: "POST",
+    headers: { "X-Admin-Token": adminToken },
+    body: form,
+  });
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    throw new Error(`HTTP ${response.status}${detail ? `: ${detail}` : ""}`);
+  }
+  return response.json();
+}

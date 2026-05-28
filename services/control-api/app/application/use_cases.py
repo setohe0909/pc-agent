@@ -16,6 +16,7 @@ from app.ports.gateways import (
     KnowledgeSourceRepository,
     MentisMemory,
     MemoryRepository,
+    SpeechTranscriber,
     SystemProbe,
     VectorKnowledgeBase,
     WhatsAppOutreachRepository,
@@ -187,3 +188,21 @@ class SubmitAssistantRequest:
         if not prompt:
             raise ValueError("prompt requerido.")
         return await self.gateway.submit_request({**payload, "prompt": prompt})
+
+
+class TranscribeAssistantAudio:
+    def __init__(self, transcriber: SpeechTranscriber, max_bytes: int = 12 * 1024 * 1024) -> None:
+        self.transcriber = transcriber
+        self.max_bytes = max_bytes
+
+    async def execute(self, audio: bytes, filename: str, content_type: str, language: str = "es") -> dict:
+        if not audio:
+            raise ValueError("audio requerido.")
+        if len(audio) > self.max_bytes:
+            raise ValueError("El audio excede el limite de 12MB.")
+        if not content_type.startswith("audio/") and content_type != "application/octet-stream":
+            raise ValueError("Formato de audio no soportado.")
+        text = (await self.transcriber.transcribe(audio, filename, content_type, language)).strip()
+        if not text:
+            raise ValueError("No se pudo transcribir voz clara.")
+        return {"text": text, "language": language}

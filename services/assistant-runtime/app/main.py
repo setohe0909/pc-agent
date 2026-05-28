@@ -36,6 +36,7 @@ app = FastAPI(title="PC Agent Assistant Runtime")
 
 class ActionType(str, Enum):
     chat = "chat"
+    orchestrator = "orchestrator"
     research = "research"
     trade_decision = "trade_decision"
     open_position = "open_position"
@@ -161,6 +162,9 @@ async def dispatch_assistant_request(container, request: AssistantRequest) -> tu
     if request.action_type == ActionType.model_status:
         stage = "consultando modelos conectados"
         return container.model_status_service.get_status(agent=request.payload.get("agent", request.prompt)), stage
+    if request.action_type == ActionType.orchestrator:
+        stage = "orquestando agentes"
+        return await container.orchestrator_workflow.run(prompt=request.prompt, payload=request.payload), stage
 
     stage = "ejecutando chat"
     result_text = await container.trading_workflow.execute_chat(prompt=request.prompt, user_id=request.source.user_id)
@@ -188,6 +192,7 @@ def _assistant_response(result: dict, request: AssistantRequest) -> dict:
         "email_status": result.get("email_status"),
         "email_bulk_reply": result.get("email_bulk_reply"),
         "email_jobs": result.get("email_jobs"),
+        "orchestrator": result.get("orchestrator"),
         "requires_approval": result.get("requires_approval", result.get("status") == "requires_approval"),
         "input": request.model_dump(),
     }

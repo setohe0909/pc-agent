@@ -77,6 +77,8 @@ class WriterWorkflowTests(unittest.TestCase):
                 saved_path = Path(tmp) / result["artifact"]
                 self.assertTrue(saved_path.exists())
                 self.assertIn("Contenido listo", saved_path.read_text(encoding="utf-8"))
+                self.assertEqual(saved_path.stat().st_mode & 0o777, 0o664)
+                self.assertEqual(saved_path.parent.stat().st_mode & 0o777, 0o775)
 
         asyncio.run(scenario())
 
