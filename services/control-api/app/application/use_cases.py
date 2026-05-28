@@ -11,6 +11,7 @@ from app.domain.models import (
     WhatsAppContact,
 )
 from app.ports.gateways import (
+    AssistantRuntimeGateway,
     IngestionControl,
     KnowledgeSourceRepository,
     MentisMemory,
@@ -175,3 +176,14 @@ class TriggerIngestionRun:
 
     async def execute(self, target: str) -> IngestionRun:
         return await self.control.trigger_run(target)
+
+
+class SubmitAssistantRequest:
+    def __init__(self, gateway: AssistantRuntimeGateway) -> None:
+        self.gateway = gateway
+
+    async def execute(self, payload: dict) -> dict:
+        prompt = str(payload.get("prompt", "")).strip()
+        if not prompt:
+            raise ValueError("prompt requerido.")
+        return await self.gateway.submit_request({**payload, "prompt": prompt})

@@ -5,7 +5,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "services" / "control-api"))
 
-from app.application.use_cases import ListKnowledgeSources, RegisterKnowledgeSource
+from app.application.use_cases import ListKnowledgeSources, RegisterKnowledgeSource, SubmitAssistantRequest
 from app.domain.models import KnowledgeSource, SourceType
 
 
@@ -19,6 +19,15 @@ class FakeKnowledgeSourceRepository:
     async def add_source(self, source: KnowledgeSource) -> KnowledgeSource:
         self.sources.append(source)
         return source
+
+
+class FakeAssistantRuntimeGateway:
+    def __init__(self) -> None:
+        self.payload: dict | None = None
+
+    async def submit_request(self, payload: dict) -> dict:
+        self.payload = payload
+        return {"status": "success", "message": f"ok:{payload['prompt']}"}
 
 
 class UseCaseTests(unittest.TestCase):
@@ -37,6 +46,28 @@ class UseCaseTests(unittest.TestCase):
 
             self.assertEqual(saved.name, "Fuente macro")
             self.assertEqual(listed, [source])
+
+        asyncio.run(scenario())
+
+    def test_submit_assistant_request_trims_prompt(self) -> None:
+        async def scenario() -> None:
+            gateway = FakeAssistantRuntimeGateway()
+            response = await SubmitAssistantRequest(gateway).execute({
+                "action_type": "marketing",
+                "prompt": "  revisa campanas  ",
+                "source": {"platform": "admin"},
+                "payload": {"sub_command": "status"},
+            })
+
+            self.assertEqual(response["message"], "ok:revisa campanas")
+            self.assertEqual(gateway.payload["prompt"], "revisa campanas")
+
+        asyncio.run(scenario())
+
+    def test_submit_assistant_request_rejects_empty_prompt(self) -> None:
+        async def scenario() -> None:
+            with self.assertRaises(ValueError):
+                await SubmitAssistantRequest(FakeAssistantRuntimeGateway()).execute({"prompt": "   "})
 
         asyncio.run(scenario())
 

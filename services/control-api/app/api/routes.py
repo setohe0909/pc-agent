@@ -7,6 +7,7 @@ from apscheduler.triggers.cron import CronTrigger
 from pydantic import BaseModel, Field, field_validator
 
 from app.api.auth import require_admin
+from app.adapters.assistant_runtime import HttpAssistantRuntimeGateway
 from app.adapters.config.ingestion_control import JsonIngestionControl
 from app.adapters.config.in_memory import InMemoryKnowledgeSourceRepository
 from app.adapters.config.probes import HttpSystemProbe
@@ -28,6 +29,7 @@ from app.application.use_cases import (
     ListKnowledgeSources,
     RegisterKnowledgeSource,
     ClearMemoryContext,
+    SubmitAssistantRequest,
     TriggerIngestionRun,
     UpsertWhatsAppContact,
     UpdateIngestionSchedule,
@@ -98,6 +100,21 @@ class WhatsAppCampaignRequest(BaseModel):
 class WhatsAppCampaignDecisionRequest(BaseModel):
     approved: bool
     decided_by: str = Field(min_length=1, max_length=120)
+
+
+class AssistantSourceRequest(BaseModel):
+    platform: str = Field(default="admin", min_length=2, max_length=40)
+    channel_id: str | None = Field(default="assistance-ui", max_length=120)
+    user_id: str | None = Field(default="admin", max_length=120)
+
+
+class AssistantProxyRequest(BaseModel):
+    action_type: str = Field(default="chat", pattern="^(chat|research|trade_decision|open_position|marketing|writer|picture|coder-web|email|model_status)$")
+    prompt: str = Field(min_length=1, max_length=8000)
+    source: AssistantSourceRequest = Field(default_factory=AssistantSourceRequest)
+    payload: dict = Field(default_factory=dict)
+    images: list[str] = Field(default_factory=list, max_length=4)
+    image_metadata: list[dict] = Field(default_factory=list)
 
 
 @router.get("/health")
@@ -251,6 +268,23 @@ async def update_runtime_config(request: RuntimeConfigUpdate) -> dict:
         await runtime_config_store.sync_to_supabase(s_url, s_key)
         
     return {"runtime": updated}
+
+
+@router.post("/assistant/request", dependencies=[Depends(require_admin)])
+async def submit_assistant_request(request: AssistantProxyRequest) -> dict:
+    runtime_url = str(settings.effective("open_claw_base_url") or settings.open_claw_base_url)
+    gateway = HttpAssistantRuntimeGateway(runtime_url)
+    use_case = SubmitAssistantRequest(gateway)
+    try:
+        return await use_case.execute(request.model_dump())
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except httpx.HTTPStatusError as exc:
+        detail = exc.response.text[:500] if exc.response is not None else str(exc)
+        upstream_status = exc.response.status_code if exc.response is not None else "unknown"
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Assistant runtime HTTP {upstream_status}: {detail}") from exc
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=f"No se pudo contactar assistant-runtime: {exc}") from exc
 
 
 async def _openai_usage(runtime: dict, start: datetime) -> dict:

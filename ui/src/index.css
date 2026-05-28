@@ -370,3 +370,111 @@
   background: rgb(250 250 250);
   box-shadow: none;
 }
+
+.assistance-shell {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  background:
+    radial-gradient(circle at 50% 42%, rgba(14, 165, 233, 0.18), transparent 24rem),
+    linear-gradient(180deg, #061018 0%, #03070b 100%);
+}
+
+.assistance-layout {
+  min-height: 720px;
+}
+
+.assistance-shell-expanded {
+  max-height: 100dvh;
+}
+
+.assistance-shell-expanded .assistance-layout {
+  min-height: 0;
+}
+
+.assistance-panel {
+  border-color: rgb(103 232 249 / 0.1);
+  background: linear-gradient(180deg, rgb(8 25 36 / 0.86), rgb(3 12 18 / 0.94));
+}
+
+.assistance-grid-bg {
+  background-image:
+    linear-gradient(rgb(103 232 249 / 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(103 232 249 / 0.035) 1px, transparent 1px);
+  background-size: 42px 42px;
+  mask-image: radial-gradient(circle, black 0%, transparent 68%);
+}
+
+.assistance-core {
+  display: grid;
+  width: min(42vw, 340px);
+  min-width: 230px;
+  aspect-ratio: 1;
+  place-items: center;
+}
+
+.assistance-core .ring,
+.assistance-core .core-dot {
+  grid-area: 1 / 1;
+  border-radius: 999px;
+}
+
+.assistance-core .ring {
+  border: 1px solid rgb(103 232 249 / 0.24);
+  box-shadow: inset 0 0 30px rgb(34 211 238 / 0.09), 0 0 30px rgb(34 211 238 / 0.08);
+}
+
+.assistance-core .ring-one {
+  width: 100%;
+  height: 100%;
+  animation: assistance-spin 18s linear infinite;
+}
+
+.assistance-core .ring-two {
+  width: 74%;
+  height: 74%;
+  border-width: 10px;
+  border-color: rgb(34 211 238 / 0.17);
+  animation: assistance-spin 11s linear infinite reverse;
+}
+
+.assistance-core .ring-three {
+  width: 55%;
+  height: 55%;
+  border-width: 18px;
+  border-color: rgb(125 211 252 / 0.2);
+}
+
+.assistance-core .core-dot {
+  display: grid;
+  width: 35%;
+  height: 35%;
+  place-items: center;
+  background: radial-gradient(circle, rgb(103 232 249 / 0.34), rgb(12 74 110 / 0.54));
+  box-shadow: 0 0 48px rgb(34 211 238 / 0.28);
+}
+
+.assistance-core .core-dot span {
+  width: 48%;
+  height: 10%;
+  border-radius: 999px;
+  background: repeating-linear-gradient(90deg, rgb(34 211 238) 0 8px, transparent 8px 16px);
+  filter: drop-shadow(0 0 8px rgb(34 211 238));
+}
+
+.assistance-core.is-listening .core-dot {
+  animation: assistance-pulse 1.4s ease-in-out infinite;
+}
+
+.assistance-core.is-thinking .ring-two {
+  animation-duration: 4s;
+}
+
+@keyframes assistance-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes assistance-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}

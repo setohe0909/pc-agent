@@ -91,3 +91,8 @@ class IngestionControl(Protocol):
 
     async def trigger_run(self, target: str) -> IngestionRun:
         ...
+
+
+class AssistantRuntimeGateway(Protocol):
+    async def submit_request(self, payload: dict) -> dict:
+        ...

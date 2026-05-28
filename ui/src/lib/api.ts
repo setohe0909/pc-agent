@@ -83,3 +83,13 @@ export async function decideWhatsAppCampaign(campaignId: string, payload: any, a
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   return response.json();
 }
+
+export async function submitAssistantRequest(payload: unknown, adminToken: string) {
+  const response = await fetch(`${API_BASE}/assistant/request`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Admin-Token": adminToken },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return response.json();
+}

@@ -39,7 +39,9 @@ def _get_env(key: str, default: str | None = None) -> str | None:
 
 def _is_requests_channel(channel_id: int) -> bool:
     expected = _get_env("DISCORD_REQUESTS_CHANNEL_ID")
-    return bool(expected) and str(channel_id) == expected
+    if not expected:
+        return True
+    return str(channel_id) == expected
 
 
 def _approvers() -> set[str]:

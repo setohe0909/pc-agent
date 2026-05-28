@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import {
   Activity,
   BookOpen,
+  Bot,
   Brain,
   Camera,
   Code,
@@ -39,9 +40,11 @@ import { CoderWebView } from "@/components/views/CoderWebView";
 import { ConsolidationView } from "@/components/views/ConsolidationView";
 import { WhatsAppView } from "@/components/views/WhatsAppView";
 import { EmailView } from "@/components/views/EmailView";
+import { AssistanceView } from "@/components/views/AssistanceView";
 
 const navItems = [
   { value: "overview", label: "Resumen", icon: Home, group: "main" },
+  { value: "assistance", label: "Asistente", icon: Bot, group: "main" },
   { value: "knowledge", label: "Conocimiento", icon: FolderKanban, group: "main" },
   { value: "discord", label: "Discord", icon: Brain, group: "main" },
   { value: "marketing", label: "Marketing", icon: Megaphone, group: "main" },
@@ -68,6 +71,10 @@ const tabTitles: Record<string, { title: string; subtitle: string }> = {
   overview: {
     title: "PC Agent Operations Dashboard",
     subtitle: "Métricas, salud de servicios y señales de memoria para administrar la plataforma multiagente.",
+  },
+  assistance: {
+    title: "AURORA Asistente",
+    subtitle: "Interfaz conversacional por voz para coordinar agentes, runtime y Discord desde el admin.",
   },
   discord: {
     title: "Discord Control Plane",
@@ -122,6 +129,20 @@ const tabTitles: Record<string, { title: string; subtitle: string }> = {
     subtitle: "Documentación viva para operar y extender PC Agent.",
   },
 };
+
+const routeByTab: Record<string, string> = {
+  overview: "/",
+  assistance: "/assistance",
+};
+
+const tabByRoute: Record<string, string> = {
+  "/": "overview",
+  "/assistance": "assistance",
+};
+
+function tabFromLocation() {
+  return tabByRoute[window.location.pathname] || "overview";
+}
 
 type ServiceStatus = {
   name: string;
@@ -186,7 +207,7 @@ type DashboardData = {
 
 export default function App() {
   const [data, setData] = useState<DashboardData | null>(null);
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState(tabFromLocation);
   const [adminToken, setAdminToken] = useState(localStorage.getItem("pc_agent_admin_token") || "");
 
   const refresh = () => {
@@ -219,6 +240,20 @@ export default function App() {
     return () => clearInterval(iv);
   }, []);
 
+  useEffect(() => {
+    const onPopState = () => setActiveTab(tabFromLocation());
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    const nextPath = routeByTab[value] || "/";
+    if (window.location.pathname !== nextPath) {
+      window.history.pushState({}, "", nextPath);
+    }
+  };
+
   const handleSaveConfig = async (payload: unknown) => {
     try {
       await saveRuntimeConfig(payload, adminToken);
@@ -242,6 +277,7 @@ export default function App() {
   const renderContent = () => {
     switch (activeTab) {
       case "overview": return <OverviewView data={data} />;
+      case "assistance": return <AssistanceView data={data} adminToken={adminToken} />;
       case "discord": return <DiscordView data={data} adminToken={adminToken} onSave={handleSaveConfig} />;
       case "knowledge": return <KnowledgeView data={data} adminToken={adminToken} onRefresh={refresh} />;
       case "config": return <ConfigView data={data} adminToken={adminToken} onSave={handleSaveConfig} />;
@@ -266,7 +302,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#101010] text-neutral-950">
       <div className="min-h-screen bg-[#f7f7f6]">
-        <Tabs value={activeTab} onValueChange={setActiveTab} orientation="vertical" className="min-h-screen w-full flex-row gap-0">
+        <Tabs value={activeTab} onValueChange={handleTabChange} orientation="vertical" className="min-h-screen w-full flex-row gap-0">
           <aside className="app-sidebar fixed inset-y-0 left-0 z-20 flex w-[72px] flex-col border-r border-white/10 bg-[#171717] px-2 py-3 text-neutral-300 shadow-[14px_0_32px_rgba(0,0,0,0.18)] md:w-[248px] md:px-3">
             <div className="app-sidebar-brand mb-3 flex h-11 items-center justify-center gap-3 rounded-[8px] px-0 md:justify-start md:px-2">
               <div className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-[6px] bg-black ring-1 ring-white/10">
