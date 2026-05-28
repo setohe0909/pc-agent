@@ -73,7 +73,7 @@ const tabTitles: Record<string, { title: string; subtitle: string }> = {
     subtitle: "Métricas, salud de servicios y señales de memoria para administrar la plataforma multiagente.",
   },
   assistance: {
-    title: "AURORA Asistente",
+    title: "SAVITAR Asistente",
     subtitle: "Interfaz conversacional por voz para coordinar agentes, runtime y Discord desde el admin.",
   },
   discord: {

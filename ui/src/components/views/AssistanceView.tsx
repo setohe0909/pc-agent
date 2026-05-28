@@ -39,7 +39,7 @@ type AssistanceViewProps = {
   adminToken: string;
 };
 
-const assistantName = "AURORA";
+const assistantName = "SAVITAR";
 
 type AssistanceDashboardData = {
   status?: {
@@ -55,7 +55,9 @@ type AssistantResponse = {
 
 type SpeechRecognitionResultEventLike = {
   results?: {
+    length?: number;
     [index: number]: {
+      isFinal?: boolean;
       [index: number]: {
         transcript?: string;
       };
@@ -69,9 +71,14 @@ type SpeechRecognitionLike = {
   continuous: boolean;
   onresult: ((event: SpeechRecognitionResultEventLike) => void) | null;
   onend: (() => void) | null;
-  onerror: (() => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEventLike) => void) | null;
   start: () => void;
   stop: () => void;
+};
+
+type SpeechRecognitionErrorEventLike = {
+  error?: string;
+  message?: string;
 };
 
 type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
@@ -157,6 +164,28 @@ function speechChunks(text: string) {
   return chunks;
 }
 
+function isLocalOrSecureContext() {
+  return window.isSecureContext || ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
+}
+
+function recognitionErrorMessage(error?: string) {
+  switch (error) {
+    case "not-allowed":
+    case "service-not-allowed":
+      return "El navegador no tiene permiso para usar el microfono. Activalo en permisos del sitio y vuelve a intentar.";
+    case "audio-capture":
+      return "No encuentro un microfono disponible. Revisa que el microfono este conectado y no lo este usando otra app.";
+    case "no-speech":
+      return "No detecte voz. Pulsa el microfono otra vez y habla un poco mas cerca o durante mas tiempo.";
+    case "network":
+      return "El reconocimiento de voz del navegador no pudo conectar su servicio. Prueba Chrome o una conexion estable.";
+    case "aborted":
+      return "Dictado cancelado.";
+    default:
+      return "No pude iniciar el dictado. Revisa permisos de microfono y prueba de nuevo.";
+  }
+}
+
 export function AssistanceView({ data, adminToken }: AssistanceViewProps) {
   const [prompt, setPrompt] = useState("");
   const [activeAction, setActiveAction] = useState<AssistantAction>("chat");
@@ -234,6 +263,31 @@ export function AssistanceView({ data, adminToken }: AssistanceViewProps) {
     setMessages((current) => [...current, { id: crypto.randomUUID(), role, text, time: currentTime() }]);
   };
 
+  const ensureMicrophoneAccess = async () => {
+    if (!isLocalOrSecureContext()) {
+      appendMessage("system", "El dictado requiere HTTPS o localhost para acceder al microfono.");
+      return false;
+    }
+    if (!navigator.mediaDevices?.getUserMedia) {
+      return true;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach((track) => track.stop());
+      return true;
+    } catch (error) {
+      const name = error instanceof DOMException ? error.name : "";
+      if (name === "NotAllowedError" || name === "SecurityError") {
+        appendMessage("system", "El microfono esta bloqueado para este sitio. Abre los permisos del navegador y permite el microfono.");
+      } else if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+        appendMessage("system", "No encuentro un microfono disponible en este equipo.");
+      } else {
+        appendMessage("system", "No pude acceder al microfono. Revisa permisos o selecciona otro dispositivo de entrada.");
+      }
+      return false;
+    }
+  };
+
   const submitPrompt = async (rawPrompt = prompt) => {
     const cleanPrompt = rawPrompt.trim();
     if (!cleanPrompt || isSending) return;
@@ -271,7 +325,7 @@ export function AssistanceView({ data, adminToken }: AssistanceViewProps) {
     }
   };
 
-  const toggleListening = () => {
+  const toggleListening = async () => {
     const speechWindow = window as SpeechRecognitionWindow;
     const SpeechRecognitionApi = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
     if (!SpeechRecognitionApi) {
@@ -283,23 +337,37 @@ export function AssistanceView({ data, adminToken }: AssistanceViewProps) {
       setIsListening(false);
       return;
     }
+    const canUseMicrophone = await ensureMicrophoneAccess();
+    if (!canUseMicrophone) return;
     const recognition = new SpeechRecognitionApi();
-    recognition.lang = "es-CO";
-    recognition.interimResults = false;
+    recognition.lang = "es-419";
+    recognition.interimResults = true;
     recognition.continuous = false;
     recognition.onresult = (event) => {
-      const transcript = event.results?.[0]?.[0]?.transcript || "";
+      const index = Math.max((event.results?.length || 1) - 1, 0);
+      const transcript = event.results?.[index]?.[0]?.transcript || "";
+      if (!transcript.trim()) return;
       setPrompt(transcript);
-      void submitPrompt(transcript);
+      if (event.results?.[index]?.isFinal !== false) {
+        recognition.stop();
+        void submitPrompt(transcript);
+      }
     };
     recognition.onend = () => setIsListening(false);
-    recognition.onerror = () => {
-      appendMessage("system", "El dictado se detuvo antes de recibir audio claro.");
+    recognition.onerror = (event) => {
+      if (event.error !== "aborted") {
+        appendMessage("system", recognitionErrorMessage(event.error));
+      }
       setIsListening(false);
     };
     recognitionRef.current = recognition;
-    recognition.start();
-    setIsListening(true);
+    try {
+      recognition.start();
+      setIsListening(true);
+    } catch {
+      appendMessage("system", "El dictado ya estaba iniciandose. Espera un segundo y vuelve a pulsar el microfono.");
+      setIsListening(false);
+    }
   };
 
   return (
@@ -383,7 +451,7 @@ export function AssistanceView({ data, adminToken }: AssistanceViewProps) {
           </div>
 
           <div className="relative mt-12 flex items-center gap-4">
-            <Button type="button" size="icon-lg" variant="outline" title="Dictar" aria-label="Dictar" onClick={toggleListening} className="size-14 rounded-[8px] border-cyan-300/20 bg-cyan-950/50 text-cyan-100 hover:bg-cyan-900/60">
+            <Button type="button" size="icon-lg" variant="outline" title="Dictar" aria-label="Dictar" onClick={() => void toggleListening()} className="size-14 rounded-[8px] border-cyan-300/20 bg-cyan-950/50 text-cyan-100 hover:bg-cyan-900/60">
               {isListening ? <MicOff className="size-5" /> : <Mic className="size-5" />}
             </Button>
             <Button type="button" size="icon-lg" variant="outline" title="Voz" aria-label="Voz" onClick={() => setIsSpeaking((value) => !value)} className="size-14 rounded-[8px] border-cyan-300/20 bg-cyan-950/50 text-cyan-100 hover:bg-cyan-900/60">
